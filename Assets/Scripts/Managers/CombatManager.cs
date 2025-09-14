@@ -1114,8 +1114,8 @@ public class CombatManager : MonoBehaviour
             // Modyfikator za różnicę rozmiarów
             if (attackerStats.Size < targetStats.Size)
             {
-                attackModifier += (attackerStats.Size - targetStats.Size) * 2;
-                Debug.Log($"Uwzględniono modyfikator +{(attackerStats.Size - targetStats.Size) * 2} za różnicę rozmiarów. Łączny modyfikator: " + attackModifier);
+                attackModifier += (targetStats.Size - attackerStats.Size) * 2;
+                Debug.Log($"Uwzględniono modyfikator +{(targetStats.Size - attackerStats.Size) * 2} za różnicę rozmiarów. Łączny modyfikator: " + attackModifier);
             }
 
             // Sprawdza, czy na linii strzału znajduje się przeszkoda
