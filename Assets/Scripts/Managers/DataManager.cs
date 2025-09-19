@@ -911,7 +911,11 @@ public class SpellData
     public int Duration; // czas trwania zaklęcia
     public int Targets; // ilość celów
 
-    public bool SaveTestRequiring; // określa, czy zaklęcie powoduje konieczność wykonania testu obronnego
+    public string DamageType; // Rodzaj obrażeń, np. ice, poison, physical
+    public string SaveAttribute; // Cecha, która jest testowana u celu zaklęcia, aby się przed nim obronić
+    public string SaveSkill; // Umiejętność, która jest testowana u celu zaklęcia, aby się przed nim obronić
+
+    //public bool SaveTestRequiring; // określa, czy zaklęcie powoduje konieczność wykonania testu obronnego
     //public int AttributeValue; // określa o ile są zmieniane cechy opisane w tabeli Attribute
     //public string[] Attribute; // określa cechę, jaka jest testowana podczas próby oparcia się zaklęciu lub cechę na którą wpływa zaklęcie (np. podnosi ją lub obniża). Czasami jest to więcej cech, np. Pancerz Etery wpływa na każdą z lokalizacji
 

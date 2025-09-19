@@ -1,474 +1,67 @@
 {
   "Spells": [
     {
-      "Name": "Assault of Stone",
-      "Arcane": "Tradycja Światła",
-      "Type": [ "offensive", "magic-missile", "constant-strength", "constant-area-size"],
-      "CastingNumber": 12,
-      "Range": 1,
-      "Targets": 1,
-      "AreaSize": 10,
-      "Strength": 20,
-      "SaveTestRequiring": true,
-      "Attributes": [
-        {
-          "Key": "Dodge"
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Bitwy",
-      "Arcane": "Błogosławieństwa",
+      "Name": "Kamienna Skóra",
+      "Arcane": "Ścieżka Ziemi",
       "Type": [ "buff" ],
-      "Range": 3,
+      "CastingNumber": 16,
+      "Range": 1.5,
       "Targets": 1,
       "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "WW",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Charyzmy",
-      "Arcane": "Błogosławieństwa",
-      "Type": [ "buff" ],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "Ogd",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Finezji",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "Zr",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Łowów",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "US",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Mądrości",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "Int",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Odwagi",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "SW",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Siły",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "S",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Sprytu",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "I",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Uzdrawiania",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 1.5,
-      "Targets": 1,
-      "Attributes": [
-        {
-          "Key": "TempHealth",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Wdzięku",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "Zw",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błogosławieństwo Wytrzymałości",
-      "Arcane": "Błogosławieństwa",
-      "Type": ["buff"],
-      "Range": 3,
-      "Targets": 1,
-      "Duration": 6,
-      "Attributes": [
-        {
-          "Key": "Wt",
-          "Value": 10
-        }
-      ]
-    },
-    {
-      "Name": "Błyskawica T'Essli",
-      "Arcane": "Tradycja Niebios",
-      "Type": [ "offensive", "magic-missile", "buff" ],
-      "CastingNumber": 7,
-      "Range": 1,
-      "Targets": 1,
-      "Strength": 10
-    },
-    {
-      "Name": "Dar Ulryka",
-      "Arcane": "Cuda",
-      "Type": [ "buff"],
-      "Range": 1,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Frenzy",
-          "Value": 1
-        },
-        {
-          "Key": "IsFrenzy",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Dekoncentracja",
-      "Arcane": "Magia powszechna",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 4,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Distracting",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Gejzer",
-      "Arcane": "Tradycja Życia",
-      "Type": [ "offensive", "magic-missile"],
-      "CastingNumber": 8,
-      "Range": 1,
-      "Targets": 1,
-      "AreaSize": 1,
-      "Strength": 4,
-      "Attributes": [
-        {
-          "Key": "Prone",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Magiczna ochrona",
-      "Arcane": "Magia powszechna",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 5,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Ward",
-          "Value": 9
-        }
-      ]
-    },
-    {
-      "Name": "Meteoric Ironclad",
-      "Arcane": "Tradycja Metalu",
-      "Type": [ "buff", "constant-duration" ],
-      "CastingNumber": 7,
-      "Range": 1,
-      "AreaSize": 1,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Ward",
-          "Value": 4
-        }
-      ]
-    },
-    {
-      "Name": "Magiczne żądło",
-      "Arcane": "Magia prosta",
-      "Type": [ "offensive", "magic-missile" ],
-      "CastingNumber": 0,
-      "Range": 1,
-      "Targets": 1,
-      "Strength": 0
-    },
-    {
-      "Name": "Mądrość Sowy",
-      "Arcane": "Cuda",
-      "Type": [ "buff", "self-only" ],
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Int",
-          "Value": 20
-        }
-      ]
-    },
-    {
-      "Name": "Natchnienie",
-      "Arcane": "Tradycja Światła",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 8,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Int",
-          "Value": 20
-        },
-        {
-          "Key": "I",
-          "Value": 20
-        }
-      ]
-    },
-    {
-      "Name": "Pancerz Eteru",
-      "Arcane": "Magia powszechna",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 2,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "NaturalArmor",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Pocisk",
-      "Arcane": "Magia powszechna",
-      "Type": [ "offensive", "magic-missile" ],
-      "CastingNumber": 4,
-      "Range": 1,
-      "Targets": 1,
-      "Strength": 4
-    },
-    {
-      "Name": "Przerażający wygląd",
-      "Arcane": "Magia powszechna",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 4,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Terror",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Purpurowy całun",
-      "Arcane": "Tradycja Śmierci",
-      "Type": [ "buff", "self-only", "scaling-by-SW" ],
-      "CastingNumber": 9,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "NaturalArmor",
-          "Value": 1
-        },
-        {
-          "Key": "Fear",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Regeneracja",
-      "Arcane": "Tradycja Życia",
-      "Type": [ "buff" ],
-      "CastingNumber": 6,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Regeneration",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Skóra łowcy",
-      "Arcane": "Tradycja Zwierząt",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 6,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "Wt",
-          "Value": 20
-        },
-        {
-          "Key": "Fear",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Skóra z kory",
-      "Arcane": "Tradycja Życia",
-      "Type": [ "buff" ],
-      "CastingNumber": 3,
-      "Range": 1.5,
-      "Targets": 1,
-      "Duration": 1,
       "Attributes": [
         {
           "Key": "NaturalArmor",
           "Value": 2
         },
         {
-          "Key": "Zr",
-          "Value": -10
-        },
-        {
           "Key": "Zw",
-          "Value": -10
+          "Value": -2
         }
       ]
     },
     {
-      "Name": "Straszny wygląd",
-      "Arcane": "Magia powszechna",
-      "Type": [ "buff", "self-only" ],
-      "CastingNumber": 3,
+      "Name": "Kamienny Pocisk",
+      "Arcane": "Ścieżka Ziemi",
+      "Type": [ "offensive", "magic-missile" ],
+      "CastingNumber": 14,
+      "Range": 7.5,
+      "Targets": 1,
+      "SaveAttribute":  "Zw",
+      "SaveSkill": "Dodge"
+    },
+    {
+      "Name": "Ognisty Pocisk",
+      "Arcane": "Ścieżka Ognia",
+      "Type": [ "offensive", "magic-missile" ],
+      "CastingNumber": 14,
+      "Range": 10,
+      "Targets": 1,
+      "SaveAttribute": "Zw",
+      "SaveSkill": "Dodge"
+    },
+    {
+      "Name": "Regeneracja Tkanki",
+      "Arcane": "Ścieżka Ziemi",
+      "Type": [ "buff" ],
+      "CastingNumber": 12,
       "Range": 1.5,
       "Targets": 1,
-      "Duration": 1,
       "Attributes": [
         {
-          "Key": "Fear",
-          "Value": 1
+          "Key": "Bleeding",
+          "Value": -1
         }
       ]
     },
     {
-      "Name": "Tarcza Myrmidii",
-      "Arcane": "Cuda",
-      "Type": [ "buff", "targets-scaling-by-Int" ],
-      "Range": 1,
+      "Name": "Wodny Pocisk",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "offensive", "magic-missile" ],
+      "CastingNumber": 14,
+      "Range": 10,
       "Targets": 1,
-      "Duration": 1,
-      "Attributes": [
-        {
-          "Key": "NaturalArmor",
-          "Value": 1
-        }
-      ]
-    },
-    {
-      "Name": "Wybuch",
-      "Arcane": "Magia powszechna",
-      "Type": [ "offensive", "magic-missile"],
-      "CastingNumber": 4,
-      "Range": 1,
-      "Targets": 1,
-      "AreaSize": 1,
-      "Strength": 3
-    },
-    {
-      "Name": "Wyssanie",
-      "Arcane": "Magia prosta",
-      "Type": [ "offensive", "magic-missile", "self-attribute" ],
-      "CastingNumber": 0,
-      "Range": 1.5,
-      "Targets": 1,
-      "Strength": 0,
-      "Attributes": [
-        {
-          "Key": "TempHealth",
-          "Value": 1
-        }
-      ],
-      "ArmourIgnoring": true
-    }  
+      "SaveAttribute": "Zw",
+      "SaveSkill": "Dodge"
+    }
   ]
 }

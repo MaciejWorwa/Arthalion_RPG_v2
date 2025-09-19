@@ -805,7 +805,7 @@ public class CombatManager : MonoBehaviour
             StartCoroutine(AnimationManager.Instance.PlayAnimation("damage", null, target.gameObject, finalDamage));
 
             // Uwzględnienie cechy broni "Zatruta"
-            if (attackerWeapon.Poisonous > 0)
+            if (attackerWeapon != null && attackerWeapon.Poisonous > 0)
             {
                 // sprawdzamy odporności celu
                 bool immuneToPoison = (targetStats.Resistance != null && targetStats.Resistance.Contains("Poison")) || targetStats.Undead;

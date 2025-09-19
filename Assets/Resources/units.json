@@ -26,7 +26,7 @@
     {
       "Race": "Krasnolud",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Buzdygan", "Miecz", "Topór", "Młot bojowy" ],
+      "PrimaryWeaponNames": [ "Buława", "Miecz", "Topór", "Młot bojowy" ],
       "Sz": 3,
       "ExtraPoints": 4
     },
@@ -856,7 +856,7 @@
       "Undead": true,
       "Spellcasting": 1,
       "Magic": [ "Fire", "Ice", "Earth", "Water", "Air" ],
-      "Resistance": [ "Fire", "Ice", "Earth", "Water", "Air" ],
+      "Resistance": [ "Fire", "Ice", "Physical", "Electric", "Poison" ],
       "Unmeaning": true
     }
   ]

@@ -861,13 +861,11 @@ public class UnitsManager : MonoBehaviour
         Inventory inventory = unitGO.GetComponent<Inventory>();
         if (unit == null || stats == null) return;
 
-        // 1) Rzut 2k10
-        int roll = UnityEngine.Random.Range(1, 11) + UnityEngine.Random.Range(1, 11);
-
-        // 2) Podstawa: wyższa z P lub Zw
+        // Podstawa: wyższa z P lub Zw
         int baseAttr = Mathf.Max(stats.P, stats.Zw);
+        string attrKey = (baseAttr == stats.Zw) ? "Zw" : "P";
 
-        // 3) Modyfikator za cechę broni (Fast/Slow) – na podstawie EquippedWeapons
+        // Modyfikator za cechę broni (Fast/Slow) – na podstawie EquippedWeapons
         int weaponMod = 0;
         bool hasFast = false, hasSlow = false;
 
@@ -882,10 +880,10 @@ public class UnitsManager : MonoBehaviour
             else weaponMod = 0;
         }
 
-        // 4) Finalna inicjatywa wg zasad: 2k10 + max(P, Zw) ± modyfikatory broni
-        stats.Initiative = roll + baseAttr + weaponMod;
+        // Finalna inicjatywa
+        stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", attrKey, "Reflex", weaponMod)[3];
 
-        // 5) Aktualizacja kolejki inicjatywy — wpisujemy RZECZYWISTĄ wartość
+        // Aktualizacja kolejki inicjatywy — wpisujemy RZECZYWISTĄ wartość
         InitiativeQueueManager.Instance.InitiativeQueue[unit] = stats.Initiative;
         InitiativeQueueManager.Instance.UpdateInitiativeQueue();
 
@@ -1093,7 +1091,7 @@ public class UnitsManager : MonoBehaviour
 
         Stats stats = unit.GetComponent<Stats>();
 
-        if (stats.MagicLanguage > 0)
+        if (stats.Spellcasting > 0)
         {
             _spellbookButton.interactable = true;
             DataManager.Instance.LoadAndUpdateSpells(); //Aktualizuje listę zaklęć, które może rzucić jednostka

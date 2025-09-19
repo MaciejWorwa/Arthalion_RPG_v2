@@ -1,11 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using TMPro;
 using Unity.VisualScripting;
+using Unity.VisualScripting.Antlr3.Runtime.Misc;
 using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
 
 public class MagicManager : MonoBehaviour
 {
@@ -35,44 +38,20 @@ public class MagicManager : MonoBehaviour
     [SerializeField] private CustomDropdown _spellbookDropdown;
     [SerializeField] private UnityEngine.UI.Button _castSpellButton;
     public List<Spell> SpellBook = new List<Spell>();
-    [SerializeField] private UnityEngine.UI.Toggle _grimuarToggle;
     public static bool IsTargetSelecting;
     private float _spellDistance;
 
     public HashSet<GameObject> Targets = new HashSet<GameObject>();
     private List<Stats> _targetsStats; // Lista jednostek, które są wybierane jako cele zaklęcia, które pozwala wybrać więcej niż jeden cel
 
-    [Header("Panele do manualnego zarządzania")]
-    [SerializeField] private GameObject _dispellPanel;
-
     [Header("Panel do manualnego zarządzania krytycznym splecieniem zaklęcia")]
     [SerializeField] private GameObject _criticalCastingPanel;
-    [SerializeField] private UnityEngine.UI.Button _criticalWoundButton; // Zadaje dodatkowo ranę krytyczną, jeśli to zaklęcie zadające obrażenia
-    [SerializeField] private UnityEngine.UI.Button _forceCastButton; // Zaklęcie jest rzucone mimo niewystarczającego poziomu sukcesu
-    [SerializeField] private UnityEngine.UI.Button _antiDispellButton; // Zaklęcie nie może być rozproszone
     private string _criticalCastingString;
-
-    [Header("Panel do manualnego zarządzania overcastingiem")]
-    [SerializeField] private GameObject _overcastingPanel;
     [SerializeField] private UnityEngine.UI.Button _extraTargetButton;
     [SerializeField] private UnityEngine.UI.Button _extraDamageButton;
     [SerializeField] private UnityEngine.UI.Button _extraRangeButton;
     [SerializeField] private UnityEngine.UI.Button _extraAreaSizeButton;
     [SerializeField] private UnityEngine.UI.Button _extraDurationButton;
-    [SerializeField] private TMP_Text _overcastingLevelDisplay;
-    private List<string> _overcastingStrings = new List<string>();
-    private int _overcastingLevel;
-
-    [Header("Tradycje magii")]
-    [SerializeField] private List<UnityEngine.UI.Toggle> _arcanesToggles;
-    [SerializeField] private UnityEngine.UI.Toggle _aqshyToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _azyrToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _chamonToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _ghurToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _ghyranToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _hyshToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _shyishToggle;
-    [SerializeField] private UnityEngine.UI.Toggle _ulguToggle;
 
     void Start()
     {
@@ -81,26 +60,11 @@ public class MagicManager : MonoBehaviour
 
         _targetsStats = new List<Stats>();
 
-        _arcanesToggles = new List<UnityEngine.UI.Toggle> {
-        _aqshyToggle, _azyrToggle, _chamonToggle,
-        _ghurToggle, _ghyranToggle, _hyshToggle,
-        _shyishToggle, _ulguToggle
-        };
-
-        foreach (var toggle in _arcanesToggles)
-        {
-            toggle.onValueChanged.AddListener((isOn) => OnArcaneToggleChanged(toggle, isOn));
-        }
-
-        _criticalWoundButton.onClick.AddListener(() => CriticalCastingButtonClick("critical_wound"));
-        _forceCastButton.onClick.AddListener(() => CriticalCastingButtonClick("force_cast"));
-        _antiDispellButton.onClick.AddListener(() => CriticalCastingButtonClick("anti_dispell"));
-
-        _extraTargetButton.onClick.AddListener(() => OvercastingButtonClick(_extraTargetButton.gameObject, "target"));
-        _extraDamageButton.onClick.AddListener(() => OvercastingButtonClick(_extraDamageButton.gameObject, "damage"));
-        _extraRangeButton.onClick.AddListener(() => OvercastingButtonClick(_extraRangeButton.gameObject, "range"));
-        _extraAreaSizeButton.onClick.AddListener(() => OvercastingButtonClick(_extraAreaSizeButton.gameObject, "area_size"));
-        _extraDurationButton.onClick.AddListener(() => OvercastingButtonClick(_extraDurationButton.gameObject, "duration"));
+        _extraTargetButton.onClick.AddListener(() => CriticalButtonClick(_extraTargetButton.gameObject, "target"));
+        _extraDamageButton.onClick.AddListener(() => CriticalButtonClick(_extraDamageButton.gameObject, "damage"));
+        _extraRangeButton.onClick.AddListener(() => CriticalButtonClick(_extraRangeButton.gameObject, "range"));
+        _extraAreaSizeButton.onClick.AddListener(() => CriticalButtonClick(_extraAreaSizeButton.gameObject, "area_size"));
+        _extraDurationButton.onClick.AddListener(() => CriticalButtonClick(_extraDurationButton.gameObject, "duration"));
     }
 
     #region Channeling magic
@@ -134,7 +98,7 @@ public class MagicManager : MonoBehaviour
     {
         if (Unit.SelectedUnit == null) return;
 
-        if (Unit.SelectedUnit.GetComponent<Stats>().MagicLanguage == 0)
+        if (Unit.SelectedUnit.GetComponent<Stats>().Spellcasting == 0)
         {
             Debug.Log("Wybrana jednostka nie może rzucać zaklęć.");
             return;
@@ -175,17 +139,14 @@ public class MagicManager : MonoBehaviour
         Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
         Spell spell = Unit.SelectedUnit.GetComponent<Spell>();
 
-        SetArcaneToggle(spell);
-
         unit.CanCastSpell = false;
         _criticalCastingString = "";
-        _overcastingStrings.Clear();
 
         int rollResult = 0;
         int[] castingTest = null;
         if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Rzucanie Zaklęć", "SW", "Spellcasting", callback: result => castingTest = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Rzucanie Zaklęć", "SW", "Spellcasting", difficultyLevel: spell.CastingNumber, callback: result => castingTest = result));
             if (castingTest == null) yield break;
         }
         else
@@ -194,38 +155,30 @@ public class MagicManager : MonoBehaviour
         }
         rollResult = castingTest[3];
 
-        // Modyfikator za zbroję
-        int modifier = CalculateArmorModifier(stats);
-
-        string color = rollResult >= spell.CastingNumber ? "green" : "red"; // Zielony, jeśli >= CastingNumber, inaczej czerwony
-        Debug.Log($"{stats.Name} splata zaklęcie. Uzyskane poziomy sukcesu: <color={color}>{rollResult}/{spell.CastingNumber}</color>.");
-
         bool spellFailed = spell.CastingNumber - rollResult > 0;
-        Debug.Log(spellFailed ? $"Rzucanie zaklęcia {spell.Name} nie powiodło się." : $"Zaklęcie {spell.Name} zostało splecione pomyślnie.");
-
-        CheckForChaosManifestation(stats, rollResult, castingTest[3], spell.Arcane == "Cuda" || spell.Arcane == "Błogosławieństwa" ? "Pray" : "MagicLanguage", spell.CastingNumber - rollResult);
+        Debug.Log(spellFailed ? $"Rzucanie zaklęcia {spell.Name} nie powiodło się." : $"Zaklęcie {spell.Name} zostało rzucone pomyślnie.");
 
         // Zresetowanie zaklęcia
         ResetSpellCasting();
 
         // Krytyczne rzucenie zaklęcia
-        if (DiceRollManager.Instance.IsDoubleDigit(rollResult, rollResult) && rollResult <= stats.Int + stats.MagicLanguage)
+        if (DiceRollManager.Instance.IsDoubleDigit(castingTest[0], castingTest[1]))
         {
-            StartCoroutine(CriticalCastingRoll(spell, spellFailed));
+            GodsWrath(stats, spell.CastingNumber);
+
+            if(!spellFailed)
+            {
+                CriticalCasting(spell);
+            }
         }
 
-        if(rollResult - spell.CastingNumber > 0)
-        {
-            StartCoroutine(Overcasting(spell, rollResult - spell.CastingNumber));
-        }
-
-        while (_criticalCastingPanel.activeSelf || _overcastingPanel.activeSelf)// || _overcastingBlessingPanel.activeSelf)
+        while (_criticalCastingPanel.activeSelf)
         {
             yield return null;
         }
 
         // Zaklęcie nie zostało w pełni splecione - przerywamy funkcję
-        if (spellFailed && _criticalCastingString != "force_cast") yield break;
+        if (spellFailed) yield break;
 
         GridManager.Instance.ResetColorOfTilesInMovementRange();
 
@@ -233,14 +186,11 @@ public class MagicManager : MonoBehaviour
         _targetsStats.Clear();
 
         //Zmienia kolor przycisku na aktywny
-        _castSpellButton.GetComponent<UnityEngine.UI.Image>().color = Color.green;
+        _castSpellButton.GetComponent<UnityEngine.UI.Image>().color = UnityEngine.Color.green;
 
         Debug.Log("Kliknij prawym przyciskiem myszy na jednostkę, która ma być celem zaklęcia.");
 
-        if(spell.Type.Contains("targets-scaling-by-Int"))
-        {
-            spell.Targets = stats.Int / 10;
-        }
+        if (_criticalCastingString == "target") spell.Targets *= 2;
 
         while (Targets.Count < spell.Targets)
         {
@@ -255,21 +205,21 @@ public class MagicManager : MonoBehaviour
 
             //Sprawdza dystans
             _spellDistance = CombatManager.Instance.CalculateDistance(Unit.SelectedUnit, target);
-            float baseStat = spell.Arcane == "Cuda" ? stats.Ch : stats.SW;
-            float spellRange = spell.Range == 1.5f || spell.Arcane == "Błogosławieństwa" ? spell.Range : spell.Range * baseStat / 2f; // Zazwyczaj zasięg zaklęcia jest zależny od Siły Woli lub Ogłady czarodzieja. Czary dotykowe mają zasięg równy 1.5f
-            Debug.Log($"Dystans: {_spellDistance}. Zasięg zaklęcia: {spellRange}");
 
-            if (_spellDistance > spellRange)
+            if (_criticalCastingString == "range") spell.Range *= 2;
+
+            Debug.Log($"Dystans do celu: {_spellDistance}. Zasięg zaklęcia: {spell.Range}");
+
+            if (_spellDistance > spell.Range)
             {
                 Debug.Log($"{targetStats.Name} znajduje się poza zasięgiem zaklęcia.");
                 continue;
             }
 
-            // Ustala obszar działania zaklęcia. Zwykle jest to mnożnik bonusu z Siły Woli
-            float areaSize = spell.Type.Contains("constant-area-size") ? spell.AreaSize : spell.AreaSize * (stats.SW / 10) / 2f;
+            if (_criticalCastingString == "area_size") spell.AreaSize *= 2;
 
             // Pobiera wszystkie collidery w obszarze działania zaklęcia
-            List<Collider2D> allTargets = Physics2D.OverlapCircleAll(target.transform.position, areaSize).ToList();
+            List<Collider2D> allTargets = Physics2D.OverlapCircleAll(target.transform.position, spell.AreaSize).ToList();
 
             // Filtruje wśród colliderów jednostki, na których można użyć tego zaklęcia
             allTargets.RemoveAll(collider =>
@@ -284,78 +234,10 @@ public class MagicManager : MonoBehaviour
                 continue;
             }
 
-            //Czary dotykowe (ofensywne)
-            if (spell.Range == 1.5f && spell.Type.Contains("offensive"))
-            {
-                //Zresetowanie broni, aby zaklęcie dotykowe było wykonywane przy pomocy rąk
-                stats.GetComponent<Weapon>().ResetWeapon();
-                Weapon attackerWeapon = stats.GetComponent<Weapon>();
-
-                int touchRollResult = 0;
-
-                int[] attackerTest = null;
-                if (!GameManager.IsAutoDiceRollingMode && unit.CompareTag("PlayerUnit"))
-                {
-                    yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Walkę Wręcz", "Zr", "MeleeCombat", callback: result => attackerTest = result));
-                    if (attackerTest == null) yield break;
-                }
-                else
-                {
-                    attackerTest = DiceRollManager.Instance.TestSkill(stats, "Walkę Wręcz", "Zr", "MeleeCombat");
-                }
-                touchRollResult = attackerTest[3];
-
-
-                //Próba obrony przed dotknięciem
-
-                int parryValue = 0;
-                int dodgeValue = 0;
-
-                Weapon targetWeapon = InventoryManager.Instance.ChooseWeaponToAttack(target);
-                Weapon weaponUsedForParry = CombatManager.Instance.GetBestParryWeapon(targetStats, targetWeapon);
-                int parryModifier = CombatManager.Instance.CalculateParryModifier(targetUnit, targetStats, stats, weaponUsedForParry);
-                int dodgeModifier = CombatManager.Instance.CalculateDodgeModifier(targetUnit, unit);
-
-                //Modyfikator za strach
-                if (targetUnit.Scared)
-                {
-                    parryModifier -= 2;
-                    dodgeModifier -= 2;
-                    Debug.Log($"Uwzględniono modyfikator -2 za strach.");
-                }
-
-                string parryModifierString = parryModifier != 0 ? $" Modyfikator: {parryModifier}," : "";
-                string dodgeModifierString = dodgeModifier != 0 ? $" Modyfikator: {dodgeModifier}," : "";
-
-                // Obliczamy sumaryczną wartość parowania i uniku
-                //MeleeCategory targetMeleeSkill = EnumConverter.ParseEnum<MeleeCategory>(targetWeapon.Category) ?? MeleeCategory.Basic;
-                parryValue = targetStats.Zr + parryModifier;
-                dodgeValue = targetStats.Dodge + targetStats.Zw + dodgeModifier;
-
-                // Funkcja obrony
-                yield return StartCoroutine(CombatManager.Instance.Defense(targetUnit, targetStats, weaponUsedForParry, parryValue, dodgeValue, parryModifier, dodgeModifier, true));
-
-
-                // Sprawdzenie warunku trafienia
-                if (touchRollResult < CombatManager.Instance.DefenceResults[3])
-                {
-                    Debug.Log($"Atak skierowany w {targetStats.Name} chybił.");
-                    continue;
-                }
-            }
-
-
-
-
-
-
-
-
-            int finalSuccessLevel = 0;
             // Wywołanie efektu zaklęcia
             foreach (var collider in allTargets)
             {
-                StartCoroutine(HandleSpellEffect(stats, collider.GetComponent<Stats>(), spell, rollResult, 0));
+                StartCoroutine(HandleSpellEffect(stats, collider.GetComponent<Stats>(), spell, rollResult, castingTest));
             }
         }  
 
@@ -365,7 +247,7 @@ public class MagicManager : MonoBehaviour
     public void ResetSpellCasting()
     {
         IsTargetSelecting = false;
-        _castSpellButton.GetComponent<UnityEngine.UI.Image>().color = Color.white;
+        _castSpellButton.GetComponent<UnityEngine.UI.Image>().color = UnityEngine.Color.white;
 
         if (Unit.SelectedUnit != null)
         {
@@ -375,17 +257,16 @@ public class MagicManager : MonoBehaviour
     #endregion
 
     #region Handle spell effect
-    private IEnumerator HandleSpellEffect(Stats spellcasterStats, Stats targetStats, Spell spell, int rollResult, int successLevel)
+    private IEnumerator HandleSpellEffect(Stats spellcasterStats, Stats targetStats, Spell spell, int rollResult, int[] castingTest)
     {
         Unit targetUnit = targetStats.GetComponent<Unit>();
+        int successLevel = 0;
+
+        if (_criticalCastingString == "duration") spell.Duration *= 2;
 
         //Uwzględnienie czasu trwania zaklęcia, które wpływa na statystyki postaci
         if (spell.Duration != 0 && spell.Type.Contains("buff"))
         {
-            // Obliczenie czasu trwania efektu – przykładowo modyfikowany przez Siłę Woli (SW) lub Ogładę
-            int baseStat = spell.Arcane == "Cuda" ? spellcasterStats.Ch : spellcasterStats.SW;
-            int effectDuration = spell.Type.Contains("constant-duration") || spell.Arcane == "Błogosławieństwa" ? spell.Duration : spell.Duration * (baseStat / 10);
-
             // Przygotowanie słownika modyfikacji – iterujemy po liście atrybutów, które zaklęcie ma zmieniać
             Dictionary<string, int> modifications = new Dictionary<string, int>();
 
@@ -409,46 +290,43 @@ public class MagicManager : MonoBehaviour
             var existingEffect = targetStats.ActiveSpellEffects.FirstOrDefault(e => e.SpellName == spell.Name);
             if (existingEffect != null)
             {
-                existingEffect.RemainingRounds = effectDuration;
+                existingEffect.RemainingRounds = spell.Duration;
                 Debug.Log($"Nadpisujemy poprzedni efekt zaklęcia {spell.Name} u {targetStats.Name}.");
                 yield break;
             }
 
             // Tworzymy nowy efekt
-            SpellEffect newEffect = new SpellEffect(spell.Name, effectDuration, modifications);
+            SpellEffect newEffect = new SpellEffect(spell.Name, spell.Duration, modifications);
             targetStats.ActiveSpellEffects.Add(newEffect);
         }
 
-        // Uwzględnienie testu obronnego
-        if (spell.SaveTestRequiring == true && spell.Attributes != null && spell.Attributes.Count > 0)
+        //Próba obrony przed zaklęciem
+        if (!string.IsNullOrEmpty(spell.SaveAttribute) || !string.IsNullOrEmpty(spell.SaveSkill))
         {
             // Pobiera pierwszy atrybut jako ten, który służy do testu obronnego
-            string attributeName = spell.Attributes.First().Key;  // Zmieniono dostęp do atrybutu, teraz używamy First()
+            // string attributeName = spell.Attributes.First().Key;  // Zmieniono dostęp do atrybutu, teraz używamy First()
 
-            // Rzut na test obronny
             int saveRollResult = 0;
+
+            string saveName = !string.IsNullOrEmpty(spell.SaveSkill) ? spell.SaveSkill : spell.SaveAttribute;
+
             int[] saveTest = null;
-            if (!GameManager.IsAutoDiceRollingMode && targetStats.CompareTag("PlayerUnit"))
+            if (!GameManager.IsAutoDiceRollingMode && targetUnit.CompareTag("PlayerUnit"))
             {
-                yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, $"rzut obronny na ({attributeName})", attributeName, callback: result => saveTest = result));
+                yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill, difficultyLevel: rollResult, callback: result => saveTest = result));
                 if (saveTest == null) yield break;
             }
             else
             {
-                saveTest = DiceRollManager.Instance.TestSkill(targetStats, $"rzut obronny na ({attributeName})", attributeName);
+                saveTest = DiceRollManager.Instance.TestSkill(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill);
             }
             saveRollResult = saveTest[3];
 
-            string skillName = null;
-            if(attributeName == "Dodge")
-            {
-                attributeName = "Zw";
-                skillName = "Dodge";
-            }
 
-            if (saveRollResult < 12)
+            if (saveRollResult <= rollResult)
             {
                 Debug.Log($"{targetStats.Name} nie udało się przeciwstawić zaklęciu.");
+                successLevel = rollResult - saveRollResult;
             }
             else
             {
@@ -485,12 +363,6 @@ public class MagicManager : MonoBehaviour
 
                 int value = baseValue;
 
-                // Tylko pierwszy atrybut jest skalowany przez SW
-                if (i == 0 && spell.Type.Contains("attribute-scaling-by-SW"))
-                {
-                    value *= affectedStats.SW / 10;
-                }
-
                 if (field.FieldType == typeof(bool))
                 {
                     bool boolValue = value != 0;
@@ -507,13 +379,21 @@ public class MagicManager : MonoBehaviour
                             field.SetValue(affectedStats, newValue);
                             affectedUnit.DisplayUnitHealthPoints();
                             UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
-                            Debug.Log($"{affectedStats.Name} odzyskuje {value} punktów tymczasowej Żywotności.");
+                            Debug.Log($"{affectedStats.Name} odzyskuje {value} punktów Żywotności.");
                         }
                     }
                     else
                     {
                         int current = (int)field.GetValue(targetObject);
-                        field.SetValue(targetObject, current + value);
+                        int newValue = current + value;
+
+                        // jeśli pole to Bleeding albo Poison -> zabezpieczenie przed < 0
+                        if (field.Name == "Bleeding" || field.Name == "Poison")
+                        {
+                            newValue = Mathf.Max(0, newValue);
+                        }
+
+                        field.SetValue(targetObject, newValue);
                         Debug.Log($"Zaklęcie {spell.Name} zmienia u {affectedStats.Name} cechę {attributeName} o {value}.");
                     }
 
@@ -530,49 +410,53 @@ public class MagicManager : MonoBehaviour
         //Zaklęcia zadające obrażenia
         if (!spell.Type.Contains("no-damage") && spell.Type.Contains("offensive"))
         {
-            StartCoroutine(DealMagicDamage(spellcasterStats, targetStats, spell, rollResult, successLevel));
+            StartCoroutine(DealMagicDamage(spellcasterStats, targetStats, spell, successLevel, castingTest));
         }
     }
 
-    // START: zaktualizowana wersja jako korutyna
     public IEnumerator DealMagicDamage(
         Stats spellcasterStats,
         Stats targetStats,
         Spell spell,
-        int rollResult,
-        int successLevel)
+        int successLevel,
+        int[] castingTest)
     {
         if (spellcasterStats == null || targetStats == null || spell == null)
             yield break;
 
-        int damage = spell.Type != null && spell.Type.Contains("constant-strength")
-            ? spell.Strength
-            : successLevel + spell.Strength;
+        int damage = spell.Type != null && spell.Type.Contains("constant-strength") ? spell.Strength : successLevel;
 
-        Debug.Log($"Poziom sukcesu {spellcasterStats.Name}: {successLevel}. Siła zaklęcia: {spell.Strength}");
+        //Debug.Log($"Poziom sukcesu {spellcasterStats.Name}: {successLevel}. Siła zaklęcia: {spell.Strength}");
 
-        // === USTALENIE LOKACJI TRAFIENIA (czeka na wybór przy 9–10) ===
-        string unnormalizedHitLocation = CombatManager.Instance.HitLocation;
+        if (_criticalCastingString == "damage") damage *= 2;
+
+        Debug.Log($"Łączne obrażenia zadane przez {spellcasterStats.Name}: <color=#4dd2ff>{damage}</color>");
+
+        // --- Ustalamy miejsce trafienia ---
+        int roll1 = castingTest[0];
+        int roll2 = castingTest[1];
+        int chosenValue;
+
+        // domyślnie bierzemy niższą z kości
+        chosenValue = roll1 > roll2 ? roll2 : roll1;
+
+        string unnormalizedHitLocation = !string.IsNullOrEmpty(CombatManager.Instance.HitLocation) ? CombatManager.Instance.HitLocation : null;
 
         if (string.IsNullOrEmpty(unnormalizedHitLocation))
         {
-            // Korutyna sama obsłuży: 1–8 natychmiast, 9–10 panel wyboru, AutoCombat → najsłabsza lokacja
-            string resolved = null;
-            yield return CombatManager.Instance.StartCoroutine(
-                CombatManager.Instance.DetermineHitLocationCoroutine(
-                    rollResult,
-                    targetStats,
-                    onResolved: loc => resolved = loc
-                )
-            );
-            unnormalizedHitLocation = resolved;
+            // uruchom korutynę wyboru lokacji; wynik przyjdzie w callbacku
+            yield return StartCoroutine(CombatManager.Instance.DetermineHitLocationCoroutine(
+                chosenValue,
+                targetStats,
+                location => unnormalizedHitLocation = location
+            ));
         }
 
         string hitLocation = CombatManager.Instance.NormalizeHitLocation(unnormalizedHitLocation);
 
         // === PANCERZ CELU (bezpiecznie) ===
         int metalArmorValue = 0;
-        int armor = CombatManager.Instance.CalculateArmor(targetStats, hitLocation, null, out metalArmorValue);
+        int armor = CombatManager.Instance.CalculateArmor(targetStats, unnormalizedHitLocation, null, out metalArmorValue);
 
         var inventory = targetStats.GetComponent<Inventory>();
         var dict = inventory != null ? inventory.ArmorByLocation : null;
@@ -584,20 +468,16 @@ public class MagicManager : MonoBehaviour
 
 
         // IGNOROWANIE PANCERZA
-        if (spell.ArmourIgnoring || (_ulguToggle != null && _ulguToggle.isOn))
-            armor = 0;
+        if (spell.ArmourIgnoring) armor = 0;
 
-        if ((spell.MetalArmourIgnoring ||
-             (_chamonToggle != null && _chamonToggle.isOn) ||
-             (_azyrToggle != null && _azyrToggle.isOn)) && metalArmorValue != 0)
+        if (spell.MetalArmourIgnoring && metalArmorValue != 0)
         {
             armor -= metalArmorValue; // może zejść poniżej zera – dalej i tak zclampujesz w ApplyDamageToTarget
 
-            // Chamon: obrażenia + wartość metalowego pancerza
-            if (_chamonToggle != null && _chamonToggle.isOn && metalArmorValue > 0)
+            if (spell.Type.Contains("electric") && metalArmorValue > 0)
             {
                 damage += metalArmorValue;
-                Debug.Log($"{targetStats.Name} otrzymuje +{metalArmorValue} obrażeń za metalowy pancerz (Tradycja Metalu).");
+                Debug.Log($"{targetStats.Name} otrzymuje +{metalArmorValue} obrażeń za metalowy pancerz.");
             }
         }
 
@@ -607,7 +487,8 @@ public class MagicManager : MonoBehaviour
             armor,
             spellcasterStats,
             targetStats,
-            targetStats.GetComponent<Unit>()
+            targetStats.GetComponent<Unit>(),
+            damageType: spell.DamageType
         );
 
         // === KRYTYK / ŚMIERĆ ===
@@ -622,378 +503,189 @@ public class MagicManager : MonoBehaviour
                 yield return StartCoroutine(CombatManager.Instance.CriticalWoundRoll(spellcasterStats, targetStats, unnormalizedHitLocation));
             }
         }
-
-        // === TRADYCJA NIEBIOS: przeskok na sąsiadów ===
-        if (_azyrToggle != null && _azyrToggle.isOn)
-        {
-            Vector2 targetPos = targetStats.transform.position;
-            Unit[] unitsAroundTarget = CombatManager.Instance.GetAdjacentUnits(targetPos, targetStats.GetComponent<Unit>());
-
-            foreach (Unit adjacentUnit in unitsAroundTarget)
-            {
-                if (adjacentUnit == null) continue;
-
-                var adjStats = adjacentUnit.GetComponent<Stats>();
-                int adjacentUnitArmor = CombatManager.Instance.CalculateArmor(adjStats, hitLocation);
-
-                int electricDamage = (spellcasterStats.SW / 10) + UnityEngine.Random.Range(1, 11);
-                Debug.Log($"{adjacentUnit.Stats.Name} otrzymuje {electricDamage} obrażeń (wyładowanie – Tradycja Niebios).");
-
-                CombatManager.Instance.ApplyDamageToTarget(
-                    electricDamage,
-                    adjacentUnitArmor,
-                    spellcasterStats,
-                    adjStats,
-                    adjacentUnit
-                );
-            }
-        }
-
-        // === KRYTYK Z RZUTU NA MAGIĘ ===
-        if (_criticalCastingString == "critical_wound")
-        {
-            yield return StartCoroutine(CombatManager.Instance.CriticalWoundRoll(spellcasterStats, targetStats, unnormalizedHitLocation));
-        }
     }
     #endregion
 
-    #region Critical casting
-    public IEnumerator CriticalCastingRoll(Spell spell, bool spellFailed)
+    #region Critical Casting
+    public void CriticalCasting(Spell spell)
     {
-        // Wyświetlenie panelu akcji i oczekiwanie na wybór gracza
-        _criticalCastingString = "";
-        if (_criticalCastingPanel != null)
-        {
-            _criticalWoundButton.interactable = spell.Type.Contains("offensive") && !spellFailed;
-            _antiDispellButton.interactable = !spellFailed;
-            _forceCastButton.interactable = spellFailed;
+        if (_criticalCastingPanel == null) return;
 
-            _criticalCastingPanel.SetActive(true);
-            yield return new WaitUntil(() => !string.IsNullOrEmpty(_criticalCastingString));
-            _criticalCastingPanel.SetActive(false);
-        }
-        else yield break;
+        _extraTargetButton.interactable = !spell.Type.Contains("self-only") && spell.AreaSize == 0;
+        _extraDamageButton.interactable = spell.Type.Contains("magic-missile");
+        _extraRangeButton.interactable = spell.Range != 1.5f;
+        _extraAreaSizeButton.interactable = spell.AreaSize != 0;
+        _extraDurationButton.interactable = spell.Duration != 0;
+
+        _criticalCastingPanel.SetActive(true);
     }
 
-    private void CriticalCastingButtonClick(string action)
+    private void CriticalButtonClick(GameObject button, string action)
     {
+        if (Unit.SelectedUnit == null || Unit.SelectedUnit.GetComponent<Spell>() == null) return;
+
+        string arcane = Unit.SelectedUnit.GetComponent<Spell>().Arcane;
+
         _criticalCastingString = action;
     }
     #endregion
 
-    #region Overcasting
 
-    // Wartości z tabeli Overcastingu
-    int[] targetValues = { 1, 1, 1, 2, 2, 2, 3 };
-    int[] damageValues = { 1, 2, 3, 4, 5, 6, 7 };
-    int[] rangeMultipliers = { 2, 2, 2, 3, 3, 3, 4 };
-    int[] areaMultipliers = { 1, 1, 2, 2, 2, 2, 3 };
-    int[] durationMultipliers = { 1, 2, 2, 2, 3, 3, 3 };
-
-    public IEnumerator Overcasting(Spell spell, int successLevels)
+    #region Gods Wrath
+    public IEnumerator GodsWrath(Stats stats, int spellLevel)
     {
-        _overcastingLevel = successLevels;
-        _overcastingLevelDisplay.text = "PS do rozdania: " + _overcastingLevel.ToString();
-        _overcastingStrings.Clear();
-        ClearAllOvercastCounterTexts();
-
-        if (_overcastingPanel != null)// && spell.Arcane != "Błogosławieństwa")
+        // Jeżeli jesteśmy w trybie manualnych rzutów kośćmi i wybrana jednostka to sojusznik to czekamy na wynik rzutu
+        int[] test = null;
+        if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))
         {
-            _extraTargetButton.interactable = !spell.Type.Contains("self-only") && spell.AreaSize == 0;
-            _extraDamageButton.interactable = spell.Type.Contains("magic-missile");
-            _extraRangeButton.interactable = spell.Range != 1.5f;
-            _extraAreaSizeButton.interactable = spell.AreaSize != 0;
-            _extraDurationButton.interactable = spell.Duration != 0;
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Gniew Boży", null, "Religious", spellLevel, callback: result => test = result));
+            if (test == null) yield break;
+        }
+        else
+        {
+            test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, "Religious", spellLevel);
+        }
 
-            _overcastingPanel.SetActive(true);
+        int score = test[3];
 
-            // Czekaj, aż gracz wybierze wszystkie efekty albo zamknie panel
-            yield return new WaitUntil(() => _overcastingLevel == 0 || !_overcastingPanel.activeSelf);
+        // Notka dołączana do każdego loga
+        const string manualNote = " <color=orange>Efekt uwzględnij ręcznie</color>.";
 
-            var effectCounts = new Dictionary<string, int>
+        // Helper do 6 rund
+        const string oneMinute = "6 rund";
+
+        // Efekty wg progu wyniku
+        if (score >= 4 && score <= 13)
+        {
+            Debug.Log($"{stats.Name}: Migotanie – zaklęcie zadziała na początku następnej tury rzucającego.{manualNote}");
+        }
+        else if (score >= 14 && score <= 15)
+        {
+            Debug.Log($"{stats.Name}: Rozbłysk – impuls magiczny oślepia rzucającego na 1 turę (stan Oślepienie).{manualNote}");
+        }
+        else if (score == 16)
+        {
+            Debug.Log($"{stats.Name}: Zwarcie magiczne – skóra pokrywa się iskrami; rzucający traci k4 Punktów Zdrowia.{manualNote}");
+        }
+        else if (score == 17)
+        {
+            Debug.Log($"{stats.Name}: Zanik mocy – brak możliwości rzucania zaklęć w następnej turze.{manualNote}");
+        }
+        else if (score == 18)
+        {
+            Debug.Log($"{stats.Name}: Przeciążenie umysłu – do końca starcia -2 do testów opartych na Inteligencji i Percepcji.{manualNote}");
+        }
+        else if (score == 19)
+        {
+            Debug.Log($"{stats.Name}: Echo – każdy dźwięk powtarza się szeptem przez minutę; testy Słuchu -5 do końca starcia.{manualNote}");
+        }
+        else if (score == 20)
+        {
+            Debug.Log($"{stats.Name}: Ślepe Oko Bogów – zaklęcie działa, ale trafia losowy cel w zasięgu (wszyscy rzucają 2k10, najwyższy wynik = cel).{manualNote}");
+        }
+        else if (score == 21)
+        {
+            Debug.Log($"{stats.Name}: Zwrot energii – zaklęcie działa, ale uderza w rzucającego; jeśli już był celem, dodatkowo traci k6 Punktów Zdrowia.{manualNote}");
+        }
+        else if (score == 22)
+        {
+            Debug.Log($"{stats.Name}: Wstrząs magiczny – k10 obrażeń ignorujących pancerz.{manualNote}");
+        }
+        else if (score == 23)
+        {
+            Debug.Log($"{stats.Name}: Paraliż – ciało sztywnieje na k4 tury; brak ruchu i akcji; traktowany jak w Utracie Przytomności.{manualNote}");
+        }
+        else if (score == 24)
+        {
+            int senseRoll = UnityEngine.Random.Range(1, 7); // k6 tylko do opisu
+            string sense = senseRoll <= 2 ? "wzroku" : (senseRoll <= 4 ? "słuchu" : "dotyku");
+            Debug.Log($"{stats.Name}: Zanik zmysłu – utrata {sense} na minutę ({oneMinute}).{manualNote}");
+        }
+        else if (score == 25)
+        {
+            Debug.Log($"{stats.Name}: Wypalenie magiczne – do końca starcia brak możliwości rzucania jakichkolwiek zaklęć.{manualNote}");
+        }
+        else if (score == 26)
+        {
+            Debug.Log($"{stats.Name}: Spaczenie Krwi – do najbliższego długiego odpoczynku każde rzucenie zaklęcia wywołuje Krwawienie (poziom 1).{manualNote}");
+        }
+        else if (score == 27)
+        {
+            Debug.Log($"{stats.Name}: Furia Żywiołu – użyty zostaje efekt innego potężnego zaklęcia z tej ścieżki (decyduje MG).{manualNote}");
+        }
+        else if (score == 28)
+        {
+            Debug.Log($"{stats.Name}: Drgawki – przez 3 tury: -2 do Zwinności i Zręczności.{manualNote}");
+        }
+        else if (score == 29)
+        {
+            Debug.Log($"{stats.Name}: Wyładowanie – fala o promieniu 10 m wokół rzucającego; wszystkie istoty test Odporności (16+) albo k10 obrażeń.{manualNote}");
+        }
+        else if (score == 30)
+        {
+            Debug.Log($"{stats.Name}: Zanik głosu – przez minutę ({oneMinute}) brak możliwości mówienia i rzucania zaklęć.{manualNote}");
+        }
+        else if (score == 31)
+        {
+            Debug.Log($"{stats.Name}: Rozproszenie – wszystkie aktywne efekty magiczne w promieniu 100 m natychmiast ustają.{manualNote}");
+        }
+        else if (score == 32)
+        {
+            Debug.Log($"{stats.Name}: Skoki energii – przez minutę ({oneMinute}) każdy test Rzucania Zaklęć dostaje dodatkowy rzut k10 (większa szansa na sukces i na dublet).{manualNote}");
+        }
+        else if (score == 33)
+        {
+            Debug.Log($"{stats.Name}: Blokada Mocy – do najbliższego długiego odpoczynku wszystkie testy Rzucania Zaklęć otrzymują karę -5.{manualNote}");
+        }
+        else if (score == 34)
+        {
+            Debug.Log($"{stats.Name}: Przekleństwo Mocy – do najbliższego długiego odpoczynku każde rzucenie zaklęcia ma 50% szansy na automatyczny Gniew Boży (gdy wynik rzutu jest nieparzysty).{manualNote}");
+        }
+        else if (score == 35)
+        {
+            Debug.Log($"{stats.Name}: Odmagicznienie – najbliższy magiczny przedmiot traci swoją moc (czasowo lub trwale – decyduje MG).{manualNote}");
+        }
+        else if (score == 36)
+        {
+            int deformRoll = UnityEngine.Random.Range(1, 7); // k6 do opisu
+            string deform = deformRoll switch
             {
-                { "target", 0 },
-                { "damage", 0 },
-                { "range", 0 },
-                { "area_size", 0 },
-                { "duration", 0 }
+                1 => "dodatkowe oko (+1 poziom Spostrzegawczości, jeśli < 3)",
+                2 => "dodatkowe ucho (+1 poziom Słuchu, jeśli < 3)",
+                3 => "k4 dodatkowych palców (+1 do Zręczności)",
+                4 => "dodatkowy język (głównie efekt fabularny)",
+                5 => "k4 dodatkowych zębów (głównie efekt fabularny)",
+                _ => "dodatkowe usta (mogą nauczyć się mówić po wydaniu 200 PD)"
             };
-
-            // Zliczamy wystąpienia każdego efektu
-            foreach (string effect in _overcastingStrings)
+            Debug.Log($"{stats.Name}: Zniekształcenie – na ciele wyrasta {deform}. Miejsce wybiera MG.{manualNote}");
+        }
+        else if (score == 37)
+        {
+            int gateRoll = UnityEngine.Random.Range(1, 9); // k8 do opisu
+            string entity = gateRoll switch
             {
-                if (effectCounts.ContainsKey(effect))
-                    effectCounts[effect]++;
-            }
-
-            // Dla każdej akcji obliczamy łączny koszt (SL) wykorzystany przy kliknięciach
-            int slTargetCost = GetCumulativeCost("target", effectCounts["target"]);
-            if (slTargetCost > 0)
-                spell.Targets += GetOvercastingEffectValue(slTargetCost, targetValues);
-
-            int slDamageCost = GetCumulativeCost("damage", effectCounts["damage"]);
-            if (slDamageCost > 0)
-                spell.Strength += GetOvercastingEffectValue(slDamageCost, damageValues);
-
-            int slRangeCost = GetCumulativeCost("range", effectCounts["range"]);
-            if (slRangeCost > 0)
-                spell.Range *= GetOvercastingEffectValue(slRangeCost, rangeMultipliers);
-
-            int slAreaCost = GetCumulativeCost("area_size", effectCounts["area_size"]);
-            if (slAreaCost > 0)
-                spell.AreaSize *= GetOvercastingEffectValue(slAreaCost, areaMultipliers);
-
-            int slDurationCost = GetCumulativeCost("duration", effectCounts["duration"]);
-            if (slDurationCost > 0)
-                spell.Duration *= GetOvercastingEffectValue(slDurationCost, durationMultipliers);
-
-            //Debug.Log($"spell.Targets {spell.Targets}");
-            //Debug.Log($"spell.Strength {spell.Strength}");
-            //Debug.Log($"spell.Range {spell.Range}");
-            //Debug.Log($"spell.AreaSize {spell.AreaSize}");
-            //Debug.Log($"spell.Duration {spell.Duration}");
-
-            _overcastingLevel = 0;
-            _overcastingPanel.SetActive(false);
+                1 => "Nienazwany",
+                2 => "Duch",
+                3 => "Krwiożerczy Ogar",
+                4 => "Pomiot Kainera",
+                5 => "Upiór",
+                6 => "Równy Żywiołom",
+                7 => "Licz",
+                _ => "Demon"
+            };
+            Debug.Log($"{stats.Name}: Wrota Wymiarów – otwiera się szczelina; pojawia się: {entity}.{manualNote}");
         }
-        else yield break;
-    }
-
-    private void OvercastingButtonClick(GameObject button, string action)
-    {
-        if (Unit.SelectedUnit == null || Unit.SelectedUnit.GetComponent<Spell>() == null) return;
-
-        // Ile razy dotychczas kliknięto przycisk dla danej akcji
-        int count = _overcastingStrings.Count(a => a == action);
-
-        // Pobierz tablicę kosztów dla danej akcji
-        int[] costTable = GetCostTableForAction(action);
-
-        // Sprawdź, czy koszt bieżącego (kolejnego) kliknięcia przekracza dostępne SL
-        // Używamy costTable[count] – zakładając, że index count odpowiada kosztowi kolejnego kliknięcia
-
-        string arcane = Unit.SelectedUnit.GetComponent<Spell>().Arcane;
-        bool isMiracleOrBlessing = arcane == "Błogosławieństwa" || arcane == "Cuda";
-
-        if ((count < costTable.Length && costTable[count] > _overcastingLevel && !isMiracleOrBlessing) || (isMiracleOrBlessing && _overcastingLevel < 2))
+        else if (score == 38)
         {
-            Debug.Log("Niewystarczająca ilość Poziomów Sukcesu, aby zwiększyć ten efekt.");
-            return;
+            Debug.Log($"{stats.Name}: Wessanie – zostaje wessany do innego wymiaru na k4 tury; po powrocie test SW (18+); porażka: traci bazowe k4 SW.{manualNote}");
         }
-
-        // Dodajemy dany efekt (akcję) do listy kliknięć
-        _overcastingStrings.Add(action);
-
-        // Odejmujemy koszt kliknięcia – koszt bieżącego kliknięcia jest costTable[count]
-        if (count < costTable.Length)
+        else if (score == 39)
         {
-            _overcastingLevel -= isMiracleOrBlessing ? 2 : costTable[count];
+            Debug.Log($"{stats.Name}: Psychoza – trwały uraz psychiczny (np. paranoja, amnezja – wybór MG).{manualNote}");
         }
-
-        // Sumuje łączny koszt tego efektu
-        int totalCost = 0;
-        for (int i = 0; i <= count && i < costTable.Length; i++)
+        else if (score >= 40)
         {
-            totalCost += costTable[i];
-        }
-
-        // Obliczamy wartość efektu – zgodnie z Twoją tabelą, używając funkcji GetOvercastingEffectValue
-        int cumulativeValue = isMiracleOrBlessing ? count + 1 : GetOvercastingEffectValue(totalCost, GetValueTableForAction(action));
-
-        // Formatowanie tekstu: dla "damage" oraz "target" pokażemy "+{cumulativeValue}",
-        // a dla pozostałych (np. range, area_size, duration) "x{cumulativeValue}"
-        string display = (action == "damage" || action == "target") ? $"+{cumulativeValue}" : $"x{cumulativeValue}";
-
-        // Aktualizacja tekstu w przycisku (CounterText)
-        TextMeshProUGUI text = button.transform.Find("CounterText")?.GetComponent<TextMeshProUGUI>();
-        if (text != null)
-            text.text = display;
-
-        // Aktualizujemy wyświetlaną liczbę dostępnych Poziomów Sukcesu
-        _overcastingLevelDisplay.text = $"PS do rozdania: {_overcastingLevel}";
-    }
-
-    private int[] GetCostTableForAction(string action)
-    {
-        // Koszty kliknięć zgodne z kolumną SL (rozwijane sumarycznie)
-        // Przykład: koszt 1, potem +2 (czyli 3 łącznie), potem +2 (czyli 5 łącznie), potem +3 (czyli 8 łącznie) itd.
-        switch (action)
-        {
-            case "target":
-                return new int[] { 1, 4, 16 }; // SL: 1, 5, 21
-            case "damage":
-                return new int[] { 1, 1, 1, 2, 3, 5, 8 }; // SL: 1,2,3,5,8,13,21
-            case "range":
-                return new int[] { 1, 4, 16 }; // SL: 1, 5, 21
-            case "area_size":
-                return new int[] { 3, 18 }; // SL: 3, 21
-            case "duration":
-                return new int[] { 2, 6}; // SL: 2, 8
-            default:
-                return new int[] { 1 };
-        }
-    }
-
-    private int[] GetValueTableForAction(string action)
-    {
-        switch (action)
-        {
-            case "target": return targetValues;
-            case "damage": return damageValues;
-            case "range": return rangeMultipliers;
-            case "area_size": return areaMultipliers;
-            case "duration": return durationMultipliers;
-            default: return new int[] { 0 };
-        }
-    }
-
-    // Funkcja pomocnicza do pobierania wartości z tabeli na podstawie Poziomu Sukcesu
-    private int GetOvercastingEffectValue(int sl, int[] thresholds)
-    {
-        if (sl >= 21) return thresholds[6];
-        if (sl >= 13) return thresholds[5];
-        if (sl >= 8) return thresholds[4];
-        if (sl >= 5) return thresholds[3];
-        if (sl >= 3) return thresholds[2];
-        if (sl >= 2) return thresholds[1];
-        if (sl >= 1) return thresholds[0];
-        return 0;
-    }
-
-    private int GetCumulativeCost(string action, int count)
-    {
-        int[] costs = GetCostTableForAction(action);
-        int total = 0;
-        // Sumujemy koszty od 0 do count-1 (czyli dla każdego kliknięcia)
-        for (int i = 0; i < count && i < costs.Length; i++)
-        {
-            total += costs[i];
-        }
-        return total;
-    }
-
-    private void ClearAllOvercastCounterTexts()
-    {
-        if (_overcastingPanel == null)
-            return;
-
-        // Znajdź kontener z przyciskami (zakładamy, że nazywa się "Buttons")
-        Transform buttonsContainer = _overcastingPanel.transform.Find("Buttons");
-        if (buttonsContainer == null) return;
-
-        // Iteruj po wszystkich przyciskach w kontenerze
-        foreach (Transform button in buttonsContainer)
-        {
-            // Znajdź dziecko o nazwie "CounterText" w przycisku
-            Transform counterTransform = button.Find("CounterText");
-            if (counterTransform != null)
-            {
-                TextMeshProUGUI text = counterTransform.GetComponent<TextMeshProUGUI>();
-                if (text != null)
-                    text.text = ""; // Resetuj tekst
-            }
-        }
-    }
-    #endregion
-
-    private int CalculateArmorModifier(Stats stats)
-    {
-        int modifier = 0;
-
-        int[] armors = { stats.Armor_head, stats.Armor_arms, stats.Armor_torso, stats.Armor_legs };
-        //int armouredCastingModifier = stats.ArmouredCasting == true ? 3 : 0;
-        //modifier -= Math.Max(0, armors.Max() - armouredCastingModifier); //Odejmuje największa wartość zbroi i uwzględnia Pancerz Wiary
-
-        modifier -= Math.Max(0, armors.Max());
-
-        modifier += stats.NaturalArmor;
-
-        return modifier * 10;
-    }
-
-    #region Chaos manifestation
-    public void CheckForChaosManifestation(Stats stats, int rollResult, int successValue, string skillName, int castingNumberLeft = 0, bool value = false)
-    {
-        Unit unit = stats.GetComponent<Unit>();
-        bool isSuccessful = successValue >= 0;
-        bool hasDouble = DiceRollManager.Instance.IsDoubleDigit(rollResult, rollResult);
-        bool hasZeroOnes = rollResult % 10 == 0;
-
-        if (skillName == "Pray" && ((!isSuccessful && hasDouble) || (rollResult % 10 <= stats.SinPoints))) // Pech na modlitwę
-        {
-            int roll = UnityEngine.Random.Range(1, 101);
-            int modifier = Math.Max(Math.Max(0, (-successValue) * 10), Math.Max(0, castingNumberLeft * 10));
-            int finalRoll = !isSuccessful && hasDouble ? roll + modifier : roll;
-
-            if (modifier != 0)
-            {
-                Debug.Log($"<color=red>Występuje Gniew Boży!</color> Wynik rzutu: {roll}. Modyfikator: {modifier}. Poziom Gniewu Bożego: <color=red>{finalRoll}</color>.");
-            }
-            else
-            {
-                Debug.Log($"<color=red>Występuje Gniew Boży!</color> Wynik rzutu: <color=red>{finalRoll}</color>.");
-            }
-        }
-        else if ((isSuccessful && hasDouble) || (!isSuccessful && (hasDouble || hasZeroOnes)) || value == true) // Pech na Splatanie lub Język magiczny
-        {
-            int roll = UnityEngine.Random.Range(1, 101);
-            int modifier = Math.Max(Math.Max(0, (-successValue) * 10), Math.Max(0, castingNumberLeft * 10));
-            int finalRoll = roll + modifier;
-
-            if (modifier != 0)
-            {
-                Debug.Log($"<color=red>Występuje manifestacja Chaosu!</color> Wynik rzutu: {roll}. Modyfikator: {modifier}. Poziom manifestacji: <color=red>{finalRoll}</color>.");
-            }
-            else
-            {
-                Debug.Log($"<color=red>Występuje manifestacja Chaosu!</color> Wynik rzutu na manifestację: <color=red>{finalRoll}</color>.");
-            }
-        }
-    }
-    #endregion
-
-    #region Arcanes special effects
-    private void OnArcaneToggleChanged(UnityEngine.UI.Toggle changedToggle, bool isOn)
-    {
-        if (!isOn) return;
-
-        foreach (var toggle in _arcanesToggles)
-        {
-            if (toggle != changedToggle)
-            {
-                toggle.isOn = false;
-            }
-        }
-    }
-
-    private void SetArcaneToggle(Spell spell)
-    {
-        switch (spell.Arcane)
-        {
-            case "Tradycja Ognia":
-                _aqshyToggle.isOn = true;
-                break;
-            case "Tradycja Niebios":
-                _azyrToggle.isOn = true;
-                break;
-            case "Tradycja Metalu":
-                _chamonToggle.isOn = true;
-                break;
-            case "Tradycja Bestii":
-                _ghurToggle.isOn = true;
-                break;
-            case "Tradycja Życia":
-                _ghyranToggle.isOn = true;
-                break;
-            case "Tradycja Światła":
-                _hyshToggle.isOn = true;
-                break;
-            case "Tradycja Śmierci":
-                _shyishToggle.isOn = true;
-                break;
-            case "Tradycja Cienia":
-                _ulguToggle.isOn = true;
-                break;
+            Debug.Log($"{stats.Name}: Katastrofa Magiczna – fala niszczy wszystko w promieniu 100 m; istoty unicestwione, teren skażony, świat się zmienia.{manualNote}");
         }
     }
     #endregion

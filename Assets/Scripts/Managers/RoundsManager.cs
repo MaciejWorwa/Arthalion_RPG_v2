@@ -89,7 +89,7 @@ public class RoundsManager : MonoBehaviour
             {
                 unit.CanMove = false;
             }
-            if (stats.MagicLanguage > 0)
+            if (stats.Spellcasting > 0)
             {
                 unit.CanCastSpell = true;
             }

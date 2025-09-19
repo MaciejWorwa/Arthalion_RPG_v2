@@ -378,19 +378,22 @@ public class DiceRollManager : MonoBehaviour
         string roll2Str = $"<color=#4dd2ff>{roll2}</color>";
         string skillRollStr = skillRoll != 0 ? $" + <color=#FF7F50>{skillRoll}</color>" : "";
 
-        Debug.Log($"{stats.Name} rzuca na {rollContext}: {roll1Str} + {roll2Str}{skillRollStr} = <color=#4dd2ff>{roll1 + roll2 + skillRoll}</color>." + $"{attrString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>.");
-
-        if (difficultyLevel != 0 && IsDoubleDigit(rawRoll1, rawRoll2))
+        if (stats.Name != null && stats.Name.Length > 0)
         {
-            if (finalScore >= difficultyLevel)
+            Debug.Log($"{stats.Name} rzuca na {rollContext}: {roll1Str} + {roll2Str}{skillRollStr} = <color=#4dd2ff>{roll1 + roll2 + skillRoll}</color>." + $"{attrString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>.");
+
+            if (difficultyLevel != 0 && IsDoubleDigit(rawRoll1, rawRoll2))
             {
-                Debug.Log($"{stats.Name} wyrzucił <color=green>SZCZĘŚCIE</color>!");
-                stats.FortunateEvents++;
-            }
-            else
-            {
-                Debug.Log($"{stats.Name} wyrzucił <color=red>PECHA</color>!");
-                stats.UnfortunateEvents++;
+                if (finalScore >= difficultyLevel)
+                {
+                    Debug.Log($"{stats.Name} wyrzucił <color=green>SZCZĘŚCIE</color>!");
+                    stats.FortunateEvents++;
+                }
+                else
+                {
+                    Debug.Log($"{stats.Name} wyrzucił <color=red>PECHA</color>!");
+                    stats.UnfortunateEvents++;
+                }
             }
         }
 

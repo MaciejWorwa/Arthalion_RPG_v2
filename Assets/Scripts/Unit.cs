@@ -23,7 +23,6 @@ public class Unit : MonoBehaviour
     public bool IsRetreating; // Wycofuje się
 
     [Header("Stany")]
-
     public bool Ablaze; // Podpalenie
     public int Bleeding; // Krwawienie
     public bool Blinded; // Oślepienie

@@ -15,7 +15,12 @@ public class Spell : MonoBehaviour
     public int Duration; // czas trwania zaklêcia
     public int Targets; // iloœæ celów
 
-    public bool SaveTestRequiring; // okreœla, czy zaklêcie powoduje koniecznoœæ wykonania testu obronnego
+    //public bool SaveTestRequiring; // okreœla, czy zaklêcie powoduje koniecznoœæ wykonania testu obronnego
+
+    public string DamageType; // Rodzaj obra¿eñ, np. ice, poison, physical
+    public string SaveAttribute; // Cecha, która jest testowana u celu zaklêcia, aby siê przed nim obroniæ
+    public string SaveSkill; // Umiejêtnoœæ, która jest testowana u celu zaklêcia, aby siê przed nim obroniæ
+
     //public int AttributeValue; // okreœla o ile s¹ zmieniane cechy opisane w tabeli Attribute
     //public string[] Attribute; // okreœla cechê, jaka jest testowana podczas próby oparcia siê zaklêciu lub cechê na któr¹ wp³ywa zaklêcie (np. podnosi j¹ lub obni¿a). Czasami jest to wiêcej cech, np. Pancerz Etery wp³ywa na ka¿d¹ z lokalizacji
     //public Dictionary<string, int> Attributes = new(); // <-- zamiast Attribute + AttributeValue
