@@ -165,7 +165,7 @@ public class Unit : MonoBehaviour
             InventoryManager.Instance.UpdateInventoryDropdown(SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
             InventoryManager.Instance.DisplayEncumbrance(Stats);
         }
-        IsSelected = !IsSelected;
+        IsSelected = SelectedUnit == this.gameObject;
         ChangeUnitColor(this.gameObject);
 
         if(IsSelected && Entangled && !Grappled && CanDoAction)
@@ -218,10 +218,10 @@ public class Unit : MonoBehaviour
             }
         }
 
-        // Dla jednostek z Szybkością 0 wyłącza możliwość poruszania się
+        // Dla jednostek z Szybkością 0, unieruchomionych lub pochwyconych wyłącza możliwość poruszania się
         if(IsSelected)
         {
-            if (GetComponent<Stats>().Sz == 0)
+            if (GetComponent<Stats>().Sz == 0 || Entangled || Grappled)
             {
                 CanMove = false;
                 MovementManager.Instance.SetCanMoveToggle(false);

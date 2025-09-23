@@ -52,10 +52,8 @@ public class Tile : MonoBehaviour
         //Podświetla pola w obszarze działania zaklęcia
         if (MagicManager.IsTargetSelecting && Unit.SelectedUnit != null)
         {
-            // Ustala obszar działania zaklęcia. Zwykle jest to mnożnik bonusu z Siły Woli
-            float areaSize = Unit.SelectedUnit.GetComponent<Spell>().AreaSize * (Unit.SelectedUnit.GetComponent<Stats>().SW / 10) / 2f;
-
-            if (areaSize > 0)
+            // Ustala obszar działania zaklęcia.
+            if (Unit.SelectedUnit.GetComponent<Spell>().AreaSize > 0)
             {
                 GridManager.Instance.HighlightTilesInSpellArea(this.gameObject);
             }

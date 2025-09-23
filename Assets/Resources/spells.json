@@ -1,6 +1,75 @@
 {
   "Spells": [
     {
+      "Name": "Błyskawica",
+      "Arcane": "Ścieżka Powietrza",
+      "Type": [ "offensive" ],
+      "Strength": [ 10, 10 ],
+      "DamageType": "Electric",
+      "CastingNumber": 18,
+      "Range": 15,
+      "Targets": 1,
+      "SaveSkill": "Reflex",
+      "ArmourIgnoring": true
+    },
+    {
+      "Name": "Chłodny Dotyk",
+      "Arcane": "Ścieżka Lodu",
+      "Type": [ "offensive" ],
+      "Strength": [ 6 ],
+      "DamageType": "Ice",
+      "CastingNumber": 14,
+      "Range": 1.5,
+      "Targets": 1,
+      "SaveAttribute":  "K",
+      "SaveSkill": "Endurance",
+      "ArmourIgnoring": true
+    },
+    {
+      "Name": "Dotyk Śmierci",
+      "Arcane": "Ścieżka Śmierci",
+      "Type": [ "offensive" ],
+      "CastingNumber": 14,
+      "Range": 1.5,
+      "Targets": 1,
+      "SaveAttribute":  "SW"
+    },
+    {
+      "Name": "Dotyk Zepsucia",
+      "Arcane": "Ścieżka Śmierci",
+      "Type": [ "offensive", "no-damage" ],
+      "CastingNumber": 17,
+      "Range": 1.5,
+      "Targets": 1,
+      "SaveAttribute":  "K",
+      "SaveSkill": "Endurance",
+      "Attributes": [
+        {
+          "Key": "Poison",
+          "Value": 1
+        }
+      ]
+    },
+    {
+      "Name": "Gejzer",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "offensive" ],
+      "DamageType": "Physical",
+      "Strength": [ 10, 10],
+      "CastingNumber": 19,
+      "Range": 15,
+      "Targets": 1,
+      "AreaSize": 3,
+      "SaveSkill": "Reflex",
+      "SaveDifficulty": 14,
+      "Attributes": [
+        {
+          "Key": "Prone",
+          "Value": 1
+        }
+      ]
+    },
+    {
       "Name": "Kamienna Skóra",
       "Arcane": "Ścieżka Ziemi",
       "Type": [ "buff" ],
@@ -22,7 +91,8 @@
     {
       "Name": "Kamienny Pocisk",
       "Arcane": "Ścieżka Ziemi",
-      "Type": [ "offensive", "magic-missile" ],
+      "Type": [ "offensive" ],
+      "DamageType": "Physical",
       "CastingNumber": 14,
       "Range": 7.5,
       "Targets": 1,
@@ -30,14 +100,142 @@
       "SaveSkill": "Dodge"
     },
     {
+      "Name": "Kojący Chłód",
+      "Arcane": "Ścieżka Lodu",
+      "Type": [ "buff" ],
+      "Strength": [ 4 ],
+      "CastingNumber": 13,
+      "Range": 1.5,
+      "Targets": 1,
+      "Attributes": [
+        {
+          "Key": "TempHealth",
+          "Value": 4
+        }
+      ]
+    },
+    {
+      "Name": "Korzenne Okowy",
+      "Arcane": "Ścieżka Ziemi",
+      "Type": [ "offensive", "no-damage" ],
+      "CastingNumber": 14,
+      "Range": 10,
+      "Targets": 1,
+      "Duration": 3,
+      "Attributes": [
+        {
+          "Key": "Entangled",
+          "Value": 1
+        }
+      ]
+    },
+    {
+      "Name": "Lodowy Kolec",
+      "Arcane": "Ścieżka Lodu",
+      "Type": [ "offensive" ],
+      "DamageType": "Ice",
+      "CastingNumber": 14,
+      "Range": 10,
+      "Targets": 1,
+      "SaveAttribute":  "Zw",
+      "SaveSkill": "Dodge"
+    },
+    {
+      "Name": "Nawałnica",
+      "Arcane": "Ścieżka Powietrza",
+      "Type": [ "offensive" ],
+      "Strength": [ 10, 10 ],
+      "DamageType": "Electric",
+      "CastingNumber": 21,
+      "Range": 15,
+      "Targets": 3,
+      "ArmourIgnoring": true
+    },
+    {
+      "Name": "Oczyszczenie",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "buff" ],
+      "CastingNumber": 12,
+      "Range": 1.5,
+      "Targets": 1,
+      "Attributes": [
+        {
+          "Key": "Poison",
+          "Value": -1
+        }
+      ]
+    },
+    {
       "Name": "Ognisty Pocisk",
       "Arcane": "Ścieżka Ognia",
-      "Type": [ "offensive", "magic-missile" ],
+      "Type": [ "offensive" ],
+      "DamageType": "Fire",
       "CastingNumber": 14,
       "Range": 10,
       "Targets": 1,
       "SaveAttribute": "Zw",
       "SaveSkill": "Dodge"
+    },
+    {
+      "Name": "Otępienie",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "offensive", "no-damage" ],
+      "CastingNumber": 20,
+      "Range": 10,
+      "Targets": 1,
+      "Duration": 12,
+      "SaveAttribute": "SW",
+      "Attributes": [
+        {
+          "Key": "Athletics",
+          "Value": 0
+        },
+        {
+          "Key": "Cool",
+          "Value": 0
+        },
+        {
+          "Key": "Dodge",
+          "Value": 0
+        },
+        {
+          "Key": "Endurance",
+          "Value": 0
+        },
+        {
+          "Key": "MeleeCombat",
+          "Value": 0
+        },
+        {
+          "Key": "RangedCombat",
+          "Value": 0
+        },
+        {
+          "Key": "Reflex",
+          "Value": 0
+        },
+        {
+          "Key": "Spellcasting",
+          "Value": 0
+        }
+      ]
+    },
+    {
+      "Name": "Pożoga",
+      "Arcane": "Ścieżka Ognia",
+      "Type": [ "offensive" ],
+      "DamageType": "Fire",
+      "Strength": [ 10, 10],
+      "CastingNumber": 22,
+      "Range": 15,
+      "Targets": 1,
+      "AreaSize": 5,
+      "Attributes": [
+        {
+          "Key": "Ablaze",
+          "Value": 1
+        }
+      ]
     },
     {
       "Name": "Regeneracja Tkanki",
@@ -54,14 +252,123 @@
       ]
     },
     {
+      "Name": "Rytm Rzeki",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "buff" ],
+      "CastingNumber": 14,
+      "Range": 1.5,
+      "Targets": 1,
+      "Duration": 6,
+      "Attributes": [
+        {
+          "Key": "Zw",
+          "Value": 2
+        }
+      ]
+    },
+    {
+      "Name": "Tornado",
+      "Arcane": "Ścieżka Powietrza",
+      "Type": [ "offensive" ],
+      "Strength": [ 10],
+      "DamageType": "Physical",
+      "CastingNumber": 24,
+      "Range": 15,
+      "Targets": 1,
+      "AreaSize": 5,
+      "SaveAttribute":  "S",
+      "SaveDifficulty": 18,
+      "Attributes": [
+        {
+          "Key": "Prone",
+          "Value": 1
+        }
+      ]
+    },
+    {
+      "Name": "Trzęsienie Ziemi",
+      "Arcane": "Ścieżka Ziemi",
+      "Type": [ "offensive" ],
+      "Strength": [ 10, 10],
+      "DamageType": "Physical",
+      "CastingNumber": 24,
+      "Range": 15,
+      "Targets": 1,
+      "AreaSize": 5,
+      "SaveAttribute":  "Zw",
+      "SaveDifficulty": 16,
+      "Attributes": [
+        {
+          "Key": "Prone",
+          "Value": 1
+        }
+      ]
+    },
+    {
+      "Name": "Ugaszenie",
+      "Arcane": "Ścieżka Wody",
+      "Type": [ "buff" ],
+      "CastingNumber": 13,
+      "Range": 5,
+      "Targets": 1,
+      "Attributes": [
+        {
+          "Key": "Ablaze",
+          "Value": 0
+        }
+      ]
+    },
+    {
       "Name": "Wodny Pocisk",
       "Arcane": "Ścieżka Wody",
-      "Type": [ "offensive", "magic-missile" ],
+      "Type": [ "offensive" ],
+      "DamageType": "Physical",
       "CastingNumber": 14,
       "Range": 10,
       "Targets": 1,
       "SaveAttribute": "Zw",
       "SaveSkill": "Dodge"
+    },
+    {
+      "Name": "Zamrożenie",
+      "Arcane": "Ścieżka Lodu",
+      "Type": [ "offensive" ],
+      "DamageType": "Ice",
+      "CastingNumber": 19,
+      "Range": 1.5,
+      "Targets": 1,
+      "Duration": 3,
+      "SaveAttribute":  "K",
+      "SaveSkill": "Endurance",
+      "ArmourIgnoring": true,
+      "Attributes": [
+        {
+          "Key": "Entangled",
+          "Value": 1
+        }
+      ]
+    },
+    {
+      "Name": "Zimowy Krąg",
+      "Arcane": "Ścieżka Lodu",
+      "Type": [ "offensive" ],
+      "DamageType": "Ice",
+      "Strength": [ 10, 10],
+      "CastingNumber": 21,
+      "Range": 10,
+      "Targets": 1,
+      "AreaSize": 4,
+      "Duration": 6,
+      "SaveAttribute":  "K",
+      "SaveSkill": "Endurance",
+      "SaveDifficulty": 16,
+      "ArmourIgnoring": true,
+      "Attributes": [
+        {
+          "Key": "Entangled",
+          "Value": 1
+        }
+      ]
     }
   ]
 }

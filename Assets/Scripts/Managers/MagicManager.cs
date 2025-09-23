@@ -5,8 +5,10 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using TMPro;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime.Misc;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
@@ -46,7 +48,7 @@ public class MagicManager : MonoBehaviour
 
     [Header("Panel do manualnego zarządzania krytycznym splecieniem zaklęcia")]
     [SerializeField] private GameObject _criticalCastingPanel;
-    private string _criticalCastingString;
+    public string CriticalCastingString;
     [SerializeField] private UnityEngine.UI.Button _extraTargetButton;
     [SerializeField] private UnityEngine.UI.Button _extraDamageButton;
     [SerializeField] private UnityEngine.UI.Button _extraRangeButton;
@@ -66,32 +68,6 @@ public class MagicManager : MonoBehaviour
         _extraAreaSizeButton.onClick.AddListener(() => CriticalButtonClick(_extraAreaSizeButton.gameObject, "area_size"));
         _extraDurationButton.onClick.AddListener(() => CriticalButtonClick(_extraDurationButton.gameObject, "duration"));
     }
-
-    #region Channeling magic
-    public void ChannelingMagic()
-    {
-        if (Unit.SelectedUnit == null) return;
-
-        Stats stats = Unit.SelectedUnit.GetComponent<Stats>();
-        Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
-
-        //Sprawdzenie, czy wybrana postać może splatać magię
-        if (stats.Channeling == 0)
-        {
-            Debug.Log($"Wybrana jednostka nie potrafi splatać magii.");
-            return;
-        }
-
-        if (!unit.CanDoAction)
-        {
-            Debug.Log("Ta jednostka nie może w tej rundzie wykonać więcej akcji.");
-            return;
-        }
-
-        //Wykonuje akcję
-        RoundsManager.Instance.DoAction(unit);
-    }
-    #endregion
 
     #region Casting
     public void CastingSpellMode()
@@ -140,7 +116,7 @@ public class MagicManager : MonoBehaviour
         Spell spell = Unit.SelectedUnit.GetComponent<Spell>();
 
         unit.CanCastSpell = false;
-        _criticalCastingString = "";
+        CriticalCastingString = "";
 
         int rollResult = 0;
         int[] castingTest = null;
@@ -164,7 +140,7 @@ public class MagicManager : MonoBehaviour
         // Krytyczne rzucenie zaklęcia
         if (DiceRollManager.Instance.IsDoubleDigit(castingTest[0], castingTest[1]))
         {
-            GodsWrath(stats, spell.CastingNumber);
+            StartCoroutine(GodsWrath(stats, spell.CastingNumber));
 
             if(!spellFailed)
             {
@@ -190,7 +166,7 @@ public class MagicManager : MonoBehaviour
 
         Debug.Log("Kliknij prawym przyciskiem myszy na jednostkę, która ma być celem zaklęcia.");
 
-        if (_criticalCastingString == "target") spell.Targets *= 2;
+        if (CriticalCastingString == "target") spell.Targets *= 2;
 
         while (Targets.Count < spell.Targets)
         {
@@ -206,7 +182,7 @@ public class MagicManager : MonoBehaviour
             //Sprawdza dystans
             _spellDistance = CombatManager.Instance.CalculateDistance(Unit.SelectedUnit, target);
 
-            if (_criticalCastingString == "range") spell.Range *= 2;
+            if (CriticalCastingString == "range") spell.Range *= 2;
 
             Debug.Log($"Dystans do celu: {_spellDistance}. Zasięg zaklęcia: {spell.Range}");
 
@@ -216,7 +192,7 @@ public class MagicManager : MonoBehaviour
                 continue;
             }
 
-            if (_criticalCastingString == "area_size") spell.AreaSize *= 2;
+            if (CriticalCastingString == "area_size") spell.AreaSize *= 2;
 
             // Pobiera wszystkie collidery w obszarze działania zaklęcia
             List<Collider2D> allTargets = Physics2D.OverlapCircleAll(target.transform.position, spell.AreaSize).ToList();
@@ -262,10 +238,10 @@ public class MagicManager : MonoBehaviour
         Unit targetUnit = targetStats.GetComponent<Unit>();
         int successLevel = 0;
 
-        if (_criticalCastingString == "duration") spell.Duration *= 2;
+        if (CriticalCastingString == "duration") spell.Duration *= 2;
 
         //Uwzględnienie czasu trwania zaklęcia, które wpływa na statystyki postaci
-        if (spell.Duration != 0 && spell.Type.Contains("buff"))
+        if (spell.Duration != 0)
         {
             // Przygotowanie słownika modyfikacji – iterujemy po liście atrybutów, które zaklęcie ma zmieniać
             Dictionary<string, int> modifications = new Dictionary<string, int>();
@@ -276,12 +252,6 @@ public class MagicManager : MonoBehaviour
             {
                 string attributeName = spell.Attributes[i].Key;
                 int baseModifier = spell.Attributes[i].Value;
-
-                // Jeśli to pierwszy atrybut i zaklęcie ma skalowanie przez SW
-                if (i == 0 && spell.Type.Contains("scaling-by-SW"))
-                {
-                    baseModifier *= spellcasterStats.SW / 10;
-                }
                 modifications[attributeName] = baseModifier;
             }
 
@@ -310,20 +280,22 @@ public class MagicManager : MonoBehaviour
 
             string saveName = !string.IsNullOrEmpty(spell.SaveSkill) ? spell.SaveSkill : spell.SaveAttribute;
 
+            // ustalamy difficultyLevel: albo rollResult, albo SaveDifficulty
+            int saveDifficulty = spell.SaveDifficulty > 0 ? spell.SaveDifficulty : rollResult;
+
             int[] saveTest = null;
             if (!GameManager.IsAutoDiceRollingMode && targetUnit.CompareTag("PlayerUnit"))
             {
-                yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill, difficultyLevel: rollResult, callback: result => saveTest = result));
+                yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill, difficultyLevel: saveDifficulty, callback: result => saveTest = result));
                 if (saveTest == null) yield break;
             }
             else
             {
-                saveTest = DiceRollManager.Instance.TestSkill(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill);
+                saveTest = DiceRollManager.Instance.TestSkill(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill, difficultyLevel: saveDifficulty);
             }
             saveRollResult = saveTest[3];
 
-
-            if (saveRollResult <= rollResult)
+            if (saveRollResult < saveDifficulty || (spell.SaveDifficulty == 0 && saveRollResult == saveDifficulty))
             {
                 Debug.Log($"{targetStats.Name} nie udało się przeciwstawić zaklęciu.");
                 successLevel = rollResult - saveRollResult;
@@ -334,7 +306,8 @@ public class MagicManager : MonoBehaviour
                 yield break;
             }
         }
-        else if (spell.Attributes != null && spell.Attributes.Count > 0)
+
+        if (spell.Attributes != null && spell.Attributes.Count > 0)
         {
             // Konwersja listy Attributes do listy kluczy
             var keys = spell.Attributes.Select(a => a.Key).ToList();
@@ -342,7 +315,7 @@ public class MagicManager : MonoBehaviour
             for (int i = 0; i < keys.Count; i++)
             {
                 string attributeName = keys[i];
-                int baseValue = spell.Attributes.First(a => a.Key == attributeName).Value;
+                int baseValue = (spell.Strength != null && spell.Strength.Length > 0) ? UnityEngine.Random.Range(1, Mathf.Max(1, spell.Strength[0]) + 1) : spell.Attributes.First(a => a.Key == attributeName).Value;
 
                 Stats affectedStats = spell.Type.Contains("self-attribute") ? spellcasterStats : targetStats;
                 Unit affectedUnit = affectedStats.GetComponent<Unit>();
@@ -367,7 +340,12 @@ public class MagicManager : MonoBehaviour
                 {
                     bool boolValue = value != 0;
                     field.SetValue(targetObject, boolValue);
-                    Debug.Log($"{affectedStats.Name} zyskuje cechę {attributeName}: {(boolValue ? "aktywna" : "nieaktywna")}.");
+                    Debug.Log($"{affectedStats.Name} zmienia cechę {attributeName} na {(boolValue ? "aktywną" : "nieaktywną")}.");
+
+                    //if (field.Name == "Entangled")
+                    //{
+                    //    spellcasterStats.GetComponent<Unit>().EntangledUnitId = targetUnit.UnitId;
+                    //}
                 }
                 else if (field.FieldType == typeof(int))
                 {
@@ -424,13 +402,72 @@ public class MagicManager : MonoBehaviour
         if (spellcasterStats == null || targetStats == null || spell == null)
             yield break;
 
-        int damage = spell.Type != null && spell.Type.Contains("constant-strength") ? spell.Strength : successLevel;
+        // === helper do ustalenia obrażeń constant-strength (1–2 kości + opcjonalny modyfikator) ===
+        IEnumerator ComputeConstantStrengthDamage(
+            Stats caster,
+            int[] strengthSpec,
+            Action<int> onComputed)
+        {
+            if (strengthSpec == null || strengthSpec.Length == 0)
+            {
+                onComputed?.Invoke(0);
+                yield break;
+            }
+
+            // Kości: max 2 pierwsze wartości; 3. to modyfikator
+            int dice1 = Mathf.Max(1, strengthSpec[0]);
+            int dice2 = (strengthSpec.Length >= 2) ? Mathf.Max(1, strengthSpec[1]) : 0;
+            int modifier = (strengthSpec.Length >= 3) ? strengthSpec[2] : 0;
+
+            string diceCtx = FormatDiceContext(strengthSpec);
+
+            int die1, die2;
+            if (!GameManager.IsAutoDiceRollingMode && caster.CompareTag("PlayerUnit"))
+            {
+                // Tryb ręczny – gracz wpisuje wyniki kości dla obrażeń (bez umiejętności/atrybutów)
+                int[] damageRoll = null;
+                yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(
+                        caster,
+                        $"obrażenia zaklęcia {diceCtx}",
+                        null,
+                        callback: result => damageRoll = result
+                    )
+                );
+                if (damageRoll == null) { onComputed?.Invoke(0); yield break; }
+
+                // Zakładamy, że gracz poda 1 lub 2 wartości; bierzemy pierwsze dwie pozycje
+                die1 = damageRoll.Length >= 1 ? damageRoll[0] : 0;
+                die2 = (dice2 > 0 && damageRoll.Length >= 2) ? damageRoll[1] : 0;
+
+                // Opcjonalnie ograniczamy do zakresu danej kości (żeby uniknąć literówek)
+                if (dice1 > 0) die1 = Mathf.Clamp(die1, 1, dice1);
+                if (dice2 > 0) die2 = Mathf.Clamp(die2, 1, dice2);
+            }
+            else
+            {
+                // Tryb automatyczny – losujemy
+                die1 = UnityEngine.Random.Range(1, dice1 + 1);
+                die2 = (dice2 > 0) ? UnityEngine.Random.Range(1, dice2 + 1) : 0;
+
+                Debug.Log($"Wynik rzutu na obrażenia zaklęcia: <color=#4dd2ff>{die1}</color>" + (dice2 > 0 ? $"+ <color=#4dd2ff>{die2}</color>" : "") + (modifier != 0 ? $" +<color=#FF7F50>{modifier}</color>" : "") + ".");
+            }
+
+            int total = die1 + die2 + modifier;
+            onComputed?.Invoke(total);
+        }
+
+        // Jeśli typ zawiera "constant-strength", obrażenia są wynikiem rzutów wg spell.Strength[]
+        if (spell.Strength != null && spell.Strength.Length > 0)
+        {
+            int rolled = 0;
+            yield return ComputeConstantStrengthDamage(spellcasterStats, spell.Strength, total => rolled = total);
+            successLevel = rolled;
+        }
+
+        // Siła obrażeń = successLevel (w tym dla constant-strength)
+        int damage = successLevel;
 
         //Debug.Log($"Poziom sukcesu {spellcasterStats.Name}: {successLevel}. Siła zaklęcia: {spell.Strength}");
-
-        if (_criticalCastingString == "damage") damage *= 2;
-
-        Debug.Log($"Łączne obrażenia zadane przez {spellcasterStats.Name}: <color=#4dd2ff>{damage}</color>");
 
         // --- Ustalamy miejsce trafienia ---
         int roll1 = castingTest[0];
@@ -454,6 +491,15 @@ public class MagicManager : MonoBehaviour
 
         string hitLocation = CombatManager.Instance.NormalizeHitLocation(unnormalizedHitLocation);
 
+        if (!String.IsNullOrEmpty(hitLocation))
+        {
+            Debug.Log($"Atak jest skierowany w {CombatManager.Instance.TranslateHitLocation(unnormalizedHitLocation)}.");
+        }
+
+        if (CriticalCastingString == "damage") damage *= 2;
+
+        Debug.Log($"Łączne obrażenia zadane przez {spellcasterStats.Name}: <color=#4dd2ff>{damage}</color>");
+
         // === PANCERZ CELU (bezpiecznie) ===
         int metalArmorValue = 0;
         int armor = CombatManager.Instance.CalculateArmor(targetStats, unnormalizedHitLocation, null, out metalArmorValue);
@@ -470,16 +516,24 @@ public class MagicManager : MonoBehaviour
         // IGNOROWANIE PANCERZA
         if (spell.ArmourIgnoring) armor = 0;
 
-        if (spell.MetalArmourIgnoring && metalArmorValue != 0)
+        if (spell.DamageType == "Electric" && metalArmorValue > 0)
         {
-            armor -= metalArmorValue; // może zejść poniżej zera – dalej i tak zclampujesz w ApplyDamageToTarget
-
-            if (spell.Type.Contains("electric") && metalArmorValue > 0)
-            {
-                damage += metalArmorValue;
-                Debug.Log($"{targetStats.Name} otrzymuje +{metalArmorValue} obrażeń za metalowy pancerz.");
-            }
+            int extraDamage = UnityEngine.Random.Range(1, 7);
+            damage += extraDamage;
+            Debug.Log($"{targetStats.Name} otrzymuje +{extraDamage} obrażeń za noszenie metalowego pancerza.");
         }
+
+        //if (spell.MetalArmourIgnoring && metalArmorValue != 0)
+        //{
+        //    armor -= metalArmorValue; // może zejść poniżej zera – dalej i tak zclampujesz w ApplyDamageToTarget
+
+        //    if (spell.DamageType == "Electric" && metalArmorValue > 0)
+        //    {
+        //        int extraDamage = UnityEngine.Random.Range(1, 7);
+        //        damage += extraDamage;
+        //        Debug.Log($"{targetStats.Name} otrzymuje +{extraDamage} obrażeń za noszenie metalowego pancerza.");
+        //    }
+        //}
 
         // === ZADANIE OBRAŻEŃ ===
         CombatManager.Instance.ApplyDamageToTarget(
@@ -504,6 +558,30 @@ public class MagicManager : MonoBehaviour
             }
         }
     }
+
+    // === helper: zapis kości do kontekstu UI/logów ===
+    string FormatDiceContext(int[] strengthSpec)
+    {
+        if (strengthSpec == null || strengthSpec.Length == 0) return "";
+
+        int dice1 = Mathf.Max(1, strengthSpec[0]);
+        int dice2 = (strengthSpec.Length >= 2) ? Mathf.Max(1, strengthSpec[1]) : 0;
+        int modifier = (strengthSpec.Length >= 3) ? strengthSpec[2] : 0;
+
+        string part;
+        if (dice2 > 0)
+        {
+            if (dice1 == dice2) part = $"2k{dice1}";
+            else part = $"k{dice1}+k{dice2}";
+        }
+        else
+        {
+            part = $"k{dice1}";
+        }
+
+        if (modifier != 0) part += (modifier > 0 ? $"+{modifier}" : $"{modifier}");
+        return $"({part})";
+    }
     #endregion
 
     #region Critical Casting
@@ -512,7 +590,7 @@ public class MagicManager : MonoBehaviour
         if (_criticalCastingPanel == null) return;
 
         _extraTargetButton.interactable = !spell.Type.Contains("self-only") && spell.AreaSize == 0;
-        _extraDamageButton.interactable = spell.Type.Contains("magic-missile");
+        _extraDamageButton.interactable = spell.Type.Contains("offensive") && !spell.Type.Contains("no-damage");
         _extraRangeButton.interactable = spell.Range != 1.5f;
         _extraAreaSizeButton.interactable = spell.AreaSize != 0;
         _extraDurationButton.interactable = spell.Duration != 0;
@@ -526,10 +604,9 @@ public class MagicManager : MonoBehaviour
 
         string arcane = Unit.SelectedUnit.GetComponent<Spell>().Arcane;
 
-        _criticalCastingString = action;
+        CriticalCastingString = action;
     }
     #endregion
-
 
     #region Gods Wrath
     public IEnumerator GodsWrath(Stats stats, int spellLevel)

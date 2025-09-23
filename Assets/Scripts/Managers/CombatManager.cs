@@ -774,7 +774,6 @@ public class CombatManager : MonoBehaviour
                 if (targetStats.TempHealth < 0)
                 {
                     Debug.Log($"Punkty żywotności {targetStats.Name}: <color=red>{targetStats.TempHealth}</color><color=#4dd2ff>/{targetStats.MaxHealth}</color>");
-                    target.Prone = true; // Powalenie
                 }
                 else
                 {
@@ -791,7 +790,6 @@ public class CombatManager : MonoBehaviour
             if ((targetStats.TempHealth < 0 && GameManager.IsHealthPointsHidingMode) || (targetStats.TempHealth < 0 && targetStats.gameObject.CompareTag("EnemyUnit") && GameManager.IsStatsHidingMode))
             {
                 Debug.Log($"Żywotność {targetStats.Name} spadła poniżej zera i wynosi <color=red>{targetStats.TempHealth}</color>.");
-                target.Prone = true; // Powalenie
             }
 
             target.LastAttackerStats = attackerStats;
@@ -1530,7 +1528,7 @@ public class CombatManager : MonoBehaviour
     }
 
     // Metoda do logowania trafienia po polsku
-    private string TranslateHitLocation(string hitLocation)
+    public string TranslateHitLocation(string hitLocation)
     {
         string message = hitLocation switch
         {
@@ -2033,20 +2031,37 @@ public class CombatManager : MonoBehaviour
             if (!attempt) yield break;
         }
 
-        //Wykonuje akcję
+        // Wykonuje akcję
         RoundsManager.Instance.DoAction(entangledUnitStats.GetComponent<Unit>());
 
-        int targetRoll = 0;
+        // wybór wyższej cechy: Zwinność (Zw) lub Siła (S)
         int[] targetTest = null;
+        int bestStat = Mathf.Max(entangledUnitStats.S, entangledUnitStats.Zw);
+        string statName = (bestStat == entangledUnitStats.S) ? "Siłę" : "Zwinność";
+        string statKey = (bestStat == entangledUnitStats.S) ? "S" : "Zw";
+
+        int targetRoll = 0;
         int difficultyLevel = 12;
+
         if (!GameManager.IsAutoDiceRollingMode && entangledUnit.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(entangledUnitStats, "Zwinność", "Zw", difficultyLevel: difficultyLevel, callback: result => targetTest = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(
+                entangledUnitStats,
+                $"{statName}",
+                statKey,
+                difficultyLevel: difficultyLevel,
+                callback: result => targetTest = result
+            ));
             if (targetTest == null) yield break;
         }
         else
         {
-            targetTest = DiceRollManager.Instance.TestSkill(entangledUnitStats, "Zwinność", "Zw", difficultyLevel: difficultyLevel);
+            targetTest = DiceRollManager.Instance.TestSkill(
+                entangledUnitStats,
+                $"{statName}",
+                statKey,
+                difficultyLevel: difficultyLevel
+            );
         }
 
         targetRoll = targetTest[3];

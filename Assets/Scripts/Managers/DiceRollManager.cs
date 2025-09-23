@@ -88,6 +88,16 @@ public class DiceRollManager : MonoBehaviour
         _pendingResult = null;
         IsWaitingForRoll = true;
 
+        // Ustala interaktywność 2. kości:
+        if (_roll2InputField != null)
+        {
+            string rc = _pendingRollContext?.ToLower() ?? "";
+            bool isSpellDamageRoll = rc.Contains("obrażenia zaklęcia");
+            bool hasTwoDice = rc.Contains("2k");
+
+            _roll2InputField.interactable = !(isSpellDamageRoll && !hasTwoDice);
+        }
+
         // UI
         if (_applyRollResultPanel != null)
         {
@@ -133,39 +143,53 @@ public class DiceRollManager : MonoBehaviour
         if (_roll1InputField == null || _roll2InputField == null || _skillRollInputField == null)
             return;
 
-        if (!int.TryParse(_roll1InputField.text, out int r1) ||
-                !int.TryParse(_roll2InputField.text, out int r2))
+        // sprawdź czy to rzut na obrażenia i ile kości wymaga kontekst
+        bool isDamageRoll = _pendingRollContext != null && _pendingRollContext.ToLower().Contains("obrażenia zaklęcia");
+        bool requiresTwoDice = !isDamageRoll || (_pendingRollContext.Contains("2k"));
+
+        int r1 = 0, r2 = 0;
+
+        if (!int.TryParse(_roll1InputField.text, out r1))
         {
-            Debug.Log($"<color=red>Należy wpisać wynik obu kości k10.</color>");
+            Debug.Log("<color=red>Należy wpisać wynik kości.</color>");
             return;
         }
 
-        // skillRoll jest opcjonalny — puste lub nieparsowalne = 0
+        if (requiresTwoDice)
+        {
+            if (!int.TryParse(_roll2InputField.text, out r2))
+            {
+                Debug.Log("<color=red>Należy wpisać wynik obu kości.</color>");
+                return;
+            }
+        }
+        else
+        {
+            r2 = 0; // ignorujemy drugą kość przy obrażeniach do których używamy jednej kości
+        }
+
+        // skillRoll opcjonalny
         int r3 = 0;
         if (!string.IsNullOrWhiteSpace(_skillRollInputField.text))
             int.TryParse(_skillRollInputField.text, out r3);
 
-        // Uruchom właściwy test z podanymi rzutami
         _pendingResult = TestSkill(
             stats: _pendingStats,
             rollContext: _pendingRollContext,
-            attributeName: _pendingAttributeName,      // może być null
+            attributeName: _pendingAttributeName,
             skillName: _pendingSkillName,
             modifier: _pendingModifier,
             roll1: r1,
             roll2: r2,
-            skillRoll: r3,                  // może być 0 — wtedy po prostu się doliczy 0
+            skillRoll: r3,
             difficultyLevel: _pendingDifficultyLevel
         );
 
-        // Czyść inputy
         _roll1InputField.text = "";
         _roll2InputField.text = "";
         _skillRollInputField.text = "";
-
         _applyRollResultPanel.SetActive(false);
     }
-
 
     // Funkcja sprawdzająca, czy liczba ma dwie identyczne cyfry
     public bool IsDoubleDigit(int number1, int number2)
@@ -259,16 +283,24 @@ public class DiceRollManager : MonoBehaviour
         // Modyfikator za Strach
         if (stats.GetComponent<Unit>().Scared && !stats.GetComponent<Unit>().Blinded) modifier -= 2;
 
+        // W przypadku testu Refleksu wybieramy, która cecha jest wyższa
+        if (skillName == "Reflex")
+        {
+            // Podstawa: wyższa z P lub Zw
+            int baseAttr = Mathf.Max(stats.P, stats.Zw);
+            attributeName = (baseAttr == stats.Zw) ? "Zw" : "P";
+        }
+
         // Pobieranie wartości CECHY — bezpiecznie, gdy attributeName == null
-        int attributeValue2 = 0;
+        int attributeValue = 0;
         if (!string.IsNullOrEmpty(attributeName))
         {
             var attributeField = typeof(Stats).GetField(attributeName);
             if (attributeField != null)
-                attributeValue2 = (int)attributeField.GetValue(stats);
+                attributeValue = (int)attributeField.GetValue(stats);
         }
 
-        int finalScore = roll1 + roll2 + skillRoll + attributeValue2 + modifier;
+        int finalScore = roll1 + roll2 + skillRoll + attributeValue + modifier;
         if (finalScore < 0) finalScore = 0;
 
         // ===== Cecha Bezrozumny =====
@@ -337,7 +369,7 @@ public class DiceRollManager : MonoBehaviour
                 string oldStr = oldSkillRoll > 0 ? $" z <color=#FF7F50>{oldSkillRoll}</color>" : "";
                 Debug.Log($"{stats.Name} korzysta z talentu Specjalista i przerzuca Kość Umiejętności{oldStr} na <color=#FF7F50>{skillRoll}</color>.");
 
-                finalScore = roll1 + roll2 + skillRoll + attributeValue2 + modifier;
+                finalScore = roll1 + roll2 + skillRoll + attributeValue + modifier;
             }
         }
 
@@ -364,7 +396,7 @@ public class DiceRollManager : MonoBehaviour
                           !string.IsNullOrEmpty(attributeName) ? attributeName : "";
         }
 
-        string attrString = attributeValue2 != 0 ? $" Modyfikator z cechy: {attributeValue2}." : "";
+        string attrString = attributeValue != 0 ? $" Modyfikator z cechy: {attributeValue}." : "";
 
         // Jeśli nie ma modyfikatora z cechy, użyj etykiety "Modyfikatory", inaczej "Inne modyfikatory"
         string modifierLabel = string.IsNullOrEmpty(attrString) ? " Modyfikatory" : " Inne modyfikatory";
@@ -375,12 +407,15 @@ public class DiceRollManager : MonoBehaviour
         string color = (difficultyLevel == 0 || finalScore >= difficultyLevel) ? "green" : "red";
 
         string roll1Str = $"<color=#4dd2ff>{roll1}</color>";
-        string roll2Str = $"<color=#4dd2ff>{roll2}</color>";
+        string roll2Str = roll2 != 0 ? $" + <color=#4dd2ff>{roll2}</color>" : "";
         string skillRollStr = skillRoll != 0 ? $" + <color=#FF7F50>{skillRoll}</color>" : "";
 
-        if (stats.Name != null && stats.Name.Length > 0)
+        // suma rzutów do wyświetlenia: jeśli jest roll2 lub skillRoll, pokazujemy "= suma", w przeciwnym razie pomijamy
+        string totalStr = (roll2 != 0 || skillRoll != 0) ? $" = <color=#4dd2ff>{roll1 + roll2 + skillRoll}</color>" : "";
+
+        if (!string.IsNullOrEmpty(stats.Name))
         {
-            Debug.Log($"{stats.Name} rzuca na {rollContext}: {roll1Str} + {roll2Str}{skillRollStr} = <color=#4dd2ff>{roll1 + roll2 + skillRoll}</color>." + $"{attrString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>.");
+            Debug.Log($"{stats.Name} rzuca na {rollContext}: {roll1Str}{roll2Str}{skillRollStr}{totalStr}." + $"{attrString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>.");
 
             if (difficultyLevel != 0 && IsDoubleDigit(rawRoll1, rawRoll2))
             {

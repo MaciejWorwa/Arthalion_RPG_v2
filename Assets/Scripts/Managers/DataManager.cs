@@ -903,10 +903,10 @@ public class SpellData
     public int Id;
     public string Name;
     public string Arcane;
-    public string[] Type; // np. offensive, buff, armor-ignoring, magic-missile 
+    public string[] Type; // np. offensive, buff, armor-ignoring, no-damage
     public int CastingNumber; //poziom mocy
     public float Range; // zasięg
-    public int Strength; // siła zaklęcia
+    public int[] Strength; // siła zaklęcia
     public int AreaSize; // obszar działania
     public int Duration; // czas trwania zaklęcia
     public int Targets; // ilość celów
@@ -914,6 +914,7 @@ public class SpellData
     public string DamageType; // Rodzaj obrażeń, np. ice, poison, physical
     public string SaveAttribute; // Cecha, która jest testowana u celu zaklęcia, aby się przed nim obronić
     public string SaveSkill; // Umiejętność, która jest testowana u celu zaklęcia, aby się przed nim obronić
+    public int SaveDifficulty; // Trudność testu obronnego
 
     //public bool SaveTestRequiring; // określa, czy zaklęcie powoduje konieczność wykonania testu obronnego
     //public int AttributeValue; // określa o ile są zmieniane cechy opisane w tabeli Attribute
@@ -924,7 +925,6 @@ public class SpellData
 
     public bool ArmourIgnoring;
     public bool MetalArmourIgnoring;
-    public bool WtIgnoring;
 
     public SpellData(Spell spell)
     {

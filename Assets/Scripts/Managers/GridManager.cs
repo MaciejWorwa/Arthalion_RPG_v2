@@ -259,7 +259,10 @@ public class GridManager : MonoBehaviour
     {
         ResetColorOfTilesInMovementRange();
         Spell spell = Unit.SelectedUnit.GetComponent<Spell>();
-        float areaSize = spell.Type.Contains("constant-area-size") ? spell.AreaSize : spell.AreaSize * (Unit.SelectedUnit.GetComponent<Stats>().SW / 10) / 2f;
+
+        int areaSize = spell.AreaSize;
+        if (MagicManager.Instance.CriticalCastingString == "area_size") areaSize *= 2;
+
         Collider2D[] allColliders = Physics2D.OverlapCircleAll(tileUnderCursor.transform.position, areaSize);
         foreach (var collider in allColliders)
         {

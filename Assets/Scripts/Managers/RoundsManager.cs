@@ -78,33 +78,27 @@ public class RoundsManager : MonoBehaviour
             unit.IsTurnFinished = false;
             unit.CanDoAction = true;
             SetCanDoActionToggle(true);
-            unit.CanMove = true;
-            MovementManager.Instance.SetCanMoveToggle(true);
+
+            if (unit.Entangled || unit.Grappled || stats.Sz == 0)
+            {
+                unit.CanMove = false;
+            }
+            else
+            {
+                unit.CanMove = true;
+            }
 
             if (unit.Unconscious)
             {
                 StartCoroutine(StatesManager.Instance.Recover(unit));
             }
-            if (unit.Entangled)
-            {
-                unit.CanMove = false;
-            }
+
             if (stats.Spellcasting > 0)
             {
                 unit.CanCastSpell = true;
             }
 
             if (stinkUnitExist) StartCoroutine(StatesManager.Instance.HandleStink(unit));
-
-            //if (unit.SpellDuration > 0)
-            //{
-            //    unit.SpellDuration--;
-
-            //    if (unit.SpellDuration == 0)
-            //    {
-            //        MagicManager.Instance.ResetSpellEffect(unit);
-            //    }
-            //}
 
             if (stats.ActiveSpellEffects != null && stats.ActiveSpellEffects.Count != 0)
             {
@@ -126,6 +120,24 @@ public class RoundsManager : MonoBehaviour
                 if (!entangledUnitExist)
                 {
                     unit.EntangledUnitId = 0;
+                }
+            }
+
+            if (unit.GrappledUnitId != 0)
+            {
+                bool grappledUnitExist = false;
+
+                foreach (var u in UnitsManager.Instance.AllUnits)
+                {
+                    if (u.UnitId == unit.GrappledUnitId && u.Grappled)
+                    {
+                        grappledUnitExist = true;
+                    }
+                }
+
+                if (!grappledUnitExist)
+                {
+                    unit.GrappledUnitId = 0;
                 }
             }
 

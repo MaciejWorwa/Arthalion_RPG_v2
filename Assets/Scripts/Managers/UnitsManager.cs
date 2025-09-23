@@ -861,10 +861,6 @@ public class UnitsManager : MonoBehaviour
         Inventory inventory = unitGO.GetComponent<Inventory>();
         if (unit == null || stats == null) return;
 
-        // Podstawa: wyższa z P lub Zw
-        int baseAttr = Mathf.Max(stats.P, stats.Zw);
-        string attrKey = (baseAttr == stats.Zw) ? "Zw" : "P";
-
         // Modyfikator za cechę broni (Fast/Slow) – na podstawie EquippedWeapons
         int weaponMod = 0;
         bool hasFast = false, hasSlow = false;
@@ -881,7 +877,7 @@ public class UnitsManager : MonoBehaviour
         }
 
         // Finalna inicjatywa
-        stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", attrKey, "Reflex", weaponMod)[3];
+        stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", null, "Reflex", weaponMod)[3];
 
         // Aktualizacja kolejki inicjatywy — wpisujemy RZECZYWISTĄ wartość
         InitiativeQueueManager.Instance.InitiativeQueue[unit] = stats.Initiative;
