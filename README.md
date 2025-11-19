@@ -1,6 +1,6 @@
 # Arthalion RPG
 
-Arthalion RPG is a tactical combat simulator designed for tabletop RPG sessions set in the world of Arthalion. It combines a powerful map editor, intelligent unit management, an extensive weapon and magic system, and fully automated dice and combat mechanics—all based on a custom RPG ruleset.
+Arthalion RPG is a tactical combat simulator designed for tabletop RPG sessions set in the world of Arthalion. It combines a powerful map editor, intelligent unit management, an extensive weapon and magic system, and fully automated dice and combat mechanics — all based on a custom RPG ruleset.
 With hundreds of map assets, a flexible inventory system, and an intuitive interface, Arthalion RPG allows you to run battles and tactical encounters quickly, clearly, and efficiently, no matter what campaign you’re playing.
 
 # Setup
