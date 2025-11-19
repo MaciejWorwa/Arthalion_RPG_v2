@@ -35,7 +35,6 @@ public class DiceRollManager : MonoBehaviour
 
     [SerializeField] private TMP_InputField _roll1InputField;
     [SerializeField] private TMP_InputField _roll2InputField;
-    [SerializeField] private TMP_InputField _skillRollInputField;
     [SerializeField] private GameObject _applyRollResultPanel;
 
     public int RollModifier = 0;
@@ -92,10 +91,23 @@ public class DiceRollManager : MonoBehaviour
         if (_roll2InputField != null)
         {
             string rc = _pendingRollContext?.ToLower() ?? "";
-            bool isSpellDamageRoll = rc.Contains("obrażenia zaklęcia");
-            bool hasTwoDice = rc.Contains("2k");
 
-            _roll2InputField.interactable = !(isSpellDamageRoll && !hasTwoDice);
+            bool isDamageRoll = rc.Contains("obrażenia");
+
+            _roll2InputField.gameObject.SetActive(!isDamageRoll);
+
+            if(isDamageRoll)
+            {
+                _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Suma z kości";
+                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", true);
+                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", false);
+            }
+            else
+            {
+                _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Kość 1";
+                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", false);
+                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", true);
+            }
         }
 
         // UI
@@ -109,14 +121,6 @@ public class DiceRollManager : MonoBehaviour
 
         if (_roll1InputField != null) _roll1InputField.text = "";
         if (_roll2InputField != null) _roll2InputField.text = "";
-        if (_skillRollInputField != null) _skillRollInputField.text = "";
-
-        // zablokuj imput na Kość Umiejętności, jeśli jednostka nie posiada rozwiniętej umiejętności
-        if (_skillRollInputField != null)
-        {
-            HasSkillDie(_pendingStats, _pendingSkillName, out var skillVal);
-            _skillRollInputField.interactable = skillVal > 0;
-        }
 
         // Czekaj aż OnSubmitRoll policzy TestSkill i zapisze _pendingResult
         while (_pendingResult == null)
@@ -140,12 +144,13 @@ public class DiceRollManager : MonoBehaviour
 
     public void OnSubmitRoll()
     {
-        if (_roll1InputField == null || _roll2InputField == null || _skillRollInputField == null)
+        if (_roll1InputField == null || _roll2InputField == null)
             return;
 
-        // sprawdź czy to rzut na obrażenia i ile kości wymaga kontekst
-        bool isDamageRoll = _pendingRollContext != null && _pendingRollContext.ToLower().Contains("obrażenia zaklęcia");
-        bool requiresTwoDice = !isDamageRoll || (_pendingRollContext.Contains("2k"));
+        string rc = _pendingRollContext?.ToLower() ?? "";
+
+        // sprawdź czy to rzut na obrażenia
+        bool isDamageRoll = rc.Contains("obrażenia");
 
         int r1 = 0, r2 = 0;
 
@@ -155,23 +160,24 @@ public class DiceRollManager : MonoBehaviour
             return;
         }
 
-        if (requiresTwoDice)
+        if (isDamageRoll)
         {
-            if (!int.TryParse(_roll2InputField.text, out r2))
-            {
-                Debug.Log("<color=red>Należy wpisać wynik obu kości.</color>");
-                return;
-            }
-        }
-        else
-        {
-            r2 = 0; // ignorujemy drugą kość przy obrażeniach do których używamy jednej kości
+            // RZUT NA OBRAŻENIA:
+            // gracz wpisał SUMĘ wszystkich kości do pierwszego pola
+            _pendingResult = new int[] { r1 };
+
+            _roll1InputField.text = "";
+            _roll2InputField.text = "";
+            _applyRollResultPanel.SetActive(false);
+            return;
         }
 
-        // skillRoll opcjonalny
-        int r3 = 0;
-        if (!string.IsNullOrWhiteSpace(_skillRollInputField.text))
-            int.TryParse(_skillRollInputField.text, out r3);
+        // TESTY CECH/UMIEJĘTNOŚCI – jak wcześniej: dwa pola
+        if (!int.TryParse(_roll2InputField.text, out r2))
+        {
+            Debug.Log("<color=red>Należy wpisać wynik obu kości.</color>");
+            return;
+        }
 
         _pendingResult = TestSkill(
             stats: _pendingStats,
@@ -181,13 +187,11 @@ public class DiceRollManager : MonoBehaviour
             modifier: _pendingModifier,
             roll1: r1,
             roll2: r2,
-            skillRoll: r3,
             difficultyLevel: _pendingDifficultyLevel
         );
 
         _roll1InputField.text = "";
         _roll2InputField.text = "";
-        _skillRollInputField.text = "";
         _applyRollResultPanel.SetActive(false);
     }
 
@@ -243,8 +247,7 @@ public class DiceRollManager : MonoBehaviour
     int modifier = 0,
     int difficultyLevel = 0,
     int roll1 = 0,
-    int roll2 = 0,
-    int skillRoll = 0)
+    int roll2 = 0)
     {
         // Pobieranie wartości umiejętności
         int skillValue = 0;
@@ -260,16 +263,6 @@ public class DiceRollManager : MonoBehaviour
         {
             roll1 = UnityEngine.Random.Range(1, 11);
             roll2 = UnityEngine.Random.Range(1, 11);
-
-            switch (skillValue)
-            {
-                case 1: skillRoll = UnityEngine.Random.Range(1, 5); break;  // k4
-                case 2: skillRoll = UnityEngine.Random.Range(1, 7); break;  // k6
-                case 3: skillRoll = UnityEngine.Random.Range(1, 9); break;  // k8
-                default:
-                    // brak kostki umiejętności
-                    break;
-            }
         }
 
         // --- ZAPAMIĘTAJ PIERWOTNE WYNIKI K10 (przed Twardzielem)
@@ -300,7 +293,7 @@ public class DiceRollManager : MonoBehaviour
                 attributeValue = (int)attributeField.GetValue(stats);
         }
 
-        int finalScore = roll1 + roll2 + skillRoll + attributeValue + modifier;
+        int finalScore = roll1 + roll2 + Math.Min(skillValue + attributeValue, 10) + modifier;
         if (finalScore < 0) finalScore = 0;
 
         // ===== Cecha Bezrozumny =====
@@ -322,54 +315,32 @@ public class DiceRollManager : MonoBehaviour
             return new int[] { 0, 0, 0, finalScore };
         }
 
-        // ===== Użycie talentu SPECJALISTA: warunkowy przerzut Kości Umiejętności =====
-        if (stats.HasSpecialist(skillName) && skillValue >= 1 && skillValue <= 3 && (GameManager.IsAutoDiceRollingMode || stats.CompareTag("EnemyUnit")))
+        // ===== Użycie talentu SPECJALISTA: warunkowy przerzut niższej kości =====
+        if (stats.HasSpecialist(skillName) && (GameManager.IsAutoDiceRollingMode || stats.CompareTag("EnemyUnit")))
         {
-            int oldSkillRoll = skillRoll;
+            int oldValue = roll1 < roll2 ? roll1 : roll2;
 
-            // średnie wartości dla k4/k6/k8
-            float avg = skillValue switch
-            {
-                1 => 2.5f, // k4
-                2 => 3.5f, // k6
-                3 => 4.5f, // k8
-                _ => 0f
-            };
-
-            bool shouldReroll = false;
-
-            if (difficultyLevel > 0)
-            {
-                if (finalScore < difficultyLevel)
-                    shouldReroll = true;      // zawsze przerzut – nie spełniasz trudności
-                else
-                    shouldReroll = false;     // spełniasz trudność – nie przerzucasz
-            }
-            else // difficultyLevel == 0
-            {
-                if (oldSkillRoll < avg)
-                    shouldReroll = true;      // brak poziomu trudności – przerzut tylko przy wcześniejszym rzucie poniżej średniej
-            }
+            bool shouldReroll = oldValue <= 5; // przerzut jeśli niższa kość wynosi 5 lub mniej
 
             if (shouldReroll)
             {
                 // przerzut
-                switch (skillValue)
-                {
-                    case 1: skillRoll = UnityEngine.Random.Range(1, 5); break;  // k4
-                    case 2: skillRoll = UnityEngine.Random.Range(1, 7); break;  // k6
-                    case 3: skillRoll = UnityEngine.Random.Range(1, 9); break;  // k8
-                }
+                int newValue = UnityEngine.Random.Range(1, 11);
+
+                if (roll1 < roll2)
+                    roll1 = newValue;
+                else
+                    roll2 = newValue;
 
                 // logi
                 if (string.IsNullOrEmpty(rollContext))
                     rollContext = !string.IsNullOrEmpty(skillName) ? skillName :
                                   !string.IsNullOrEmpty(attributeName) ? attributeName : "";
 
-                string oldStr = oldSkillRoll > 0 ? $" z <color=#FF7F50>{oldSkillRoll}</color>" : "";
-                Debug.Log($"{stats.Name} korzysta z talentu Specjalista i przerzuca Kość Umiejętności{oldStr} na <color=#FF7F50>{skillRoll}</color>.");
+                string oldStr = oldValue > 0 ? $" z <color=#FF7F50>{oldValue}</color>" : "";
+                Debug.Log($"{stats.Name} korzysta z talentu Specjalista i przerzuca niższą kość{oldStr} na <color=#FF7F50>{newValue}</color>.");
 
-                finalScore = roll1 + roll2 + skillRoll + attributeValue + modifier;
+                finalScore = roll1 + roll2 + skillValue + attributeValue + modifier;
             }
         }
 
@@ -380,14 +351,14 @@ public class DiceRollManager : MonoBehaviour
             if (roll1 <= roll2)
             {
                 oldValue = roll1;
-                roll1 *= 2;
+                roll1 = Mathf.Min(roll1 * 2, 10);
             }
             else
             {
                 oldValue = roll2;
-                roll2 *= 2;
+                roll2 = Mathf.Min(roll2 * 2, 10);
             }
-            Debug.Log($"{stats.Name} korzysta z talentu Twardziel – niższa kość zostaje podwojona z <color=#4dd2ff>{oldValue}</color> na <color=#4dd2ff>{oldValue * 2}</color>.");
+            Debug.Log($"{stats.Name} korzysta z talentu Twardziel – niższa kość zostaje zwiększona z <color=#4dd2ff>{oldValue}</color> na <color=#4dd2ff>{oldValue * 2}</color>.");
         }
 
         if (string.IsNullOrEmpty(rollContext))
@@ -397,9 +368,10 @@ public class DiceRollManager : MonoBehaviour
         }
 
         string attrString = attributeValue != 0 ? $" Modyfikator z cechy: {attributeValue}." : "";
+        string skillString = skillValue != 0 ? $" Modyfikator z umiejętności: {skillValue}." : "";
 
-        // Jeśli nie ma modyfikatora z cechy, użyj etykiety "Modyfikatory", inaczej "Inne modyfikatory"
-        string modifierLabel = string.IsNullOrEmpty(attrString) ? " Modyfikatory" : " Inne modyfikatory";
+        bool hasBaseMods = (attributeValue != 0 || skillValue != 0);
+        string modifierLabel = hasBaseMods ? " Inne modyfikatory" : " Modyfikatory";
         string modifierString = modifier != 0 ? $"{modifierLabel}: {modifier}." : "";
 
         string difficultyLevelString = difficultyLevel != 0 ? $"/{difficultyLevel}" : "";
@@ -408,14 +380,16 @@ public class DiceRollManager : MonoBehaviour
 
         string roll1Str = $"<color=#4dd2ff>{roll1}</color>";
         string roll2Str = roll2 != 0 ? $" + <color=#4dd2ff>{roll2}</color>" : "";
-        string skillRollStr = skillRoll != 0 ? $" + <color=#FF7F50>{skillRoll}</color>" : "";
 
-        // suma rzutów do wyświetlenia: jeśli jest roll2 lub skillRoll, pokazujemy "= suma", w przeciwnym razie pomijamy
-        string totalStr = (roll2 != 0 || skillRoll != 0) ? $" = <color=#4dd2ff>{roll1 + roll2 + skillRoll}</color>" : "";
+        // suma rzutów do wyświetlenia: jeśli jest roll2, pokazujemy "= suma"
+        string totalStr = roll2 != 0 ? $" = <color=#4dd2ff>{roll1 + roll2}</color>" : "";
 
         if (!string.IsNullOrEmpty(stats.Name))
         {
-            Debug.Log($"{stats.Name} rzuca na {rollContext}: {roll1Str}{roll2Str}{skillRollStr}{totalStr}." + $"{attrString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>.");
+            Debug.Log(
+                $"{stats.Name} rzuca na {rollContext}: {roll1Str}{roll2Str}{totalStr}."
+                + $"{attrString}{skillString}{modifierString} Łączny wynik: <color={color}>{finalScore}{difficultyLevelString}</color>."
+            );
 
             if (difficultyLevel != 0 && IsDoubleDigit(rawRoll1, rawRoll2))
             {
@@ -433,19 +407,7 @@ public class DiceRollManager : MonoBehaviour
         }
 
         ResetRollModifier();
-        return new int[] { roll1, roll2, skillRoll, finalScore };
+        return new int[] { roll1, roll2, finalScore };
     }
     #endregion
-
-    private bool HasSkillDie(Stats stats, string skillName, out int skillValue)
-    {
-        skillValue = 0;
-        if (stats == null || string.IsNullOrEmpty(skillName)) return false;
-
-        var field = typeof(Stats).GetField(skillName);
-        if (field == null) return false;
-
-        skillValue = (int)field.GetValue(stats); // 0..3
-        return skillValue > 0;
-    }
 }

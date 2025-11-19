@@ -129,7 +129,7 @@ public class MagicManager : MonoBehaviour
         {
             castingTest = DiceRollManager.Instance.TestSkill(stats, "Rzucanie Zaklęć", "SW", "Spellcasting");
         }
-        rollResult = castingTest[3];
+        rollResult = castingTest[2];
 
         bool spellFailed = spell.CastingNumber - rollResult > 0;
         Debug.Log(spellFailed ? $"Rzucanie zaklęcia {spell.Name} nie powiodło się." : $"Zaklęcie {spell.Name} zostało rzucone pomyślnie.");
@@ -293,7 +293,7 @@ public class MagicManager : MonoBehaviour
             {
                 saveTest = DiceRollManager.Instance.TestSkill(targetStats, $"{saveName} (rzut obronny przed zaklęciem)", spell.SaveAttribute, spell.SaveSkill, difficultyLevel: saveDifficulty);
             }
-            saveRollResult = saveTest[3];
+            saveRollResult = saveTest[2];
 
             if (saveRollResult < saveDifficulty || (spell.SaveDifficulty == 0 && saveRollResult == saveDifficulty))
             {
@@ -424,36 +424,41 @@ public class MagicManager : MonoBehaviour
             int die1, die2;
             if (!GameManager.IsAutoDiceRollingMode && caster.CompareTag("PlayerUnit"))
             {
-                // Tryb ręczny – gracz wpisuje wyniki kości dla obrażeń (bez umiejętności/atrybutów)
                 int[] damageRoll = null;
                 yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(
                         caster,
-                        $"obrażenia zaklęcia {diceCtx}",
+                        $"obrażenia zaklęcia {diceCtx}",   // np. (k6+k10) albo (k8)
                         null,
                         callback: result => damageRoll = result
                     )
                 );
-                if (damageRoll == null) { onComputed?.Invoke(0); yield break; }
+                if (damageRoll == null || damageRoll.Length == 0)
+                {
+                    onComputed?.Invoke(0);
+                    yield break;
+                }
 
-                // Zakładamy, że gracz poda 1 lub 2 wartości; bierzemy pierwsze dwie pozycje
-                die1 = damageRoll.Length >= 1 ? damageRoll[0] : 0;
-                die2 = (dice2 > 0 && damageRoll.Length >= 2) ? damageRoll[1] : 0;
+                // Gracz wpisał SUMĘ wszystkich kości do pierwszego pola
+                int totalInput = damageRoll[0];
 
-                // Opcjonalnie ograniczamy do zakresu danej kości (żeby uniknąć literówek)
-                if (dice1 > 0) die1 = Mathf.Clamp(die1, 1, dice1);
-                if (dice2 > 0) die2 = Mathf.Clamp(die2, 1, dice2);
+                // Jeśli chcesz, możesz tu dodać sanity check (zakres min/max),
+                // ale nie jest to konieczne.
+                int total = totalInput + modifier;
+                onComputed?.Invoke(total);
             }
             else
             {
-                // Tryb automatyczny – losujemy
+                // Tryb automatyczny – zostaw tak jak masz
                 die1 = UnityEngine.Random.Range(1, dice1 + 1);
                 die2 = (dice2 > 0) ? UnityEngine.Random.Range(1, dice2 + 1) : 0;
 
-                Debug.Log($"Wynik rzutu na obrażenia zaklęcia: <color=#4dd2ff>{die1}</color>" + (dice2 > 0 ? $"+ <color=#4dd2ff>{die2}</color>" : "") + (modifier != 0 ? $" +<color=#FF7F50>{modifier}</color>" : "") + ".");
+                int total = die1 + die2 + modifier;
+                Debug.Log($"Wynik rzutu na obrażenia zaklęcia: <color=#4dd2ff>{die1}</color>"
+                    + (dice2 > 0 ? $"+ <color=#4dd2ff>{die2}</color>" : "")
+                    + (modifier != 0 ? $" +<color=#FF7F50>{modifier}</color>" : "")
+                    + $". Suma: <color=#4dd2ff>{total}</color>.");
+                onComputed?.Invoke(total);
             }
-
-            int total = die1 + die2 + modifier;
-            onComputed?.Invoke(total);
         }
 
         // Jeśli typ zawiera "constant-strength", obrażenia są wynikiem rzutów wg spell.Strength[]
@@ -623,7 +628,7 @@ public class MagicManager : MonoBehaviour
             test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, "Religious", spellLevel);
         }
 
-        int score = test[3];
+        int score = test[2];
 
         // Notka dołączana do każdego loga
         const string manualNote = " <color=orange>Efekt uwzględnij ręcznie</color>.";

@@ -54,7 +54,7 @@ public class CombatManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _dodgeButton;
     [SerializeField] private UnityEngine.UI.Button _parryButton;
     private string _parryOrDodge;
-    public int[] DefenceResults = new int[3]; // Wynik rzutu obronnego
+    public int[] DefenceResults = new int[2]; // Wynik rzutu obronnego
 
     private string _grapplingActionChoice = "";    // Zmienna do przechowywania wyboru akcji przy grapplingu
     [SerializeField] private GameObject _grapplingActionPanel;
@@ -438,12 +438,12 @@ public class CombatManager : MonoBehaviour
             // Auto – TestSkill sam wylosuje kości
             attackTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie", "Zr", skillName, attackModifier);
         }
-        attackRollResult = attackTest[3];
+        attackRollResult = attackTest[2];
 
 
-        // ============== TALENTY ZABÓJCA, WOJOWNIK I STRZELEC WYBOROWY =================
+        // ============== TALENTY WOJOWNIK I STRZELEC WYBOROWY =================
         //
-        // Podwojenie niższej k10: wybierz ŹRÓDŁO (Slayer > CombatMaster/Scharpshooter)
+        // Podwojenie niższej k10: wybierz ŹRÓDŁO
         bool hasSharpshooterOrCombatMaster =
             (!isRangedAttack && attackerStats.CombatMaster) ||
             (isRangedAttack && attackerStats.Sharpshooter);
@@ -464,15 +464,8 @@ public class CombatManager : MonoBehaviour
                     break;
                 }
             }
-        }
 
-        // Priorytet: Slayer > Wojownik/Strzelec Wyborowy (nie sumują się)
-        bool shouldDoubleLowerDice = hasSlayerMatch || (!hasSlayerMatch && hasSharpshooterOrCombatMaster);
-
-        if (shouldDoubleLowerDice)
-        {
             int lowerIndex = attackTest[0] <= attackTest[1] ? 0 : 1;
-            attackRollResult += attackTest[lowerIndex]; // dodaj niższą kość drugi raz = podwojenie
 
             if (hasSlayerMatch)
             {
@@ -480,13 +473,22 @@ public class CombatManager : MonoBehaviour
                           $"Wartość niższej kości k10 zostaje podwojona z <color=#4dd2ff>{attackTest[lowerIndex]}</color> " +
                           $"na <color=#4dd2ff>{attackTest[lowerIndex] * 2}</color>. Nowy łączny wynik: <color=green>{attackRollResult}</color>.");
             }
-            else
-            {
-                string talentName = isRangedAttack ? "Strzelec Wyborowy" : "Wojownik";
-                Debug.Log($"{attackerStats.Name} korzysta z talentu {talentName}. " +
-                          $"Wartość niższej kości k10 zostaje podwojona z <color=#4dd2ff>{attackTest[lowerIndex]}</color> " +
-                          $"na <color=#4dd2ff>{attackTest[lowerIndex] * 2}</color>. Nowy łączny wynik: <color=green>{attackRollResult}</color>.");
-            }
+        }
+
+        // Wojownik/Strzelec Wyborowy
+        if (hasSharpshooterOrCombatMaster)
+        {
+            int lowerIndex = attackTest[0] <= attackTest[1] ? 0 : 1;
+
+            // podwojenie niższej kości, ale maksymalnie do 10
+            int doubled = Mathf.Min(attackTest[lowerIndex] * 2, 10);
+
+            attackRollResult += doubled;
+
+            string talentName = isRangedAttack ? "Strzelec Wyborowy" : "Wojownik";
+            Debug.Log($"{attackerStats.Name} korzysta z talentu {talentName}. " +
+                        $"Wartość niższej kości k10 zostaje zwiększona z <color=#4dd2ff>{attackTest[lowerIndex]}</color> " +
+                        $"na <color=#4dd2ff>{doubled}</color>. Nowy łączny wynik: <color=green>{attackRollResult}</color>.");
         }
 
         // --- Ustalamy miejsce trafienia ---
@@ -592,7 +594,7 @@ public class CombatManager : MonoBehaviour
 
         // 10) Rozstrzygnięcie trafienia
 
-        bool attackSucceeded = attackRollResult >= DefenceResults[3];
+        bool attackSucceeded = attackRollResult >= DefenceResults[2];
 
         // Sprawdzamy Szczęście i Pecha
 
@@ -676,20 +678,19 @@ public class CombatManager : MonoBehaviour
 
         if (attackerWeapon.Type.Contains("no-damage")) yield break; //Jeśli broń nie powoduje obrażeń, np. sieć, to pomijamy dalszą część kodu
 
-        // 11) OBLICZENIE OBRAŻEŃ
-
-        int armor = CalculateArmor(targetStats, hitLocation, attackerWeapon);
-        int damage = CalculateDamage(attackRollResult - DefenceResults[3], attackerStats, attackerWeapon);
-        //.Log($"{attackerStats.Name} zadaje {damage} obrażeń.");
-
-        // 12) ZADANIE OBRAŻEŃ
+        // 11) OBLICZENIE i ZADANIE OBRAŻEŃ
 
         // Lista jednostek, które otrzymają obrażenia
         HashSet<Unit> affectedUnits = new HashSet<Unit> { target }; // Dodajemy target od razu
 
-        ApplyDamageToTarget(damage, armor, attackerStats, targetStats, target, attackerWeapon);
+        int armor = CalculateArmor(targetStats, hitLocation, attackerWeapon);
+        StartCoroutine(CalculateDamage(attackerStats, attackerWeapon, damage =>
+        {
+            ApplyDamageToTarget(damage, armor, attackerStats, targetStats, target, attackerWeapon);
+        }));
 
-        // 13) ANIMACJA ATAKU I OBSŁUGA ŚMIERCI
+
+        // 12) ANIMACJA ATAKU I OBSŁUGA ŚMIERCI
 
         StartCoroutine(AnimationManager.Instance.PlayAnimation("attack", attacker.gameObject, target.gameObject));
 
@@ -951,12 +952,12 @@ public class CombatManager : MonoBehaviour
         int[] defenceTest = null;
         if (!GameManager.IsAutoDiceRollingMode && target.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, "parowanie", "Zr", "MeleeCombat", targetWeapon.Defensive + parryModifier, callback: result => defenceTest = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(targetStats, "parowanie", "Zr", "MeleeCombat", parryModifier, callback: result => defenceTest = result));
             if (defenceTest == null) yield break;
         }
         else
         {
-            defenceTest = DiceRollManager.Instance.TestSkill(targetStats, "parowanie", "Zr", "MeleeCombat", targetWeapon.Defensive + parryModifier);
+            defenceTest = DiceRollManager.Instance.TestSkill(targetStats, "parowanie", "Zr", "MeleeCombat", parryModifier);
         }
 
         DefenceResults = defenceTest;
@@ -1053,13 +1054,6 @@ public class CombatManager : MonoBehaviour
         attackModifier += attackerUnit.AimingBonus;
         if (attackerUnit.AimingBonus > 0) Debug.Log($"Uwzględniono modyfikator +{attackerUnit.AimingBonus} za celowanie. Łączny modyfikator: " + attackModifier);
         else if (attackerUnit.AimingBonus < 0) Debug.Log($"Uwzględniono modyfikator {attackerUnit.AimingBonus} za celowanie. Łączny modyfikator: " + attackModifier);
-
-        // Modyfikator za szarżę
-        if (attackerUnit.IsCharging && attackerStats.S > 0)
-        {
-            attackModifier += attackerStats.S;
-            Debug.Log($"Uwzględniono modyfikator +{attackerStats.S} za szarżę. Łączny modyfikator: " + attackModifier);
-        }
      
         // Utrudnienie za atak słabszą ręką
         if (attackerUnit.GetComponent<Inventory>().EquippedWeapons[0] == null || attackerWeapon.Name != attackerUnit.GetComponent<Inventory>().EquippedWeapons[0].Name)
@@ -1095,7 +1089,7 @@ public class CombatManager : MonoBehaviour
         int outNumber = CountOutnumber(attackerUnit, targetUnit, out adjacentEnemies);
 
         // Tylko w Walce Wręcz
-        if (attackerWeapon.Type.Contains("melee"))
+        if (attackerWeapon.Type.Contains("melee") && (targetStats.Size < SizeCategory.Big || attackerStats.Size >= targetStats.Size))
         {
             // Przewaga liczebna
             attackModifier += outNumber;
@@ -1228,31 +1222,147 @@ public class CombatManager : MonoBehaviour
     #endregion
 
     #region Calculating damage
-    int CalculateDamage(int successLevel, Stats attackerStats, Weapon attackerWeapon)
+    public IEnumerator CalculateDamage(Stats attackerStats, Weapon attackerWeapon, Action<int> onComputed)
     {
-        int damage;
+        // ===== Kości obrażeń broni =====
+        List<int> damageDice = new List<int>(attackerWeapon.Damage ?? new List<int>());
+
+        // Jeśli z jakiegoś powodu lista jest pusta – broń nie zadaje obrażeń (albo 0)
+        if (damageDice.Count == 0)
+        {
+            damageDice.Add(0);
+        }
+
+        // ===== Dodatkowe kości za ROZMIAR + SIŁĘ (tylko melee, tylko powyżej Average) =====
+        if (attackerStats.Size > SizeCategory.Average &&
+            attackerWeapon.Type.Contains("melee") &&
+            attackerStats.S > 0)
+        {
+            int s = attackerStats.S;
+
+            if (s == 1 || s == 2) damageDice.Add(4);       // +k4
+            else if (s == 3) damageDice.Add(6);     // +k6
+            else if (s == 4) damageDice.Add(8);     // +k8
+            else if (s == 5) damageDice.Add(10);    // +k10
+            else if (s == 6 || s == 7) damageDice.Add(12); // +k12
+            else if (s >= 8)
+            {
+                // +2k8
+                damageDice.Add(8);
+                damageDice.Add(8);
+            }
+        }
+
+        // ===== Modyfikator za Siłę =====
         int strengthModifier = 0;
 
-        //Modyfikator za rozmiar
-        if (attackerStats.Size > SizeCategory.Average && attackerWeapon.Type.Contains("melee") && attackerStats.S > 0)
+        // Broń typu "strength-based" dodaje S (NA RAZIE NIEUŻYWANE W GRZE, ALE ZOSTAWIAM)
+        if (attackerWeapon.Type.Contains("strength-based") && attackerStats.S > 0)
         {
-            strengthModifier = attackerStats.S;
+            strengthModifier += attackerStats.S;
         }
 
-        //Modyfikator za broń typu strength-based
-        if(attackerWeapon.Type.Contains("strength-based"))
+        // Modyfikator za szarżę
+        if (attackerStats.GetComponent<Unit>().IsCharging && attackerStats.S > 0)
         {
-            attackerWeapon.Damage = attackerStats.S;
+            strengthModifier += attackerStats.S;
+            Debug.Log($"Uwzględniono modyfikator +{attackerStats.S} do wartości obrażeń za szarżę.");
         }
 
-        damage = successLevel + strengthModifier + attackerWeapon.Damage;
+        // ===== Przygotowanie opisu kości do komunikatu =====
+        string diceCtx = "";
+        if (damageDice.Count > 0)
+        {
+            // np. (k4+k4+k6+k10)
+            string expr = string.Join("+", damageDice.ConvertAll(d => $"k{d}"));
+            diceCtx = $"({expr})";
+        }
 
-        string strenghtBonusString = strengthModifier != 0 ? $" Modyfikator z Siły: {strengthModifier}." : "";
-        Debug.Log($"Różnica w rzutach: {successLevel}.{strenghtBonusString} Siła broni: {attackerWeapon.Damage}. Łączne obrażenia zadane przez {attackerStats.Name}: <color=#4dd2ff>{damage}</color>");
+        int rolledDamage = 0;
+        List<int> individualRolls = new List<int>();
 
-        if (damage < 0) damage = 0;
+        // ===== TRYB RĘCZNY (gracz wpisuje wyniki) =====
+        if (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit"))
+        {
+            int[] damageRoll = null;
 
-        return damage;
+            yield return StartCoroutine(
+                DiceRollManager.Instance.WaitForRollValue(
+                    attackerStats,
+                    $"obrażenia broni {diceCtx}",
+                    attributeName: null,
+                    skillName: null,
+                    modifier: 0,
+                    difficultyLevel: 0,
+                    callback: result => damageRoll = result
+                )
+            );
+
+            if (damageRoll == null || damageRoll.Length == 0)
+            {
+                onComputed?.Invoke(0);
+                yield break;
+            }
+
+            int total = damageRoll[0]; // SUMA wszystkich kości
+            rolledDamage = total;
+            individualRolls.Clear();
+            individualRolls.Add(total); // do logów możemy wyświetlić po prostu sumę
+        }
+        // ===== TRYB AUTOMATYCZNY =====
+        else
+        {
+            foreach (int die in damageDice)
+            {
+                int roll = die > 0
+                    ? UnityEngine.Random.Range(1, die + 1)  // kX → 1..X
+                    : 0;
+
+                rolledDamage += roll;
+                individualRolls.Add(roll);
+            }
+        }
+
+        // ===== Całkowite obrażenia =====
+        int finalDamage = rolledDamage + strengthModifier;
+        if (finalDamage < 0) finalDamage = 0;
+
+        // ===== Log =====
+        string diceTypes = damageDice.Count > 0
+            ? string.Join(" + ", damageDice.ConvertAll(d => $"<color=#4dd2ff>k{d}</color>"))
+            : "brak";
+
+        string diceRolls = damageDice.Count > 0
+            ? string.Join(" + ", individualRolls)
+            : "0";
+
+        string diceInfo;
+        if (damageDice.Count == 0)
+        {
+            diceInfo = "Broń nie zadaje obrażeń.";
+        }
+        else if (damageDice.Count == 1 || (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit")))
+        {
+            diceInfo =
+                $"Rzut na obrażenia: {diceTypes}. " +
+                $"Wynik: <color=#4dd2ff>{individualRolls[0]}</color>.";
+        }
+        else
+        {
+            diceInfo =
+                $"Rzut na obrażenia: {diceTypes}. " +
+                $"Wyniki: {diceRolls} = <color=#4dd2ff>{rolledDamage}</color>.";
+        }
+
+        string modifierString = strengthModifier != 0
+            ? $" Modyfikator: <color=#4dd2ff>{strengthModifier}</color>."
+            : "";
+
+        Debug.Log(
+            $"{diceInfo}{modifierString} Łączne obrażenia zadane przez {attackerStats.Name}: <color=#4dd2ff>{finalDamage}</color>."
+        );
+
+        onComputed?.Invoke(finalDamage);
     }
     #endregion
 
@@ -1270,7 +1380,7 @@ public class CombatManager : MonoBehaviour
         {
             criticalWoundTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie krytyczne", null, "Pitiless");
         }
-        rollResult = criticalWoundTest[3];
+        rollResult = criticalWoundTest[2];
 
 
         int modifier = targetStats.TempHealth < 0 ? Math.Abs(targetStats.TempHealth) : 0;
@@ -1600,7 +1710,7 @@ public class CombatManager : MonoBehaviour
                         w.Type.Any(t => !string.IsNullOrEmpty(t) &&
                                         (t.Equals("chain", StringComparison.OrdinalIgnoreCase) ||
                                          t.Equals("plate", StringComparison.OrdinalIgnoreCase))))
-            .Sum(w => Mathf.Max(0, w.Armor - w.Damage));
+            .Sum(w => Mathf.Max(0, w.Armor - w.Damage[0]));
 
         if (attackerWeapon != null && attackerWeapon.Penetrating && armor > 0)
             armor--;
@@ -1850,7 +1960,7 @@ public class CombatManager : MonoBehaviour
                 {
                     attackerTest = DiceRollManager.Instance.TestSkill(attackerStats, statName, statKey);
                 }
-                int attackerRoll = attackerTest[3];
+                int attackerRoll = attackerTest[2];
 
                 // 2) Rzut celu (czyli pochwytującego)
                 int[] targetTest = null;
@@ -1863,7 +1973,7 @@ public class CombatManager : MonoBehaviour
                 {
                     targetTest = DiceRollManager.Instance.TestSkill(targetStats, "Siłę", "S");
                 }
-                int targetRoll = targetTest[3];
+                int targetRoll = targetTest[2];
 
                 //Wykonuje akcję
                 RoundsManager.Instance.DoAction(attacker);
@@ -1946,7 +2056,7 @@ public class CombatManager : MonoBehaviour
             {
                 attackerTest = DiceRollManager.Instance.TestSkill(attackerStats, "Siłę", "S");
             }
-            attackerRoll = attackerTest[3];
+            attackerRoll = attackerTest[2];
 
             // 2) Rzut celu: wybieramy wyższą cechę z S / Zw
             int[] targetTest = null;
@@ -1963,7 +2073,7 @@ public class CombatManager : MonoBehaviour
             {
                 targetTest = DiceRollManager.Instance.TestSkill(targetStats, statName, statKey);
             }
-            int targetRoll = targetTest[3];
+            int targetRoll = targetTest[2];
 
             //Wykonuje akcję
             RoundsManager.Instance.DoAction(attacker);
@@ -2064,7 +2174,7 @@ public class CombatManager : MonoBehaviour
             );
         }
 
-        targetRoll = targetTest[3];
+        targetRoll = targetTest[2];
 
         if (targetRoll > difficultyLevel)
         {
@@ -2303,7 +2413,7 @@ public class CombatManager : MonoBehaviour
         {
             targetTest = DiceRollManager.Instance.TestSkill(targetStats, "Kondycję", "K");
         }
-        targetRoll = targetTest[3];
+        targetRoll = targetTest[2];
 
         // Dla atakującego
         int[] attackerTest= null;
@@ -2316,7 +2426,7 @@ public class CombatManager : MonoBehaviour
         {
             attackerTest = DiceRollManager.Instance.TestSkill(attackerStats, "Siłę", "S");
         }
-        attackerRoll = attackerTest[3];
+        attackerRoll = attackerTest[2];
 
 
         if (attackerRoll > targetRoll)
@@ -2360,7 +2470,7 @@ public class CombatManager : MonoBehaviour
         {
             targetTest = DiceRollManager.Instance.TestSkill(targetStats, "Walkę Wręcz", "Zr", "MeleeCombat");
         }
-        targetRoll = targetTest[3];
+        targetRoll = targetTest[2];
 
         // Dla atakującego
         int[] attackerTest = null;
@@ -2373,7 +2483,7 @@ public class CombatManager : MonoBehaviour
         {
             attackerTest = DiceRollManager.Instance.TestSkill(attackerStats, "Walkę Wręcz", "Zr", "MeleeCombat");
         }
-        attackerRoll = attackerTest[3];
+        attackerRoll = attackerTest[2];
 
         if (attackerRoll > targetRoll)
         {

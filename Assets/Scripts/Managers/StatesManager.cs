@@ -77,7 +77,7 @@ public class StatesManager : MonoBehaviour
             );
         }
 
-        int finalScore = test[3];
+        int finalScore = test[2];
         if (finalScore >= difficulty)
         {
             unit.Ablaze = false;
@@ -137,7 +137,7 @@ public class StatesManager : MonoBehaviour
                 );
             }
 
-            int finalScore = testResult[3];
+            int finalScore = testResult[2];
 
             if (finalScore < difficulty)
             {
@@ -203,7 +203,7 @@ public class StatesManager : MonoBehaviour
 
         int roll1 = test[0];
         int roll2 = test[1];
-        int finalScore = test[3];
+        int finalScore = test[2];
 
         // SZCZĘŚCIE i PECH
         if (DiceRollManager.Instance.IsDoubleDigit(roll1, roll2))
@@ -334,7 +334,7 @@ public class StatesManager : MonoBehaviour
             );
         }
 
-        int finalScore = test[3];
+        int finalScore = test[2];
         if (finalScore >= difficulty)
         {
             unit.Unconscious = false;
@@ -500,7 +500,7 @@ public class StatesManager : MonoBehaviour
             );
         }
 
-        int finalScore = test[3];
+        int finalScore = test[2];
 
         if (finalScore < difficulty)
         {
@@ -580,7 +580,7 @@ public class StatesManager : MonoBehaviour
             );
         }
 
-        int finalScore = test[3];
+        int finalScore = test[2];
         if (finalScore < difficulty)
         {
             unit.CanDoAction = false;

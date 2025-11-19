@@ -447,7 +447,7 @@ public class MovementManager : MonoBehaviour
             {
                 runTest = DiceRollManager.Instance.TestSkill(stats, "Atletykę", "Zw", "Athletics");
             }
-            rollResult = runTest[3];
+            rollResult = runTest[2];
 
 
             //Oblicza obecną szybkość

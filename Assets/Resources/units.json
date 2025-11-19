@@ -47,7 +47,8 @@
       "Scary": 20,
       "Undead": true,
       "Tough": true,
-      "Spellcasting": 3,
+      "Spellcasting": 4,
+      "MeleeCombat": 3,
       "Magic": [ "Death" ],
       "Chosen": true
     },
@@ -65,7 +66,7 @@
       "Ch": -3,
       "SW": 3,
       "Sz": 4,
-      "MeleeCombat": 2,
+      "MeleeCombat": 3,
       "Hardy": true,
       "Scary": 12,
       "NaturalArmor": 1
@@ -77,14 +78,14 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "Size": 2,
       "S": -2,
       "K": -2,
       "Zw": 2,
-      "Zr": 0,
+      "Zr": 1,
       "Int": 2,
       "P": 2,
       "Ch": 2,
@@ -124,9 +125,9 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 4,
-      "Dodge": 1,
-      "MeleeCombat": 1,
-      "RangedCombat": 1
+      "Dodge": 2,
+      "MeleeCombat": 2,
+      "RangedCombat": 2
     },
     {
       "Race": "Goblin Szaman",
@@ -142,9 +143,8 @@
       "Ch": 0,
       "SW": 3,
       "Sz": 8,
-      "Spellcasting": 2,
-      "Dodge": 1,
-      "Intimidate": 1,
+      "Spellcasting": 3,
+      "Dodge": 2,
       "Magic": [ "Fire", "Ice", "Earth", "Water", "Air", "Death" ],
       "NaturalArmor": 1
     },
@@ -169,7 +169,7 @@
       "Ch": -3,
       "SW": 0,
       "Sz": 5,
-      "Reflex": 2
+      "Reflex": 4
     },
     {
       "Race": "Koń",
@@ -179,7 +179,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": 4,
@@ -191,7 +191,7 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 7,
-      "Athletics": 1
+      "Athletics": 2
     },
     {
       "Race": "Krwiopij",
@@ -201,7 +201,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": -5,
@@ -213,7 +213,7 @@
       "Ch": -5,
       "SW": -3,
       "Sz": 2,
-      "Reflex": 3,
+      "Reflex": 5,
       "Flight": 6,
       "Resistance": [ "Poison" ]
     },
@@ -231,10 +231,11 @@
       "Ch": -5,
       "SW": 0,
       "Sz": 6,
-      "Athletics": 2,
-      "Reflex": 2,
+      "Athletics": 3,
+      "Reflex": 3,
       "Pitiless": 1,
-      "Hungry": true
+      "Hungry": true,
+      "MeleeCombat": 2
     },
     {
       "Race": "Kuc",
@@ -244,7 +245,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": 2,
@@ -256,7 +257,7 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 5,
-      "Athletics": 1
+      "Athletics": 2
     },
     {
       "Race": "Kurhaniec",
@@ -272,8 +273,8 @@
       "Ch": -3,
       "SW": 0,
       "Sz": 6,
-      "Athletics": 3,
-      "Reflex": 2,
+      "Athletics": 5,
+      "Reflex": 3,
       "Hungry": true
     },
     {
@@ -293,8 +294,8 @@
       "Undead": true,
       "BlackMagic": true,
       "Scary": 16,
-      "Spellcasting": 3,
-      "Dodge": 2,
+      "Spellcasting": 5,
+      "Dodge": 3,
       "Magic": [ "Death" ],
       "NaturalArmor": 5
     },
@@ -306,7 +307,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": 1
+          "Value": 4
         }
       ],
       "S": -2,
@@ -318,7 +319,7 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 6,
-      "Reflex": 2,
+      "Reflex": 4,
       "Flight": 8
     },
     {
@@ -342,19 +343,19 @@
       "Race": "Morgras",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buzdygan" ],
+      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława" ],
       "S": 2,
       "K": 3,
       "Zw": 0,
-      "Zr": 3,
+      "Zr": 2,
       "Int": -1,
       "P": 0,
       "Ch": -2,
       "SW": 2,
       "Sz": 5,
-      "Endurance": 1,
-      "Dodge": 1,
-      "MeleeCombat": 1,
+      "Endurance": 3,
+      "Dodge": 2,
+      "MeleeCombat": 2,
       "NaturalArmor": 3
     },
     {
@@ -371,7 +372,7 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 5,
-      "Athletics": 1
+      "Athletics": 2
     },
     {
       "Race": "Nienazwany",
@@ -430,8 +431,8 @@
       "Ch": -3,
       "SW": 3,
       "Sz": 6,
-      "Endurance": 2,
-      "Reflex": 2,
+      "Endurance": 4,
+      "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 1,
       "Resistance": [ "Poison" ]
@@ -456,8 +457,8 @@
       "Ch": -3,
       "SW": 4,
       "Sz": 6,
-      "Endurance": 2,
-      "Reflex": 2,
+      "Endurance": 4,
+      "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 2,
       "Resistance": [ "Poison" ]
@@ -487,7 +488,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": -5,
@@ -515,7 +516,7 @@
       "Ch": -5,
       "SW": 0,
       "Sz": 5,
-      "MeleeCombat": 1,
+      "MeleeCombat": 2,
       "Pitiless": 1,
       "Scary": 14,
       "Hungry": true,
@@ -529,7 +530,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": 2
+          "Value": 10
         },
         {
           "Key": "Penetrating",
@@ -539,14 +540,14 @@
       "S": 3,
       "K": 3,
       "Zw": 5,
-      "Zr": 5,
+      "Zr": 4,
       "Int": 2,
       "P": 4,
       "Ch": -4,
       "SW": 5,
       "Sz": 7,
-      "MeleeCombat": 3,
-      "Dodge": 3,
+      "MeleeCombat": 4,
+      "Dodge": 5,
       "Pitiless": 2,
       "Undead": true,
       "Scary": 16
@@ -559,7 +560,7 @@
       "S": 3,
       "K": 3,
       "Zw": 2,
-      "Zr": 5,
+      "Zr": 4,
       "Int": 2,
       "P": 2,
       "Ch": -2,
@@ -569,14 +570,17 @@
       "Scary": 16,
       "Undead": true,
       "Pitiless": 2,
-      "CombatMaster": true
+      "CombatMaster": true,
+      "MeleeCombat": 5,
+      "Dodge": 5,
+      "Cool": 5
     },
     {
       "Race": "Smok",
       "Type": "Dragon",
       "Size": 4,
       "PrimaryWeaponNames": [ "Broń naturalna" ],
-      "S": 9,
+      "S": 8,
       "K": 9,
       "Zw": 2,
       "Zr": 0,
@@ -590,8 +594,8 @@
       "Flight": 10,
       "Resistance": [ "Fire", "Poison", "Ice", "Electricity" ],
       "NaturalArmor": 3,
-      "MeleeCombat": 3,
-      "Cool": 3
+      "MeleeCombat": 5,
+      "Cool": 5
     },
     {
       "Race": "Szczur",
@@ -601,13 +605,13 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": -5,
       "K": -4,
       "Zw": 3,
-      "Zr": -4,
+      "Zr": 0,
       "Int": -5,
       "P": 3,
       "Ch": -5,
@@ -618,7 +622,7 @@
       "Race": "Szkielet",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buzdygan", "Młot bojowy", "Włócznia", "Puklerz" ],
+      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz" ],
       "S": -1,
       "K": -1,
       "Zw": 0,
@@ -657,12 +661,6 @@
       "Type": "Humanoid",
       "Size": 3,
       "PrimaryWeaponNames": [ "Broń naturalna" ],
-      "PrimaryWeaponAttributes": [
-        {
-          "Key": "Damage",
-          "Value": 1
-        }
-      ],
       "S": 3,
       "K": 3,
       "Zw": 0,
@@ -672,10 +670,11 @@
       "Ch": -5,
       "SW": 0,
       "Sz": 4,
-      "Stink": true
+      "Stink": true,
+      "Endurance": 4
     },
     {
-      "Race": "Troll",
+      "Race": "Troll górski",
       "Type": "Beast",
       "Size": 3,
       "PrimaryWeaponNames": [ "Pałka" ],
@@ -688,11 +687,31 @@
       "Ch": -3,
       "SW": 0,
       "Sz": 4,
-      "MeleeCombat": 1,
+      "MeleeCombat": 3,
       "Hardy": true,
       "Hungry": true,
       "Scary": 12,
       "NaturalArmor": 3
+    },
+    {
+      "Race": "Troll leśny",
+      "Type": "Beast",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Pałka" ],
+      "S": 5,
+      "K": 4,
+      "Zw": -2,
+      "Zr": -2,
+      "Int": -4,
+      "P": -3,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 4,
+      "MeleeCombat": 3,
+      "Hardy": true,
+      "Hungry": true,
+      "Scary": 12,
+      "NaturalArmor": 1
     },
     {
       "Race": "Upiór",
@@ -711,8 +730,8 @@
       "Undead": true,
       "Scary": 16,
       "Resistance": [ "Physical" ],
-      "Dodge": 1,
-      "MeleeCombat": 2,
+      "Dodge": 2,
+      "MeleeCombat": 3,
       "NaturalArmor": 3
     },
     {
@@ -739,7 +758,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": 1
+          "Value": 8
         }
       ],
       "S": 0,
@@ -751,8 +770,8 @@
       "Ch": -2,
       "SW": 0,
       "Sz": 7,
-      "Athletics": 2,
-      "Reflex": 2
+      "Athletics": 3,
+      "Reflex": 3
     },
     {
       "Race": "Złodziej Myśli",
@@ -762,7 +781,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": -3,
@@ -775,7 +794,7 @@
       "SW": 5,
       "Sz": 3,
       "Flight": 8,
-      "Reflex": 3
+      "Reflex": 5
     },
     {
       "Race": "Zombie",
@@ -804,7 +823,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": 3
+          "Value": 8
         },
         {
           "Key": "AttackRange",
@@ -841,7 +860,7 @@
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
-          "Value": -2
+          "Value": 4
         }
       ],
       "S": 2,
@@ -854,7 +873,7 @@
       "SW": 3,
       "Sz": 4,
       "Undead": true,
-      "Spellcasting": 1,
+      "Spellcasting": 2,
       "Magic": [ "Fire", "Ice", "Earth", "Water", "Air" ],
       "Resistance": [ "Fire", "Ice", "Physical", "Electric", "Poison" ],
       "Unmeaning": true

@@ -20,8 +20,8 @@ public class Weapon : MonoBehaviour
     [Header("Uszkodzenie")]
     public bool Broken; // Uszkodzenie broni
 
-    [Header("Obrażenia")]
-    public int Damage;
+    [Header("Obrażenia (np. 4 i 6 to k4 + k6) lub uszkodzenie pancerza")]
+    public List<int> Damage = new List<int> { 0 };
 
     [Header("Zasięg")]
     public float AttackRange;
@@ -62,7 +62,7 @@ public class Weapon : MonoBehaviour
         // Zapisujemy bazowe statystyki przy uruchomieniu
         BaseWeaponStats = new WeaponBaseStats
         {
-            Damage = this.Damage,
+            Damage = new List<int>(this.Damage),
             AttackRange = this.AttackRange,
             ReloadTime = this.ReloadTime,
             Penetrating = this.Penetrating,
@@ -78,7 +78,7 @@ public class Weapon : MonoBehaviour
         NaturalWeapon = true;
         TwoHanded = false;
         Quality = "Zwykła";
-        Damage = -2;
+        Damage = new List<int> { 4 }; ;
         AttackRange = 1.5f;
         AmmoType = "Brak";
         ReloadTime = 0;
@@ -100,7 +100,7 @@ public class Weapon : MonoBehaviour
 [System.Serializable]
 public class WeaponBaseStats
 {
-    public int Damage;
+    public List<int> Damage = new List<int> { 0 };
     public float AttackRange;
     public int ReloadTime;
     public bool Penetrating;

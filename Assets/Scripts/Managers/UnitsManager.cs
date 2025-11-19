@@ -398,6 +398,27 @@ public class UnitsManager : MonoBehaviour
                         {
                             convertedValue = fVal;
                         }
+                        else if (ft == typeof(List<int>))
+                        {
+                            // Obsługa DAMAGE jako listy kości
+                            var list = new List<int>();
+
+                            if (!string.IsNullOrWhiteSpace(attr.Value))
+                            {
+                                // pozwól na "4" albo "4,6,8"
+                                var parts = attr.Value.Split(',');
+                                foreach (var p in parts)
+                                {
+                                    if (int.TryParse(p.Trim(), out var die) && die > 0)
+                                        list.Add(die);
+                                }
+                            }
+
+                            if (list.Count == 0)
+                                list.Add(0); // fallback, żeby lista nie była pusta
+
+                            convertedValue = list;
+                        }
                     }
                     catch
                     {
@@ -639,7 +660,7 @@ public class UnitsManager : MonoBehaviour
             );
         }
 
-        int finalScore = test[3];
+        int finalScore = test[2];
 
         if (finalScore < 12)
         {
@@ -877,7 +898,7 @@ public class UnitsManager : MonoBehaviour
         }
 
         // Finalna inicjatywa
-        stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", null, "Reflex", weaponMod)[3];
+        stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", null, "Reflex", weaponMod)[2];
 
         // Aktualizacja kolejki inicjatywy — wpisujemy RZECZYWISTĄ wartość
         InitiativeQueueManager.Instance.InitiativeQueue[unit] = stats.Initiative;

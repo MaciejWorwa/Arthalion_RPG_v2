@@ -604,7 +604,6 @@ GameObject:
   - component: {fileID: -2754630250583481522}
   - component: {fileID: 8447459666408192081}
   - component: {fileID: 6267734093322851998}
-  - component: {fileID: -2613873717699355788}
   - component: {fileID: -2147539621934683725}
   m_Layer: 6
   m_Name: Unit
@@ -652,6 +651,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -673,6 +674,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -743,35 +745,24 @@ MonoBehaviour:
   IsTurnFinished: 0
   IsRunning: 0
   IsCharging: 0
+  IsFlying: 0
   IsRetreating: 0
-  IsFrenzy: 0
   Ablaze: 0
   Bleeding: 0
   Blinded: 0
-  Broken: 0
-  Deafened: 0
   Entangled: 0
-  Fatiqued: 0
   Poison: 0
-  PoisonTestModifier: 0
   Prone: 0
-  Stunned: 0
-  Surprised: 0
+  Scared: 0
   Unconscious: 0
+  Grappled: 0
+  GrappledUnitId: 0
   EntangledUnitId: 0
-  FeintedUnitId: 0
-  IsFearTestPassed: 0
-  IsTerrorTestPassed: 0
-  FearLevel: 0
-  SpellDuration: 0
+  FearTestedLevel: 0
   AimingBonus: 0
-  ChannelingModifier: 0
-  DefensiveBonus: 0
-  FeintModifier: 0
   CanMove: 1
   CanDoAction: 1
   CanCastSpell: 0
-  CanDispell: 0
   Stats: {fileID: 0}
   NameDisplay: {fileID: 5344260523014033116}
   HealthDisplay: {fileID: 1306580773643467112}
@@ -797,108 +788,90 @@ MonoBehaviour:
   Exp: 0
   Name: 
   Race: 
+  Type: 
   Size: 0
   PrimaryWeaponNames: []
-  WW: 0
-  US: 0
+  PrimaryWeaponAttributes: []
   S: 0
-  Wt: 0
-  I: 0
+  K: 0
   Zw: 0
   Zr: 0
   Int: 0
+  P: 0
+  Ch: 0
   SW: 0
-  Ogd: 0
   Sz: 0
   TempSz: 0
   MaxHealth: 0
   TempHealth: 0
   CriticalWounds: 0
-  CorruptionPoints: 0
   SinPoints: 0
-  PS: 0
-  PP: 0
-  Resolve: 0
-  Resilience: 0
+  TempPL: 0
+  MaxPL: 0
+  PB: 0
   ExtraPoints: 0
   Initiative: 0
   CurrentEncumbrance: 0
   MaxEncumbrance: 0
+  ExtraEncumbrance: 0
   Armor_head: 0
   Armor_arms: 0
   Armor_torso: 0
   Armor_legs: 0
+  ArmorPenaltyZw: 0
+  ArmorPenaltyP: 0
   Athletics: 0
-  Channeling: 0
   Cool: 0
   Dodge: 0
   Endurance: 0
+  MeleeCombat: 0
+  RangedCombat: 0
+  Reflex: 0
+  Spellcasting: 0
+  Pray: 0
+  Channeling: 0
   MagicLanguage: 0
-  AethyricAttunement: 0
   AccurateShot: 0
-  Ambidextrous: 0
+  Chosen: 0
   CombatMaster: 0
-  CombatReflexes: 0
-  DirtyFighting: 0
-  Disarm: 0
-  DualWielder: 0
-  FastHands: 0
-  Feint: 0
-  Frenzy: 0
-  FrenzyAttacksLeft: 0
-  FuriousAssault: 0
-  Gunner: 0
+  Fast: 0
+  Fencing: 0
   Hardy: 0
-  Implacable: 0
-  InstinctiveDiction: 0
-  IronJaw: 0
-  MagicResistance: 0
-  RapidReload: 0
-  ReactionStrike: 0
-  ReactionStrikesLeft: 0
-  Relentless: 0
-  Resolute: 0
-  Riposte: 0
-  RiposteAttacksLeft: 0
-  Robust: 0
+  Pitiless: 0
+  Religious: 0
   Sharpshooter: 0
-  Shieldsman: 0
-  Sniper: 0
-  Sprinter: 0
-  StoutHearted: 0
-  StrikeMightyBlow: 0
-  StrikeToInjure: 0
-  StrikeToStun: 0
-  StrongBack: 0
-  Sturdy: 0
-  SureShot: 0
-  Unshakable: 0
-  Vaulting: 0
-  WarWizard: 0
-  Bestial: 0
-  Bounce: 0
-  Champion: 0
-  CorrosiveBlood: 0
-  Daemonic: 0
-  Distracting: 0
-  Ethereal: 0
-  Fear: 0
+  SurvivalInstinct: 0
+  Magic:
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  Resistance:
+  - 
+  - 
+  - 
+  - 
+  - 
+  Slayer:
+  - 
+  - 
+  - 
+  Specialist:
+  - 
+  - 
+  - 
+  BlackMagic: 0
+  Flight: 0
   Hungry: 0
-  ImmunityToPsychology: 0
   NaturalArmor: 0
-  Regeneration: 0
-  Stride: 0
-  Terror: 0
+  Scary: 0
+  Slow: 0
+  Stink: 0
+  Tough: 0
   Undead: 0
-  Unstable: 0
-  Vampiric: 0
-  Venom: 0
-  VenomModifier: 0
-  Ward: 0
-  ArmouredCasting: 0
-  MagicSense: 0
-  MightyMissile: 0
-  WillOfIron: 0
+  Unmeaning: 0
   HighestDamageDealt: 0
   TotalDamageDealt: 0
   HighestDamageTaken: 0
@@ -944,105 +917,36 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Id: 0
   BaseWeaponStats:
-    S: 0
+    Damage: 
     AttackRange: 0
     ReloadTime: 0
-    Accurate: 0
     Penetrating: 0
-    Impale: 0
-    Slash: 0
-    Undamaging: 0
-    Imprecise: 0
-    Dangerous: 0
     Pummel: 0
-    Impact: 0
-    Spread: 0
-    Precise: 0
-    Blast: 0
   Name: "Pi\u0119\u015Bci"
   Type:
   - melee
   TwoHanded: 0
   NaturalWeapon: 0
   Quality: "Zwyk\u0142a"
-  Category: 
-  Encumbrance: 0
-  Damage: 0
-  S: -4
+  Broken: 0
+  Damage: 
   AttackRange: 1.5
   AmmoType: Brak
   ReloadTime: 0
   ReloadLeft: 0
-  AmmoMax: 0
-  AmmoLeft: 0
-  Durable: 0
-  Practical: 0
-  Shoddy: 0
-  Unrielable: 0
-  Bulky: 0
-  Lightweight: 0
-  Accurate: 0
-  Blackpowder: 0
-  Blast: 0
-  Damaging: 0
-  Dangerous: 0
+  S: -4
+  Zr: 0
+  Zw: 0
+  P: 0
   Defensive: 0
-  Distract: 0
   Entangle: 0
   Fast: 0
-  Hack: 0
-  Impact: 0
-  Impale: 0
-  Imprecise: 0
   Penetrating: 0
-  Pistol: 0
-  Precise: 0
   Pummel: 0
-  Slash: 0
   Slow: 0
-  Shield: 0
-  Spread: 0
-  Tiring: 0
-  TrapBlade: 0
-  Trip: 0
-  Unbreakable: 0
-  Undamaging: 0
-  Unbalanced: 0
-  Wrap: 0
+  Magical: 0
+  Poisonous: 0
   Armor: 0
-  Flexible: 0
-  Impenetrable: 0
-  Partial: 0
-  WeakPoints: 0
---- !u!114 &-2613873717699355788
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2921409717819951567}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9a421797d8d31f41a7f2c4dfd6b205f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Id: 0
-  Name: 
-  Location: []
-  Quality: 
-  Category: 
-  Encumbrance: 0
-  Damage: 0
-  Bulky: 0
-  Durable: 0
-  Flexible: 0
-  Impenetrable: 0
-  Lightweight: 0
-  Partial: 0
-  Practical: 0
-  Shoddy: 0
-  Unrielable: 0
-  WeakPoints: 0
 --- !u!114 &-2147539621934683725
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1107,6 +1011,8 @@ SpriteMask:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1128,6 +1034,7 @@ SpriteMask:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -2106,6 +2013,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -2127,6 +2036,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI;
 
 public class DataManager : MonoBehaviour
 {
@@ -373,6 +374,16 @@ public class DataManager : MonoBehaviour
                         if (weaponToUpdate.WeaponsWithReloadLeft.ContainsKey(weapon.Id) && field.Name == "ReloadLeft")
                         {
                             weaponToUpdate.ReloadLeft = weaponToUpdate.WeaponsWithReloadLeft[weapon.Id];
+                            continue;
+                        }
+
+                        if (field.Name == "Damage")
+                        {
+                            var srcValue = field.GetValue(weapon);
+                            if (srcValue is List<int> listDamage)
+                            {
+                                targetField.SetValue(weaponToUpdate, new List<int>(listDamage));
+                            }
                             continue;
                         }
 
@@ -816,7 +827,7 @@ public class WeaponData
     public string Name;
     public string[] Type;
     public string Quality;
-    public int Damage; // Obrażenia
+    public List<int> Damage = new List<int> { 0 }; // Obrażenia
     public bool Broken; // Uszkodzenie broni
     public bool TwoHanded;
     public bool NaturalWeapon;
@@ -857,41 +868,21 @@ public class WeaponData
         {
             var field = fields.FirstOrDefault(f => f.Name == thisField.Name); // Znajduje pierwsze pole o tej samej nazwie wśród pol z klasy Weapon
 
-            if (field != null && field.GetValue(weapons) != null)
+            if (field == null) continue;
+
+            var value = field.GetValue(weapons);
+            if (value == null) continue;
+
+            // Specjalne traktowanie Damage, żeby skopiować listę, a nie referencję
+            if (thisField.Name == nameof(Damage) && value is List<int> dmgList)
             {
-                thisField.SetValue(this, field.GetValue(weapons));
+                var newList = new List<int>(dmgList);
+                if (newList.Count == 0) newList.Add(0);
+                thisField.SetValue(this, newList);
             }
-        }
-    }
-}
-
-
-[System.Serializable]
-public class ArmorData
-{
-    public int Id;
-    public string Name;
-    public string Quality;
-    public string Category;
-    public int Encumbrance; // Obciążenie
-    public bool Broken; // Uszkodzenie
-
-    public bool Flexible;  // Można na niego ubierać inną zbroję
-
-    public ArmorData(Armor armors)
-    {
-        // Pobiera wszystkie pola (zmienne) z klasy Stats
-        var fields = armors.GetType().GetFields();
-        var thisFields = this.GetType().GetFields();
-
-        // Dla każdego pola z klasy stats odnajduje pole w klasie this (czyli WeaponData) i ustawia mu wartość jego odpowiednika z klasy Weapon
-        foreach (var thisField in thisFields)
-        {
-            var field = fields.FirstOrDefault(f => f.Name == thisField.Name); // Znajduje pierwsze pole o tej samej nazwie wśród pol z klasy Weapon
-
-            if (field != null && field.GetValue(armors) != null)
+            else
             {
-                thisField.SetValue(this, field.GetValue(armors));
+                thisField.SetValue(this, value);
             }
         }
     }
@@ -985,7 +976,6 @@ public class AttributePair
 public class InventoryData
 {
     public List<WeaponData> AllWeapons = new List<WeaponData>(); //Wszystkie posiadane przez postać bronie
-    public List<ArmorData> AllArmors = new List<ArmorData>(); //Wszystkie posiadane przez postać elementy zbroi
     public List<int> EquippedArmorsId = new List<int>(); //Wszystkie ubrane przez postać elementy zbroi
     public int[] EquippedWeaponsId = new int[2]; // Tablica identyfikatorów broni trzymanych w rękach
     public int CopperCoins;

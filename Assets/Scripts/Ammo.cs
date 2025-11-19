@@ -6,7 +6,6 @@ public class Ammo
     public string Name; // Nazwa amunicji
 
     // Lista efektów, które ta amunicja zmienia
-    public int? Damage = null;        // Siła (S) - null oznacza, że nie zmienia tej cechy
     public float? AttackRange = null;
     public float? AttackRangeMultiplier = null; // jeśli nie null, modyfikuje zasięg mnożąc go przez podaną wartość
     public int? ReloadTime = null; // Czas przeładowania
@@ -17,7 +16,6 @@ public class Ammo
     public Ammo(string name, int? damage = null, float? attackRange = null, int? reloadTime = null, bool? penetrating = null, bool? pummel = null, float? attackRangeMultiplier = null)
     {
         Name = name;
-        Damage = damage;
         AttackRange = attackRange;
         AttackRangeMultiplier = attackRangeMultiplier;
         ReloadTime = reloadTime;

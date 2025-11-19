@@ -132,6 +132,21 @@ public class InventoryManager : MonoBehaviour
             var targetField = typeof(Weapon).GetField(field.Name, BindingFlags.Instance | BindingFlags.Public);
             if (targetField != null)
             {
+                if (field.Name == "Damage")
+                {
+                    var srcValue = field.GetValue(weaponData) as List<int>;
+
+                    if (srcValue == null || srcValue.Count == 0)
+                    {
+                        targetField.SetValue(newWeapon, new List<int> { 0 });
+                    }
+                    else
+                    {
+                        targetField.SetValue(newWeapon, new List<int>(srcValue));
+                    }
+                    continue;
+                }
+
                 targetField.SetValue(newWeapon, field.GetValue(weaponData));
             }
         }
@@ -738,6 +753,46 @@ public class InventoryManager : MonoBehaviour
         //Wybiera broń z ekwipunku na podstawie wartości dropdowna
         Weapon selectedWeapon = unit.GetComponent<Inventory>().AllWeapons[selectedIndex - 1];
 
+        // ===== SPECJALNY CASE: KOŚCI OBRAŻEŃ =====
+        if (attributeName.StartsWith("Damage"))
+        {
+            var tmp = textInput.GetComponent<TMP_InputField>();
+            if (tmp == null) return;
+
+            if (!int.TryParse(tmp.text, out int dieSize) || dieSize <= 0)
+            {
+                // jeśli wpis puste / 0 / śmieci – traktujemy jako brak kości
+                dieSize = 0;
+            }
+
+            int index = 0;
+            if (attributeName.Length > "Damage".Length &&
+                int.TryParse(attributeName.Substring("Damage".Length), out int parsed))
+            {
+                index = parsed;
+            }
+
+            if (selectedWeapon.Damage == null)
+                selectedWeapon.Damage = new List<int>();
+
+            // upewniamy się, że lista ma odpowiedni rozmiar
+            while (selectedWeapon.Damage.Count <= index)
+                selectedWeapon.Damage.Add(0);
+
+            selectedWeapon.Damage[index] = dieSize;
+
+            // opcjonalnie wyczyść kości >1, jeśli chcesz mieć max 2:
+            // for (int i = 2; i < selectedWeapon.Damage.Count; i++) selectedWeapon.Damage[i] = 0;
+
+            // możesz też zsynchronizować bazowe staty
+            if (selectedWeapon.BaseWeaponStats != null)
+                selectedWeapon.BaseWeaponStats.Damage = new List<int>(selectedWeapon.Damage);
+
+            UpdateInventoryDropdown(Unit.SelectedUnit.GetComponent<Inventory>().AllWeapons, false);
+            DisplayEquippedWeaponsName();
+            return;
+        }
+
         FieldInfo field = selectedWeapon.GetType().GetField(attributeName);
 
         if (field == null) return;
@@ -853,6 +908,29 @@ public class InventoryManager : MonoBehaviour
         {
             // Pobiera pole ze statystyk postaci o nazwie takiej samej jak nazwa textInputa (z wyłączeniem słowa "input")
             string attributeName = inputField.name.Replace("_input", "");
+
+            // ===== SPECJALNY CASE: KOŚCI OBRAŻEŃ =====
+            if (attributeName.StartsWith("Damage"))
+            {
+                var tmp = inputField.GetComponent<TMP_InputField>();
+                if (tmp == null) continue;
+
+                int index = 0;
+                // "Damage0" / "Damage1" → indeks 0 / 1
+                if (attributeName.Length > "Damage".Length &&
+                    int.TryParse(attributeName.Substring("Damage".Length), out int parsed))
+                {
+                    index = parsed;
+                }
+
+                int value = 0;
+                if (selectedWeapon.Damage != null && selectedWeapon.Damage.Count > index)
+                    value = selectedWeapon.Damage[index];
+
+                tmp.text = value > 0 ? value.ToString() : ""; // puste jeśli brak kości
+                continue;
+            }
+
             FieldInfo field = selectedWeapon.GetType().GetField(attributeName);
             if (field == null) continue;
 
@@ -1077,22 +1155,22 @@ public class InventoryManager : MonoBehaviour
             {
                 if (armor.Type.Contains("head"))
                 {
-                    unitStats.Armor_head += Math.Max(0, armor.Armor - armor.Damage);
+                    unitStats.Armor_head += Math.Max(0, armor.Armor - armor.Damage[0]);
                     inventory.ArmorByLocation["head"].Add(armor);
                 }
                 if (armor.Type.Contains("arms"))
                 {
-                    unitStats.Armor_arms += Math.Max(0, armor.Armor - armor.Damage);
+                    unitStats.Armor_arms += Math.Max(0, armor.Armor - armor.Damage[0]);
                     inventory.ArmorByLocation["arms"].Add(armor);
                 }
                 if (armor.Type.Contains("torso"))
                 {
-                    unitStats.Armor_torso += Math.Max(0, armor.Armor - armor.Damage);
+                    unitStats.Armor_torso += Math.Max(0, armor.Armor - armor.Damage[0]);
                     inventory.ArmorByLocation["torso"].Add(armor);
                 }
                 if (armor.Type.Contains("legs"))
                 {
-                    unitStats.Armor_legs += Math.Max(0, armor.Armor - armor.Damage);
+                    unitStats.Armor_legs += Math.Max(0, armor.Armor - armor.Damage[0]);
                     inventory.ArmorByLocation["legs"].Add(armor);
                 }
             }
@@ -1231,7 +1309,6 @@ public class InventoryManager : MonoBehaviour
         ResetToBaseWeaponStats(weapon);
 
         // Nakładamy efekty amunicji na bazową broń
-        if (effect.Damage.HasValue) weapon.Damage = weapon.BaseWeaponStats.Damage + effect.Damage.Value; 
         if (effect.AttackRangeMultiplier.HasValue) weapon.AttackRange = weapon.BaseWeaponStats.AttackRange * effect.AttackRangeMultiplier.Value;
         else if (effect.AttackRange.HasValue) weapon.AttackRange = weapon.BaseWeaponStats.AttackRange + effect.AttackRange.Value;
         if (effect.ReloadTime.HasValue) weapon.ReloadTime = weapon.BaseWeaponStats.ReloadTime + effect.ReloadTime.Value;
