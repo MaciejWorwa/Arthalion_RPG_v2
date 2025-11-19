@@ -1,4 +1,4 @@
-# Artahlion RPG
+# Arthalion RPG
 
 Description
 
