@@ -33,6 +33,8 @@ public class AutoCombatManager : MonoBehaviour
 
     public Tile TargetTile;
 
+    [Header("Czy w Auto-Combacie jednostki powinny używać Szaleńczego Ataku?")]
+    [SerializeField] private bool _allOutAttackEnabled = true;
     public void Act(Unit unit)
     {
         Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
@@ -159,6 +161,21 @@ public class AutoCombatManager : MonoBehaviour
                 }
             }
 
+            // Decyzja: zwykły atak czy Szaleńczy Atak?
+            bool useAllOut =
+                !unit.IsCharging &&                         // podczas szarży nie używamy Szaleńczego Ataku
+                ShouldUseAllOutAttack(unit, closestOpponent.GetComponent<Unit>(), weapon); // dystans w zwarciu ≈ 1
+
+            if (useAllOut)
+            {
+                CombatManager.Instance.ChangeAttackType("AllOutAttack");
+                Debug.Log($"{unit.GetComponent<Stats>().Name} decyduje się na Szaleńczy Atak przeciwko {closestOpponent.GetComponent<Stats>().Name}.");
+            }
+            else
+            {
+                CombatManager.Instance.ChangeAttackType("StandardAttack");
+            }
+
             Debug.Log($"<color=#4dd2ff>{unit.GetComponent<Stats>().Name} atakuje {closestOpponent.GetComponent<Stats>().Name}.</color>");
             CombatManager.Instance.Attack(unit, closestOpponent.GetComponent<Unit>());
         }
@@ -186,7 +203,7 @@ public class AutoCombatManager : MonoBehaviour
 
         int movementRange = unit.IsMounted && unit.Mount != null ? unit.Mount.GetComponent<Stats>().TempSz : unit.Stats.TempSz;
 
-        if ((!weapon.Type.Contains("ranged")) && path.Count <= movementRange * 2 && path.Count >= movementRange / 2f && unit.CanDoAction && unit.CanMove && !unit.Prone) // Jeśli rywal jest w zasięgu szarży to wykonuje szarżę
+        if ((!weapon.Type.Contains("ranged")) && path.Count <= movementRange * 2 && path.Count >= movementRange / 2f && unit.CanDoAction && unit.CanMove && !unit.Prone && !unit.Stats.Slow) // Jeśli rywal jest w zasięgu szarży to wykonuje szarżę
         {
             Debug.Log($"<color=#4dd2ff>{unit.Stats.Name} szarżuje na {closestOpponent.GetComponent<Stats>().Name}.</color>");
 
@@ -215,7 +232,7 @@ public class AutoCombatManager : MonoBehaviour
             // Czeka aż ruch się zakończy
             yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false);
 
-            if (unit.CanDoAction && !unit.Prone) // Bieg (dodatkowo)
+            if (unit.CanDoAction && !unit.Prone && !unit.Stats.Slow) // Bieg (dodatkowo)
             {
                 MovementManager.Instance.Run();
                 MovementManager.Instance.MoveSelectedUnit(targetTile, unit.gameObject);
@@ -372,4 +389,56 @@ public class AutoCombatManager : MonoBehaviour
 
         return bestTile; // jeśli nie znaleziono idealnego, zwraca najlepszy możliwy
     }
+
+    private bool ShouldUseAllOutAttack(Unit attacker, Unit target, Weapon attackerWeapon)
+    {
+        // Tylko broń do walki wręcz
+        if (attackerWeapon == null || !attackerWeapon.Type.Contains("melee") || !_allOutAttackEnabled)
+            return false;
+
+        // --- ATAK ---
+
+        int attackModifier = CombatManager.Instance.CalculateAttackModifier(attacker, attackerWeapon, target);
+        int attackValueStandard = attacker.Stats.Zr + attackModifier;
+
+        int bestAttr = Mathf.Max(attacker.Stats.S, attacker.Stats.SW);
+        int attackValueAllOut = bestAttr + attackModifier;
+
+        // --- OBRONA PRZECIWNIKA ---
+
+        Inventory defInventory = target.Stats.GetComponent<Inventory>();
+        Weapon defaultDefWeapon = InventoryManager.Instance.ChooseWeaponToAttack(target.gameObject);
+
+        bool hasMeleeWeapon = defInventory.EquippedWeapons.Any(w => w != null && w.Type.Contains("melee"));
+        bool hasShield = defInventory.EquippedWeapons.Any(w => w != null && w.Type.Contains("shield"));
+        bool canParry = hasMeleeWeapon || hasShield;
+
+        Weapon parryWeapon = canParry ? CombatManager.Instance.GetBestParryWeapon(target.Stats, defaultDefWeapon) : null;
+        int parryModifier = canParry ? CombatManager.Instance.CalculateParryModifier(target, target.Stats, attacker.Stats, parryWeapon) : 0;
+        int dodgeModifier = CombatManager.Instance.CalculateDodgeModifier(target, attacker);
+
+        int parryValue = target.Stats.Zr + parryModifier;
+        int dodgeValue = target.Stats.Zw + dodgeModifier;
+
+        int defenceValue = canParry ? Mathf.Max(parryValue, dodgeValue) : dodgeValue;
+
+        int deltaStandard = attackValueStandard - defenceValue;
+        int deltaAllOut = attackValueAllOut - defenceValue;
+
+        // --- PROSTE BEZPIECZNIKI ---
+
+        // Nie ryzykuj Szaleńczego Ataku, jeśli jesteśmy już mocno poranieni
+        bool isAttackerHealthy = attacker.Stats.TempHealth > attacker.Stats.MaxHealth / 3;
+        if (!isAttackerHealthy)
+            return false;
+
+        // Szaleńczy Atak musi rzeczywiście poprawiać szanse, inaczej nie ma sensu
+        if (deltaAllOut <= deltaStandard)
+            return false;
+
+        // Wymagamy wyraźnie lepszej przewagi (tu próg 3 "oczka")
+        int gain = deltaAllOut - deltaStandard;
+        return gain >= 3;
+    }
+
 }

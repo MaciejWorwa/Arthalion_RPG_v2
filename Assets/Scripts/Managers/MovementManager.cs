@@ -364,6 +364,12 @@ public class MovementManager : MonoBehaviour
             return;
         }
 
+        if (Unit.SelectedUnit != null && Unit.SelectedUnit.GetComponent<Unit>().Entangled)
+        {
+            Debug.Log("Jednostka w stanie unieruchomienia nie może wykonywać biegu.");
+            return;
+        }
+
         //Uwzględnia cechę Długi Krok
         int modifier = 2;
 

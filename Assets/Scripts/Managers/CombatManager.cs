@@ -3,15 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
-using Unity.Mathematics;
 using Unity.VisualScripting;
-using Unity.VisualScripting.Antlr3.Runtime.Misc;
-using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
-using static UnityEngine.Rendering.DebugUI;
-using static UnityEngine.UI.CanvasScaler;
 
 public class CombatManager : MonoBehaviour
 {
@@ -44,6 +37,7 @@ public class CombatManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _mountAttackButton;
     [SerializeField] private UnityEngine.UI.Button _grapplingButton;
     [SerializeField] private UnityEngine.UI.Button _disarmButton;
+    [SerializeField] private UnityEngine.UI.Button _allOutAttackButton;
     public Dictionary<string, bool> AttackTypes = new Dictionary<string, bool>();
 
     [SerializeField] private UnityEngine.UI.Button _aimButton;
@@ -130,6 +124,7 @@ public class CombatManager : MonoBehaviour
         AttackTypes.Add("MountAttack", false);  // Atak wierzchowca
         AttackTypes.Add("Grappling", false);  // Zapasy
         AttackTypes.Add("Disarm", false);  // Rozbrajanie
+        AttackTypes.Add("AllOutAttack", false); // Szaleńczy atak
     }
 
     // Metoda ustawiająca dany typ ataku
@@ -182,13 +177,13 @@ public class CombatManager : MonoBehaviour
 
             AttackTypes[attackTypeName] = true;
 
-            //Ograniczenie finty, ogłuszania i rozbrajania do ataków w zwarciu
-            if ((AttackTypes["Disarm"] || AttackTypes["Charge"]) == true && unit.GetComponent<Inventory>().EquippedWeapons[0] != null && unit.GetComponent<Inventory>().EquippedWeapons[0].Type.Contains("ranged"))
-            {
-                AttackTypes[attackTypeName] = false;
-                AttackTypes["StandardAttack"] = true;
-                Debug.Log("Jednostka walcząca bronią dystansową nie może wykonać tej akcji.");
-            }
+            ////Ograniczenie finty, szaleńczego ataku i rozbrajania do ataków w zwarciu
+            //if ((AttackTypes["Disarm"] || AttackTypes["AllOutAttack"] || AttackTypes["Charge"]) == true && unit.GetComponent<Inventory>().EquippedWeapons[0] != null && unit.GetComponent<Inventory>().EquippedWeapons[0].Type.Contains("ranged"))
+            //{
+            //    AttackTypes[attackTypeName] = false;
+            //    AttackTypes["StandardAttack"] = true;
+            //    Debug.Log("Jednostka walcząca bronią dystansową nie może wykonać tej akcji.");
+            //}
 
             // Podczas pochwycenia lub pochwytywania kogoś możemy tylko wykonywac atak typu Zapasy
             if (attackTypeName != "Grappling" && (unit.Grappled || unit.GrappledUnitId != 0))
@@ -230,16 +225,24 @@ public class CombatManager : MonoBehaviour
         _mountAttackButton.GetComponent<UnityEngine.UI.Image>().color = AttackTypes["MountAttack"] ? new UnityEngine.Color(0.15f, 1f, 0.45f) : UnityEngine.Color.white;
         _grapplingButton.GetComponent<UnityEngine.UI.Image>().color = AttackTypes["Grappling"] ? new UnityEngine.Color(0.15f, 1f, 0.45f) : UnityEngine.Color.white;
         _disarmButton.GetComponent<UnityEngine.UI.Image>().color = AttackTypes["Disarm"] ? new UnityEngine.Color(0.15f, 1f, 0.45f) : UnityEngine.Color.white;
-        
+        _allOutAttackButton.GetComponent<UnityEngine.UI.Image>().color = AttackTypes["AllOutAttack"] ? new UnityEngine.Color(0.15f, 1f, 0.45f) : UnityEngine.Color.white;
+
         SetActionsButtonsInteractable();
     }
 
     public void SetActionsButtonsInteractable()
     {
         if (Unit.SelectedUnit == null) return;
-        _reloadButton.interactable = Unit.SelectedUnit.GetComponent<Inventory>().EquippedWeapons.Any(weapon => weapon != null && weapon.ReloadLeft > 0);
-        _grapplingButton.gameObject.SetActive(!Unit.SelectedUnit.GetComponent<Unit>().IsMounted);
-        _mountAttackButton.gameObject.SetActive(Unit.SelectedUnit.GetComponent<Unit>().IsMounted);
+        _grapplingButton.interactable = !Unit.SelectedUnit.GetComponent<Unit>().IsMounted;
+        _mountAttackButton.interactable = Unit.SelectedUnit.GetComponent<Unit>().IsMounted;
+
+        Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(Unit.SelectedUnit);
+        _reloadButton.interactable = weapon != null && weapon.ReloadLeft > 0;
+
+        bool isMelee = weapon == null || weapon.Type.Contains("melee");
+        _chargeButton.interactable = isMelee;
+        _allOutAttackButton.interactable = isMelee;
+        _disarmButton.interactable = isMelee;
     }
     #endregion
 
@@ -426,17 +429,26 @@ public class CombatManager : MonoBehaviour
         int attackRollResult = 0;
         string skillName = isRangedAttack ? "RangedCombat" : "MeleeCombat";
 
+        string attributeName = "Zr"; // domyślnie Zr
+
+        // Szaleńczy atak
+        if (AttackTypes["AllOutAttack"])
+        {
+            // wybieramy SW lub S – tę, która jest wyższa
+            attributeName = attackerStats.SW >= attackerStats.S ? "SW" : "S";
+        }
+
         int[] attackTest = null;
         if (IsManualPlayerAttack)
         {
             // Ręczne wpisanie 2–3 kości i natychmiastowy TestSkill po submit
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie", "Zr", skillName, attackModifier, callback: res => attackTest = res));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie", attributeName, skillName, attackModifier, callback: res => attackTest = res));
             if (attackTest == null) yield break;
         }
         else
         {
             // Auto – TestSkill sam wylosuje kości
-            attackTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie", "Zr", skillName, attackModifier);
+            attackTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie", attributeName, skillName, attackModifier);
         }
         attackRollResult = attackTest[2];
 
@@ -447,33 +459,6 @@ public class CombatManager : MonoBehaviour
         bool hasSharpshooterOrCombatMaster =
             (!isRangedAttack && attackerStats.CombatMaster) ||
             (isRangedAttack && attackerStats.Sharpshooter);
-
-        // Sprawdzenie Slayera — dopasowanie typu celu (case-insensitive), z tłumaczeniem PL
-        bool hasSlayerMatch = false;
-        string matchedTypePl = null;
-
-        if (attackerStats.Slayer != null && targetStats != null && !string.IsNullOrEmpty(targetStats.Type))
-        {
-            foreach (var t in attackerStats.Slayer)
-            {
-                if (string.IsNullOrEmpty(t)) continue;
-                if (string.Equals(t, targetStats.Type, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    hasSlayerMatch = true;
-                    matchedTypePl = UnitsManager.SlayerEnToPl.TryGetValue(t, out var pl) ? pl : t;
-                    break;
-                }
-            }
-
-            int lowerIndex = attackTest[0] <= attackTest[1] ? 0 : 1;
-
-            if (hasSlayerMatch)
-            {
-                Debug.Log($"{attackerStats.Name} korzysta z talentu Zabójca ({matchedTypePl}). " +
-                          $"Wartość niższej kości k10 zostaje podwojona z <color=#4dd2ff>{attackTest[lowerIndex]}</color> " +
-                          $"na <color=#4dd2ff>{attackTest[lowerIndex] * 2}</color>. Nowy łączny wynik: <color=green>{attackRollResult}</color>.");
-            }
-        }
 
         // Wojownik/Strzelec Wyborowy
         if (hasSharpshooterOrCombatMaster)
@@ -647,6 +632,34 @@ public class CombatManager : MonoBehaviour
         {
             Debug.Log($"Atak {attackerStats.Name} chybił.");
             StartCoroutine(AnimationManager.Instance.PlayAnimation("miss", null, target.gameObject));
+
+            // Nieudany szaleńczy atak
+            if (AttackTypes["AllOutAttack"])
+            {
+                int attackerArmor = CalculateArmor(attackerStats, hitLocation, targetWeapon);
+                StartCoroutine(CalculateDamage(targetStats, attackerStats, targetWeapon, damage =>
+                {
+                    ApplyDamageToTarget(damage, attackerArmor, targetStats, attackerStats, attacker, targetWeapon);
+                }));
+
+
+                // ANIMACJA ATAKU I OBSŁUGA ŚMIERCI
+
+                StartCoroutine(AnimationManager.Instance.PlayAnimation("attack", target.gameObject, attacker.gameObject));
+
+                if (attackerStats.TempHealth < 0)
+                {
+                    if (GameManager.IsAutoKillMode)
+                    {
+                        HandleDeath(attackerStats, attacker.gameObject, targetStats);
+                    }
+                    else
+                    {
+                        StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
+                    }
+                }
+            }
+
             ChangeAttackType(); // Resetuje typ ataku
 
             yield break;
@@ -684,7 +697,7 @@ public class CombatManager : MonoBehaviour
         HashSet<Unit> affectedUnits = new HashSet<Unit> { target }; // Dodajemy target od razu
 
         int armor = CalculateArmor(targetStats, hitLocation, attackerWeapon);
-        StartCoroutine(CalculateDamage(attackerStats, attackerWeapon, damage =>
+        StartCoroutine(CalculateDamage(attackerStats, targetStats, attackerWeapon, damage =>
         {
             ApplyDamageToTarget(damage, armor, attackerStats, targetStats, target, attackerWeapon);
         }));
@@ -719,7 +732,7 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
-            // Jeśli atak nie przebił pancerza, ale broń NIE JEST tępa, to broń zadaje 1 obrażeń
+            // Jeśli atak nie przebił pancerza to broń zadaje 1 obrażeń
             if (attackerWeapon != null)
             {
                 finalDamage = 1;
@@ -1222,7 +1235,7 @@ public class CombatManager : MonoBehaviour
     #endregion
 
     #region Calculating damage
-    public IEnumerator CalculateDamage(Stats attackerStats, Weapon attackerWeapon, Action<int> onComputed)
+    public IEnumerator CalculateDamage(Stats attackerStats, Stats targetStats, Weapon attackerWeapon, Action<int> onComputed)
     {
         // ===== Kości obrażeń broni =====
         List<int> damageDice = new List<int>(attackerWeapon.Damage ?? new List<int>());
@@ -1321,6 +1334,67 @@ public class CombatManager : MonoBehaviour
                 rolledDamage += roll;
                 individualRolls.Add(roll);
             }
+
+            // Sprawdzenie Slayera — dopasowanie typu celu (case-insensitive), z tłumaczeniem PL
+            bool hasSlayerMatch = false;
+            string matchedTypePl = null;
+            if (attackerStats.Slayer != null && targetStats != null && !string.IsNullOrEmpty(targetStats.Type))
+            {
+                foreach (var t in attackerStats.Slayer)
+                {
+                    if (string.IsNullOrEmpty(t)) continue;
+                    if (string.Equals(t, targetStats.Type, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasSlayerMatch = true;
+                        matchedTypePl = UnitsManager.SlayerEnToPl.TryGetValue(t, out var pl) ? pl : t;
+                        break;
+                    }
+                }
+            }
+
+            // ===== TALENT ZABÓJCA – PRZERZUT JEDNEJ KOŚCI OBRAŻEŃ =====
+            if (hasSlayerMatch && individualRolls.Count == damageDice.Count)
+            {
+                int bestIndex = -1;
+                float bestGain = 0f;
+
+                for (int i = 0; i < damageDice.Count; i++)
+                {
+                    int die = damageDice[i];
+                    int roll = individualRolls[i];
+
+                    if (die <= 1) continue; // k0 / „pusta kość” nas nie interesuje
+
+                    float avg = (die + 1) / 2f;  // średnia oczekiwana dla kX
+
+                    // przerzucamy tylko, jeśli wynik jest poniżej średniej
+                    if (roll >= avg) continue;
+
+                    float gain = avg - roll; // potencjalny zysk
+
+                    if (gain > bestGain)
+                    {
+                        bestGain = gain;
+                        bestIndex = i;
+                    }
+                }
+
+                if (bestIndex >= 0)
+                {
+                    int die = damageDice[bestIndex];
+                    int oldRoll = individualRolls[bestIndex];
+
+                    int newRoll = UnityEngine.Random.Range(1, die + 1);
+
+                    individualRolls[bestIndex] = newRoll;
+                    rolledDamage += newRoll - oldRoll;
+
+                    Debug.Log(
+                        $"{attackerStats.Name} korzysta z talentu Zabójca – przerzut kości obrażeń (k{die}) " +
+                        $"z <color=#4dd2ff>{oldRoll}</color> na <color=#4dd2ff>{newRoll}</color>."
+                    );
+                }
+            }
         }
 
         // ===== Całkowite obrażenia =====
@@ -1344,7 +1418,7 @@ public class CombatManager : MonoBehaviour
         else if (damageDice.Count == 1 || (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit")))
         {
             diceInfo =
-                $"Rzut na obrażenia: {diceTypes}. " +
+                $"{attackerStats.Name} rzuca na obrażenia: {diceTypes}. " +
                 $"Wynik: <color=#4dd2ff>{individualRolls[0]}</color>.";
         }
         else
@@ -1359,7 +1433,7 @@ public class CombatManager : MonoBehaviour
             : "";
 
         Debug.Log(
-            $"{diceInfo}{modifierString} Łączne obrażenia zadane przez {attackerStats.Name}: <color=#4dd2ff>{finalDamage}</color>."
+            $"{diceInfo}{modifierString} Łączne zadane obrażenia: <color=#4dd2ff>{finalDamage}</color>."
         );
 
         onComputed?.Invoke(finalDamage);

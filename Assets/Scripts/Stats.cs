@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
-using static UnityEditor.Experimental.GraphView.GraphView;
 
 public enum SizeCategory
 {
