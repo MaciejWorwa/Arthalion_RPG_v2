@@ -50,6 +50,7 @@ public class CombatManager : MonoBehaviour
     private string _parryOrDodge;
     public int[] DefenceResults = new int[2]; // Wynik rzutu obronnego
 
+    [Header("Zapasy")]
     private string _grapplingActionChoice = "";    // Zmienna do przechowywania wyboru akcji przy grapplingu
     [SerializeField] private GameObject _grapplingActionPanel;
     [SerializeField] private UnityEngine.UI.Button _grapplingAttackButton;
@@ -63,10 +64,15 @@ public class CombatManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _riderButton;
     [SerializeField] private UnityEngine.UI.Button _mountButton;
 
-
+    [Header("Talent: Instynkt Przetrwania")]
     [SerializeField] private GameObject _survivalInstinctPanel;
     [SerializeField] private TMP_InputField _survivalInstinctInput;
     [SerializeField] private UnityEngine.UI.Button _survivalInstinctButton;
+
+    [Header("Talent: Bezlitosny")]
+    [SerializeField] private GameObject _pitilessPanel;
+    [SerializeField] private TMP_InputField _pitilessInput;
+    [SerializeField] private UnityEngine.UI.Button _pitilessButton;
 
     [SerializeField] private GameObject _entaglingPanel;
     [SerializeField] private UnityEngine.UI.Button _escapeYesButton;
@@ -937,27 +943,27 @@ public class CombatManager : MonoBehaviour
 
         if (_parryOrDodge == "parry")
         {
-            yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryValue, parryModifier));
+            yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryModifier));
         }
         else if (_parryOrDodge == "dodge")
         {
-            yield return StartCoroutine(Dodge(target, targetStats, dodgeValue, dodgeModifier));
+            yield return StartCoroutine(Dodge(target, targetStats, dodgeModifier));
         }
     }
 
     private IEnumerator AutoDefense(Unit target, Stats targetStats, Weapon targetWeapon, int parryValue, int dodgeValue, int parryModifier, int dodgeModifier, bool canParry)
     {
-        if (parryValue + parryModifier >= dodgeValue + dodgeModifier && canParry)
+        if (parryValue + parryModifier + targetStats.MeleeCombat >= dodgeValue + dodgeModifier + targetStats.Dodge && canParry)
         {
-            yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryValue, parryModifier));
+            yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryModifier));
         }
         else
         {
-            yield return StartCoroutine(Dodge(target, targetStats, dodgeValue, dodgeModifier));
+            yield return StartCoroutine(Dodge(target, targetStats, dodgeModifier));
         }
     }
 
-    private IEnumerator Parry(Unit target, Stats targetStats, Weapon targetWeapon, int parryValue, int parryModifier)
+    private IEnumerator Parry(Unit target, Stats targetStats, Weapon targetWeapon, int parryModifier)
     {
         Debug.Log($"{targetStats.Name} próbuje parować przy użyciu {targetWeapon.Name}.");
 
@@ -976,7 +982,7 @@ public class CombatManager : MonoBehaviour
         DefenceResults = defenceTest;
     }
 
-    public IEnumerator Dodge(Unit target, Stats targetStats, int dodgeValue, int dodgeModifier)
+    public IEnumerator Dodge(Unit target, Stats targetStats, int dodgeModifier)
     {
         // Jeżeli jesteśmy w trybie manualnych rzutów kośćmi i wybrana jednostka to sojusznik to czekamy na wynik rzutu
         int[] defenceTest = null;
@@ -1447,17 +1453,69 @@ public class CombatManager : MonoBehaviour
         int[] criticalWoundTest = null;
         if (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie krytyczne", null, "Pitiless", callback: result => criticalWoundTest = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie krytyczne", null, callback: result => criticalWoundTest = result));
             if (criticalWoundTest == null) yield break;
         }
         else
         {
-            criticalWoundTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie krytyczne", null, "Pitiless");
+            criticalWoundTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie krytyczne", null);
         }
         rollResult = criticalWoundTest[2];
 
-
         int modifier = targetStats.TempHealth < 0 ? Math.Abs(targetStats.TempHealth) : 0;
+
+        // --- Talent: Bezlitosny (zwiększenie wyniku o k4/k6/k8)
+        int pitilessDieSize = 0;
+        switch (Mathf.Clamp(attackerStats.Pitiless, 0, 3))
+        {
+            case 1: pitilessDieSize = 4; break;
+            case 2: pitilessDieSize = 6; break;
+            case 3: pitilessDieSize = 8; break;
+            default: pitilessDieSize = 0; break;
+        }
+
+        if (pitilessDieSize > 0)
+        {
+            if (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit"))
+            {
+                yield return StartCoroutine(WaitForRoll());
+
+                IEnumerator WaitForRoll()
+                {
+                    int rollResult = 0;
+                    _pitilessInput.text = "";
+                    _pitilessPanel.SetActive(true);
+
+                    // podpinamy listener pod button
+                    _pitilessButton.onClick.RemoveAllListeners();
+                    _pitilessButton.onClick.AddListener(() =>
+                    {
+                        if (int.TryParse(_pitilessInput.text, out int value))
+                        {
+                            rollResult = value;
+                        }
+                        else
+                        {
+                            Debug.Log("<color=red>Musisz wpisać liczbę!</color>");
+                        }
+                    });
+
+                    // czekamy aż gracz zatwierdzi
+                    while (rollResult == 0)
+                        yield return null;
+
+                    Debug.Log($"{attackerStats.Name} korzysta z talentu Bezlitosny i zwiększa wartość trafienia krytycznego o {rollResult}.");
+                    modifier += rollResult;
+                    _pitilessPanel.SetActive(false);
+                }
+            }
+            else
+            {
+                int roll = UnityEngine.Random.Range(1, pitilessDieSize + 1);
+                Debug.Log($"{attackerStats.Name} korzysta z talentu Instynkt Bezlitosny i zwiększa wartość trafienia krytycznego o {roll}.");
+                modifier += roll;
+            }
+        }
 
         // --- Talent: Instynkt Przetrwania (redukcja k4/k6/k8)
         int survivalDieSize = 0;
