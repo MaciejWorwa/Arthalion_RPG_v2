@@ -21349,6 +21349,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 201439840}
+  - component: {fileID: 201439841}
   m_Layer: 5
   m_Name: Int
   m_TagString: Untagged
@@ -21377,6 +21378,19 @@ RectTransform:
   m_AnchoredPosition: {x: 27.5, y: -90}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &201439841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 201439839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: Inteligencja
 --- !u!1 &201619333
 GameObject:
   m_ObjectHideFlags: 0
@@ -32620,6 +32634,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 299919706}
+  - component: {fileID: 299919707}
   m_Layer: 5
   m_Name: Zw
   m_TagString: Untagged
@@ -32648,6 +32663,19 @@ RectTransform:
   m_AnchoredPosition: {x: 137.5, y: -30}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &299919707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 299919705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Zwinno\u015B\u0107"
 --- !u!1 &301130944
 GameObject:
   m_ObjectHideFlags: 0
@@ -42864,7 +42892,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: Punkty Bohatera
+  _tooltipText: Maksymalne Punkty Losu
 --- !u!1 &395926002
 GameObject:
   m_ObjectHideFlags: 0
@@ -53791,6 +53819,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 493480653}
+  - component: {fileID: 493480654}
   m_Layer: 5
   m_Name: Ch
   m_TagString: Untagged
@@ -53819,6 +53848,19 @@ RectTransform:
   m_AnchoredPosition: {x: 137.5, y: -90}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &493480654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 493480652}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: Charyzma
 --- !u!1 &493815021
 GameObject:
   m_ObjectHideFlags: 0
@@ -70023,6 +70065,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 660739415}
+  - component: {fileID: 660739416}
   m_Layer: 5
   m_Name: K
   m_TagString: Untagged
@@ -70051,6 +70094,19 @@ RectTransform:
   m_AnchoredPosition: {x: 82.5, y: -30}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &660739416
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 660739414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: Kondycja
 --- !u!1 &661017675
 GameObject:
   m_ObjectHideFlags: 0
@@ -84754,7 +84810,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Punkty Szcz\u0119\u015Bcia"
+  _tooltipText: Aktualne Punkty Losu
 --- !u!1 &797113011
 GameObject:
   m_ObjectHideFlags: 0
@@ -102008,7 +102064,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 440815477}
   m_HandleRect: {fileID: 440815476}
   m_Direction: 2
-  m_Value: 1
+  m_Value: 0
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -120944,7 +121000,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: Punkty Przeznaczenia
+  _tooltipText: Punkty Bohatera
 --- !u!1 &1146173704
 GameObject:
   m_ObjectHideFlags: 0
@@ -153221,6 +153277,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1443386257}
+  - component: {fileID: 1443386258}
   m_Layer: 5
   m_Name: Zr
   m_TagString: Untagged
@@ -153249,6 +153306,19 @@ RectTransform:
   m_AnchoredPosition: {x: 192.5, y: -30}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1443386258
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1443386256}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Zr\u0119czno\u015B\u0107"
 --- !u!1 &1443393996
 GameObject:
   m_ObjectHideFlags: 0
@@ -155370,7 +155440,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 179.99988, y: -24.999878}
+  m_AnchoredPosition: {x: 179.99976, y: -24.999878}
   m_SizeDelta: {x: 400, y: -120}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!95 &1463411318
@@ -179615,6 +179685,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1672463436}
+  - component: {fileID: 1672463437}
   m_Layer: 5
   m_Name: P
   m_TagString: Untagged
@@ -179643,6 +179714,19 @@ RectTransform:
   m_AnchoredPosition: {x: 82.5, y: -90}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1672463437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672463435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: Percepcja
 --- !u!1 &1673342645
 GameObject:
   m_ObjectHideFlags: 0
@@ -184332,6 +184416,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1719920058}
+  - component: {fileID: 1719920059}
   m_Layer: 5
   m_Name: SW
   m_TagString: Untagged
@@ -184360,6 +184445,19 @@ RectTransform:
   m_AnchoredPosition: {x: 192.5, y: -90}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1719920059
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1719920057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Si\u0142a Woli"
 --- !u!1 &1721542387
 GameObject:
   m_ObjectHideFlags: 0
@@ -197682,7 +197780,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 200, y: -809.8802}
+  m_AnchoredPosition: {x: 200, y: -810.3429}
   m_SizeDelta: {x: 400, y: 275}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1847806983
@@ -201497,6 +201595,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1893701766}
+  - component: {fileID: 1893701767}
   m_Layer: 5
   m_Name: S
   m_TagString: Untagged
@@ -201525,6 +201624,19 @@ RectTransform:
   m_AnchoredPosition: {x: 27.5, y: -30}
   m_SizeDelta: {x: 55, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1893701767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1893701765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Si\u0142a"
 --- !u!1 &1896584765
 GameObject:
   m_ObjectHideFlags: 0
@@ -210662,7 +210774,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 481666393}
   m_Direction: 2
   m_Value: 1
-  m_Size: 1
+  m_Size: 0.9999998
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
