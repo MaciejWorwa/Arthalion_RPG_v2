@@ -474,7 +474,7 @@ public class CombatManager : MonoBehaviour
             // podwojenie niższej kości, ale maksymalnie do 10
             int doubled = Mathf.Min(attackTest[lowerIndex] * 2, 10);
 
-            attackRollResult += doubled;
+            attackRollResult += doubled - attackTest[lowerIndex];
 
             string talentName = isRangedAttack ? "Strzelec Wyborowy" : "Wojownik";
             Debug.Log($"{attackerStats.Name} korzysta z talentu {talentName}. " +

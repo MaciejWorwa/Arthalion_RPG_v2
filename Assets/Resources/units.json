@@ -880,8 +880,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Fire", "Ice", "Earth", "Water", "Air" ],
-      "Resistance": [ "Fire", "Ice", "Physical", "Electric", "Poison" ],
-      "Unmeaning": true
+      "Resistance": [ "Fire", "Ice", "Physical", "Electric", "Poison" ]
     }
   ]
 }
