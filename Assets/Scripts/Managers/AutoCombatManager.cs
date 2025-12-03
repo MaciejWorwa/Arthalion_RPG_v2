@@ -438,7 +438,11 @@ public class AutoCombatManager : MonoBehaviour
 
         // Wymagamy wyraźnie lepszej przewagi (tu próg 3 "oczka")
         int gain = deltaAllOut - deltaStandard;
-        return gain >= 3;
+        if (gain < 3)
+            return false;
+
+        // Wszystkie warunki spełnione — teraz 50% szans na Szaleńczy Atak
+        return UnityEngine.Random.value > 0.5f;
     }
 
 }

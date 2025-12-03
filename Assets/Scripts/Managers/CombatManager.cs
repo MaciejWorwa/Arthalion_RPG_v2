@@ -5,6 +5,7 @@ using System.Linq;
 using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
+using static UnityEngine.UI.CanvasScaler;
 
 public class CombatManager : MonoBehaviour
 {
@@ -1246,6 +1247,8 @@ public class CombatManager : MonoBehaviour
         // ===== Kości obrażeń broni =====
         List<int> damageDice = new List<int>(attackerWeapon.Damage ?? new List<int>());
 
+        Unit attacker = attackerStats.GetComponent<Unit>();
+
         // Jeśli z jakiegoś powodu lista jest pusta – broń nie zadaje obrażeń (albo 0)
         if (damageDice.Count == 0)
         {
@@ -1282,10 +1285,17 @@ public class CombatManager : MonoBehaviour
         }
 
         // Modyfikator za szarżę
-        if (attackerStats.GetComponent<Unit>().IsCharging && attackerStats.S > 0)
+        int mountStrength = 0;
+        if (attacker.IsMounted && attacker.Mount != null)
         {
-            strengthModifier += attackerStats.S;
-            Debug.Log($"Uwzględniono modyfikator +{attackerStats.S} do wartości obrażeń za szarżę.");
+            mountStrength = attacker.Mount.GetComponent<Stats>().S;
+        }
+
+        // Jeśli jednostka szarżuje i ma jakąś siłę szarży
+        if (attacker.IsCharging && (attackerStats.S > 0 || mountStrength > 0))
+        {
+            strengthModifier += Mathf.Max(attackerStats.S, mountStrength);
+            Debug.Log($"Uwzględniono modyfikator +{Mathf.Max(attackerStats.S, mountStrength)} do wartości obrażeń za szarżę.");
         }
 
         // ===== Przygotowanie opisu kości do komunikatu =====
@@ -1512,7 +1522,7 @@ public class CombatManager : MonoBehaviour
             else
             {
                 int roll = UnityEngine.Random.Range(1, pitilessDieSize + 1);
-                Debug.Log($"{attackerStats.Name} korzysta z talentu Instynkt Bezlitosny i zwiększa wartość trafienia krytycznego o {roll}.");
+                Debug.Log($"{attackerStats.Name} korzysta z talentu Bezlitosny i zwiększa wartość trafienia krytycznego o {roll}.");
                 modifier += roll;
             }
         }

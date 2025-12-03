@@ -3,9 +3,7 @@
     {
       "Race": "Człowiek",
       "Size": 2,
-      "PrimaryWeaponNames": [
-        "Miecz"
-      ],
+      "PrimaryWeaponNames": [ "Miecz", "Pałka" ],
       "Sz": 4,
       "ExtraPoints": 4
     },
@@ -115,7 +113,7 @@
     {
       "Race": "Goblin",
       "Type": "Humanoid",
-      "PrimaryWeaponNames": [ "Miecz", "Pałka", "Topór", "Tarcza", "Łuk", "Włócznia" ],
+      "PrimaryWeaponNames": [ "Miecz", "Pałka", "Krótki łuk", "Puklerz", "Kiścień", "Włócznia" ],
       "Size": 1,
       "S": -2,
       "K": 0,
@@ -345,7 +343,7 @@
       "Race": "Morgras",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława" ],
+      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień" ],
       "S": 2,
       "K": 3,
       "Zw": 0,
@@ -445,7 +443,7 @@
       "Race": "Olbrzymi Skorpion",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Szczypce", "Kolec jadowy" ],
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Poisonous",
@@ -472,7 +470,7 @@
       "Race": "Oprych",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Pałka", "Nóż", "Nóż do rzucania" ],
+      "PrimaryWeaponNames": [ "Pałka", "Nóż", "Nóż do rzucania", "Sztylet" ],
       "S": 2,
       "K": 0,
       "Zw": 2,
