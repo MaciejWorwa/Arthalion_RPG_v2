@@ -872,6 +872,7 @@ public class InventoryManager : MonoBehaviour
             Debug.Log($"Nie udało się zmienić wartości cechy.");
         }
 
+
         //Odświeża listę ekwipunku
         UpdateInventoryDropdown(Unit.SelectedUnit.GetComponent<Inventory>().AllWeapons, false);
 
@@ -1153,24 +1154,26 @@ public class InventoryManager : MonoBehaviour
             // Sumowanie wartości pancerza
             foreach (Weapon armor in equippedArmors)
             {
+                int value = armor.Broken ? 0 : armor.Armor;
+
                 if (armor.Type.Contains("head"))
                 {
-                    unitStats.Armor_head += Math.Max(0, armor.Armor - armor.Damage[0]);
+                    unitStats.Armor_head += value;
                     inventory.ArmorByLocation["head"].Add(armor);
                 }
                 if (armor.Type.Contains("arms"))
                 {
-                    unitStats.Armor_arms += Math.Max(0, armor.Armor - armor.Damage[0]);
+                    unitStats.Armor_arms += value;
                     inventory.ArmorByLocation["arms"].Add(armor);
                 }
                 if (armor.Type.Contains("torso"))
                 {
-                    unitStats.Armor_torso += Math.Max(0, armor.Armor - armor.Damage[0]);
+                    unitStats.Armor_torso += value;
                     inventory.ArmorByLocation["torso"].Add(armor);
                 }
                 if (armor.Type.Contains("legs"))
                 {
-                    unitStats.Armor_legs += Math.Max(0, armor.Armor - armor.Damage[0]);
+                    unitStats.Armor_legs += value;
                     inventory.ArmorByLocation["legs"].Add(armor);
                 }
             }
@@ -1218,11 +1221,13 @@ public class InventoryManager : MonoBehaviour
         int otherHand = SelectedHand == 0 ? 1 : 0;
         Weapon weapon = inventory.EquippedWeapons[SelectedHand] != null ? inventory.EquippedWeapons[SelectedHand] : inventory.EquippedWeapons[otherHand];
 
-        if (weapon == null)
+        if (weapon == null || weapon.Broken)
         {
             unit.GetComponent<Weapon>().ResetWeapon();
             weapon = unit.GetComponent<Weapon>();
         }
+
+        if (string.IsNullOrEmpty(weapon.Quality)) weapon.Quality = "Zwykła";
 
         return weapon;
     }

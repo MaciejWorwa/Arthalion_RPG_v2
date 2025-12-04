@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using Unity.VisualScripting;
+using Unity.VisualScripting.Antlr3.Runtime.Misc;
 using UnityEngine;
 using static UnityEngine.UI.CanvasScaler;
 
@@ -51,6 +52,12 @@ public class CombatManager : MonoBehaviour
     private string _parryOrDodge;
     public int[] DefenceResults = new int[2]; // Wynik rzutu obronnego
 
+    [Header("Panel do zarządzania trafieniami krytycznymi")]
+    [SerializeField] private GameObject _criticalHitPanel;
+    [SerializeField] private UnityEngine.UI.Button _criticalWoundButton;
+    [SerializeField] private UnityEngine.UI.Button _doubleDamageButton;
+    private string _criticalHitEffect;
+
     [Header("Zapasy")]
     private string _grapplingActionChoice = "";    // Zmienna do przechowywania wyboru akcji przy grapplingu
     [SerializeField] private GameObject _grapplingActionPanel;
@@ -95,6 +102,9 @@ public class CombatManager : MonoBehaviour
 
         _dodgeButton.onClick.AddListener(() => ParryOrDodgeButtonClick("dodge"));
         _parryButton.onClick.AddListener(() => ParryOrDodgeButtonClick("parry"));
+
+        _criticalWoundButton.onClick.AddListener(() => CriticalHitButtonClick("critical_wound"));
+        _doubleDamageButton.onClick.AddListener(() => CriticalHitButtonClick("double_damage"));
 
         _riderButton.onClick.AddListener(() => RiderOrMountButtonClick("rider"));
         _mountButton.onClick.AddListener(() => RiderOrMountButtonClick("mount"));
@@ -594,15 +604,36 @@ public class CombatManager : MonoBehaviour
         {
             if (attackSucceeded)
             {
-                Debug.Log($"{attackerStats.Name} wyrzucił <color=green>SZCZĘŚCIE</color>!");
+                Debug.Log($"{attackerStats.Name} wyrzucił/a <color=green>SZCZĘŚCIE</color>!");
                 attackerStats.FortunateEvents++;
 
-                StartCoroutine(CriticalWoundRoll(attackerStats, targetStats, hitLocation));
+
+                _criticalHitPanel.SetActive(true);
+                _criticalHitEffect = ""; // Resetujemy poprzedni wybór
+
+                // Najpierw czekamy, aż gracz kliknie którykolwiek przycisk
+                yield return new WaitUntil(() => !_criticalHitPanel.activeSelf);
+
+                if (_criticalHitEffect == "critical_wound")
+                {
+                    yield return StartCoroutine(CriticalWoundRoll(attackerStats, targetStats, hitLocation));
+                }
             }
             else
             {
-                Debug.Log($"{attackerStats.Name} wyrzucił <color=red>PECHA</color>!");
+                Debug.Log($"{attackerStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 attackerStats.UnfortunateEvents++;
+
+                if (attackerWeapon.Quality == "Zwykła")
+                {
+                    attackerWeapon.Broken = true;
+                    Debug.Log($"{attackerStats.Name} uszkodził/a swoją broń ({attackerWeapon.Name}).");
+                }
+                else if (attackerWeapon.Quality == "Słaba")
+                {
+                    attackerWeapon.Broken = true;
+                    Debug.Log($"{attackerStats.Name} zniszczył/a swoją broń ({attackerWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
+                }
             }
         }
 
@@ -610,7 +641,7 @@ public class CombatManager : MonoBehaviour
         {
             if (!attackSucceeded)
             {
-                Debug.Log($"{targetStats.Name} wyrzucił <color=green>SZCZĘŚCIE</color>!");
+                Debug.Log($"{targetStats.Name} wyrzucił/a <color=green>SZCZĘŚCIE</color>!");
                 targetStats.FortunateEvents++;
 
                 // domyślnie bierzemy niższą z kości
@@ -622,8 +653,65 @@ public class CombatManager : MonoBehaviour
             }
             else
             {
-                Debug.Log($"{targetStats.Name} wyrzucił <color=red>PECHA</color>!");
+                Debug.Log($"{targetStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 targetStats.UnfortunateEvents++;
+
+                // --- uszkodzenie broni przy nieudanym parowaniu ---
+                if (targetWeapon.Quality == "Zwykła" && _parryOrDodge == "parry")
+                {
+                    targetWeapon.Broken = true;
+                    Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
+                }
+                else if (targetWeapon.Quality == "Słaba" && _parryOrDodge == "parry")
+                {
+                    targetWeapon.Broken = true;
+                    Debug.Log($"{targetStats.Name} zniszczył/a swoją broń ({targetWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
+                }
+
+                // --- uszkodzenie zbroi na trafionej lokalizacji ---
+                if (!string.IsNullOrEmpty(hitLocation))
+                {
+                    string normalizedHitLocation = NormalizeHitLocation(hitLocation);
+
+                    Inventory targetInventory = targetStats.GetComponent<Inventory>();
+                    if (targetInventory != null &&
+                        targetInventory.ArmorByLocation != null &&
+                        targetInventory.ArmorByLocation.TryGetValue(normalizedHitLocation, out var armorsOnLocation))
+                    {
+                        // tylko nieuszkodzone elementy pancerza
+                        var validArmors = armorsOnLocation
+                            .Where(a => a != null && !a.Broken)
+                            .ToList();
+
+                        if (validArmors.Count > 0)
+                        {
+                            // losowy element z tej lokalizacji
+                            var armorPiece = validArmors[UnityEngine.Random.Range(0, validArmors.Count)];
+
+                            // domyślnie traktujemy brak jakości jako "Zwykła"
+                            string quality = string.IsNullOrEmpty(armorPiece.Quality) ? "Zwykła" : armorPiece.Quality;
+
+                            if (quality == "Słaba")
+                            {
+                                armorPiece.Broken = true;
+                                Debug.Log(
+                                    $"{targetStats.Name} zniszczył/a swoją zbroję " +
+                                    $"({armorPiece.Name}). " +
+                                    "<color=red>Należy usunąć ją z ekwipunku.</color>"
+                                );
+                            }
+                            else if (quality == "Zwykła")
+                            {
+                                armorPiece.Broken = true;
+                                Debug.Log(
+                                    $"{targetStats.Name} uszkodził/a swoją zbroję " +
+                                    $"({armorPiece.Name})."
+                                );
+                            }
+                        }
+                    }
+                }
+
             }
         }
 
@@ -665,6 +753,12 @@ public class CombatManager : MonoBehaviour
                         StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
                     }
                 }
+            }
+
+            //Zresetowanie modyfikatora do celowania
+            if (attacker.AimingBonus != 0)
+            {
+                attacker.AimingBonus = 0;
             }
 
             ChangeAttackType(); // Resetuje typ ataku
@@ -1415,6 +1509,20 @@ public class CombatManager : MonoBehaviour
 
         // ===== Całkowite obrażenia =====
         int finalDamage = rolledDamage + strengthModifier;
+
+        if (targetStats.GetComponent<Unit>().Unconscious)
+        {
+            finalDamage *= 2;
+            Debug.Log($"<color=#FF7F50>Obrażenia zostają podwojone, ponieważ cel ataku jest nieprzytomny.</color>");
+        }
+
+        if (_criticalHitEffect == "double_damage")
+        {
+            finalDamage *= 2;
+            _criticalHitEffect = ""; // Resetujemy poprzedni wybór
+            Debug.Log($"Obrażenia zostają podwojone w wyniku trafienia krytycznego.");
+        }
+
         if (finalDamage < 0) finalDamage = 0;
 
         // ===== Log =====
@@ -1457,6 +1565,11 @@ public class CombatManager : MonoBehaviour
     #endregion
 
     #region Critical wounds
+    private void CriticalHitButtonClick(string effect)
+    {
+        _criticalHitEffect = effect;
+    }
+
     public IEnumerator CriticalWoundRoll(Stats attackerStats, Stats targetStats, string hitLocation)
     {
         int rollResult = 0;

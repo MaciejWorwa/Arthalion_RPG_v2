@@ -129,6 +129,16 @@
       "AttackRange": 1.5
     },
     {
+      "Name": "Kostur",
+      "Type": [
+        "melee"
+      ],
+      "TwoHanded": true,
+      "AttackRange": 2.0,
+      "Damage": [6],
+      "Pummel": true
+    },
+    {
       "Name": "Krótki łuk",
       "Type": [
         "ranged"
