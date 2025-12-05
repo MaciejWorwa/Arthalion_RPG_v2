@@ -561,11 +561,11 @@ public class CombatManager : MonoBehaviour
 
         // Sprawdzenie, czy jednostka może próbować parować lub unikać ataku
         Inventory inventory = target.GetComponent<Inventory>();
-        bool hasMeleeWeapon = inventory.EquippedWeapons.Any(weapon => weapon != null && weapon.Type.Contains("melee"));
-        bool hasShield = inventory.EquippedWeapons.Any(weapon => weapon != null && weapon.Type.Contains("shield"));
+        bool hasMeleeWeapon = inventory.EquippedWeapons.Any(weapon => weapon != null && !weapon.Broken && weapon.Type.Contains("melee"));
+        bool hasShield = inventory.EquippedWeapons.Any(weapon => weapon != null && !weapon.Broken && weapon.Type.Contains("shield"));
         bool bothUnarmed = attackerWeapon.Id == 0 && targetWeapon.Id == 0;
 
-        canParry = (isMeleeAttack && hasMeleeWeapon) || hasShield;
+        canParry = (isMeleeAttack && hasMeleeWeapon) || hasShield || bothUnarmed;
 
         Weapon weaponUsedForParry = null;
         int parryModifier = 0;
@@ -607,12 +607,19 @@ public class CombatManager : MonoBehaviour
                 Debug.Log($"{attackerStats.Name} wyrzucił/a <color=green>SZCZĘŚCIE</color>!");
                 attackerStats.FortunateEvents++;
 
+                if (IsManualPlayerAttack)
+                {
+                    _criticalHitPanel.SetActive(true);
+                    _criticalHitEffect = ""; // Resetujemy poprzedni wybór
 
-                _criticalHitPanel.SetActive(true);
-                _criticalHitEffect = ""; // Resetujemy poprzedni wybór
-
-                // Najpierw czekamy, aż gracz kliknie którykolwiek przycisk
-                yield return new WaitUntil(() => !_criticalHitPanel.activeSelf);
+                    // Najpierw czekamy, aż gracz kliknie którykolwiek przycisk
+                    yield return new WaitUntil(() => !_criticalHitPanel.activeSelf);
+                }
+                else
+                {
+                    // losowy wybór efektu krytycznego
+                    _criticalHitEffect = (UnityEngine.Random.value < 0.5f) ? "critical_wound" : "double_damage";
+                }
 
                 if (_criticalHitEffect == "critical_wound")
                 {
@@ -624,12 +631,12 @@ public class CombatManager : MonoBehaviour
                 Debug.Log($"{attackerStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 attackerStats.UnfortunateEvents++;
 
-                if (attackerWeapon.Quality == "Zwykła")
+                if (attackerWeapon.Quality == "Zwykła" && attackerWeapon.Id != 0)
                 {
                     attackerWeapon.Broken = true;
                     Debug.Log($"{attackerStats.Name} uszkodził/a swoją broń ({attackerWeapon.Name}).");
                 }
-                else if (attackerWeapon.Quality == "Słaba")
+                else if (attackerWeapon.Quality == "Słaba" && attackerWeapon.Id != 0)
                 {
                     attackerWeapon.Broken = true;
                     Debug.Log($"{attackerStats.Name} zniszczył/a swoją broń ({attackerWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
@@ -647,26 +654,18 @@ public class CombatManager : MonoBehaviour
                 // domyślnie bierzemy niższą z kości
                 int parryLowerValue = DefenceResults[0] > DefenceResults[1] ? DefenceResults[1] : DefenceResults[0];
 
-                yield return StartCoroutine(DetermineHitLocationCoroutine(parryLowerValue, attackerStats, location => hitLocation = location));
-
-                StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
+                if(_parryOrDodge == "parry")
+                {
+                    yield return StartCoroutine(DetermineHitLocationCoroutine(parryLowerValue, attackerStats, location => hitLocation = location));
+                    StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
+                }
             }
             else
             {
                 Debug.Log($"{targetStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 targetStats.UnfortunateEvents++;
 
-                // --- uszkodzenie broni przy nieudanym parowaniu ---
-                if (targetWeapon.Quality == "Zwykła" && _parryOrDodge == "parry")
-                {
-                    targetWeapon.Broken = true;
-                    Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
-                }
-                else if (targetWeapon.Quality == "Słaba" && _parryOrDodge == "parry")
-                {
-                    targetWeapon.Broken = true;
-                    Debug.Log($"{targetStats.Name} zniszczył/a swoją broń ({targetWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
-                }
+                bool hasArmorOnLocation = false;
 
                 // --- uszkodzenie zbroi na trafionej lokalizacji ---
                 if (!string.IsNullOrEmpty(hitLocation))
@@ -685,8 +684,15 @@ public class CombatManager : MonoBehaviour
 
                         if (validArmors.Count > 0)
                         {
-                            // losowy element z tej lokalizacji
-                            var armorPiece = validArmors[UnityEngine.Random.Range(0, validArmors.Count)];
+                            hasArmorOnLocation = true;
+
+                            // priorytety: plate > chain > leather
+                            string[] priority = { "plate", "chain", "leather" };
+
+                            var armorPiece = priority
+                                .Select(type => validArmors.FirstOrDefault(a => a.Type != null && a.Type.Contains(type)))
+                                .FirstOrDefault(a => a != null)
+                                ?? validArmors[0];
 
                             // domyślnie traktujemy brak jakości jako "Zwykła"
                             string quality = string.IsNullOrEmpty(armorPiece.Quality) ? "Zwykła" : armorPiece.Quality;
@@ -712,6 +718,28 @@ public class CombatManager : MonoBehaviour
                     }
                 }
 
+                // --- uszkodzenie broni przy pechu na parowaniu, tylko jeśli brak zbroi na tej lokalizacji ---
+                if (!hasArmorOnLocation &&
+                    _parryOrDodge == "parry" &&
+                    attackerWeapon.Id != 0 &&
+                    targetWeapon != null)
+                {
+                    string weaponQuality = string.IsNullOrEmpty(targetWeapon.Quality) ? "Zwykła" : targetWeapon.Quality;
+
+                    if (weaponQuality == "Zwykła")
+                    {
+                        targetWeapon.Broken = true;
+                        Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
+                    }
+                    else if (weaponQuality == "Słaba")
+                    {
+                        targetWeapon.Broken = true;
+                        Debug.Log(
+                            $"{targetStats.Name} zniszczył/a swoją broń ({targetWeapon.Name}). " +
+                            "<color=red>Należy usunąć ją z ekwipunku.</color>"
+                        );
+                    }
+                }
             }
         }
 
@@ -984,7 +1012,7 @@ public class CombatManager : MonoBehaviour
 
         if (!GameManager.IsAutoDefenseMode)
         {
-            yield return StartCoroutine(ManualDefense(target, targetStats, targetWeapon, parryValue, dodgeValue, parryModifier, dodgeModifier, canParry));
+            yield return StartCoroutine(ManualDefense(target, targetStats, targetWeapon, parryModifier, dodgeModifier, canParry));
         }
         else
         {
@@ -995,11 +1023,26 @@ public class CombatManager : MonoBehaviour
     }
     public Weapon GetBestParryWeapon(Stats targetStats, Weapon defaultWeapon)
     {
-        return targetStats.GetComponent<Inventory>().EquippedWeapons
-            .Where(w => w != null)
+        Inventory inventory = targetStats.GetComponent<Inventory>();
+
+        // Filtr: tylko bronie istniejące i nieuszkodzone
+        Weapon bestWeapon = inventory.EquippedWeapons
+            .Where(w => w != null && !w.Broken)
             .OrderByDescending(w => w.Defensive)
             .FirstOrDefault() ?? defaultWeapon;
+
+        // Jeśli żadnej broni nie ma (lub wszystkie są uszkodzone)
+        if (bestWeapon == null)
+        {
+            Weapon weapon = targetStats.GetComponent<Weapon>();
+            weapon.ResetWeapon();
+
+            return weapon;
+        }
+
+        return bestWeapon;
     }
+
 
     public int CalculateParryModifier(Unit target, Stats targetStats, Stats attackerStats, Weapon weaponUsedForParry)
     {
@@ -1025,7 +1068,7 @@ public class CombatManager : MonoBehaviour
         return modifier;
     }
 
-    private IEnumerator ManualDefense(Unit target, Stats targetStats, Weapon targetWeapon, int parryValue, int dodgeValue, int parryModifier, int dodgeModifier, bool canParry)
+    private IEnumerator ManualDefense(Unit target, Stats targetStats, Weapon targetWeapon, int parryModifier, int dodgeModifier, bool canParry)
     {
         _parryAndDodgePanel.SetActive(true);
         _parryAndDodgePanel.GetComponentInChildren<TMP_Text>().text = "Wybierz reakcję atakowanej postaci.";

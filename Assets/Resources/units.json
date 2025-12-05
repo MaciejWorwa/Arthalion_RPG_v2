@@ -53,7 +53,7 @@
     {
       "Race": "Drimhar",
       "Type": "Giant",
-      "PrimaryWeaponNames": [ "Pałka", "Topór dwuręczny", "Młot dwuręczny", "Pałka z kolcami", "Włócznia" ],
+      "PrimaryWeaponNames": [ "Pałka", "Topór dwuręczny", "Młot dwuręczny", "Pałka z kolcami", "Włócznia", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
       "Size": 3,
       "S": 5,
       "K": 4,
@@ -66,8 +66,7 @@
       "Sz": 4,
       "MeleeCombat": 3,
       "Hardy": true,
-      "Scary": 12,
-      "NaturalArmor": 1
+      "Scary": 12
     },
     {
       "Race": "Duch",
@@ -131,7 +130,7 @@
     {
       "Race": "Goblin Szaman",
       "Type": "Humanoid",
-      "PrimaryWeaponNames": [ "Kij" ],
+      "PrimaryWeaponNames": [ "Kostur", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
       "Size": 1,
       "S": -1,
       "K": 1,
@@ -144,8 +143,7 @@
       "Sz": 4,
       "Spellcasting": 3,
       "Dodge": 2,
-      "Magic": [ "Fire", "Ice", "Earth", "Water", "Air", "Death" ],
-      "NaturalArmor": 1
+      "Magic": [ "Fire", "Ice", "Earth", "Water", "Air", "Death" ]
     },
     {
       "Race": "Hasai",
@@ -196,7 +194,7 @@
       "Race": "Krwiopij",
       "Type": "Beast",
       "Size": 0,
-      "PrimaryWeaponNames": [ "Bron naturalna" ],
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -281,7 +279,7 @@
       "Race": "Licz",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Kij" ],
+      "PrimaryWeaponNames": [ "Kostur", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
       "S": 2,
       "K": 4,
       "Zw": 2,
@@ -296,8 +294,7 @@
       "Scary": 16,
       "Spellcasting": 5,
       "Dodge": 3,
-      "Magic": [ "Death" ],
-      "NaturalArmor": 5
+      "Magic": [ "Death" ]
     },
     {
       "Race": "Liściopiór",
@@ -343,7 +340,7 @@
       "Race": "Morgras",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień" ],
+      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy"],
       "S": 2,
       "K": 3,
       "Zw": 0,
@@ -355,8 +352,7 @@
       "Sz": 4,
       "Endurance": 3,
       "Dodge": 2,
-      "MeleeCombat": 2,
-      "NaturalArmor": 3
+      "MeleeCombat": 2
     },
     {
       "Race": "Niedźwiedź",
@@ -559,7 +555,7 @@
       "Race": "Równy Żywiołom",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz dwuręczny" ],
+      "PrimaryWeaponNames": [ "Miecz dwuręczny", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
       "S": 3,
       "K": 3,
       "Zw": 2,
@@ -569,7 +565,6 @@
       "Ch": -2,
       "SW": 4,
       "Sz": 4,
-      "NaturalArmor": 3,
       "Scary": 16,
       "Undead": true,
       "Pitiless": 2,
@@ -625,7 +620,7 @@
       "Race": "Szkielet",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz" ],
+      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice"],
       "S": -1,
       "K": -1,
       "Zw": 0,
@@ -637,7 +632,6 @@
       "Sz": 4,
       "Undead": true,
       "Scary": 10,
-      "NaturalArmor": 1,
       "Unmeaning": true
     },
     {
@@ -720,7 +714,7 @@
       "Race": "Upiór",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz dwuręczny" ],
+      "PrimaryWeaponNames": [ "Miecz dwuręczny", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
       "S": 2,
       "K": 0,
       "Zw": 2,
@@ -734,8 +728,7 @@
       "Scary": 16,
       "Resistance": [ "Physical" ],
       "Dodge": 2,
-      "MeleeCombat": 3,
-      "NaturalArmor": 3
+      "MeleeCombat": 3
     },
     {
       "Race": "Wargul",
