@@ -292,6 +292,12 @@ public class RoundsManager : MonoBehaviour
                 // Wczytaj ponownie scenę/stan rozpoczynający kolejne epizody
                 SaveAndLoadManager.Instance.SetLoadingType("units");
                 SaveAndLoadManager.Instance.LoadGame("AIlearning");
+
+                for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+                {
+                    if (UnitsManager.Instance.AllUnits[i] == null || !InitiativeQueueManager.Instance.InitiativeQueue.ContainsKey(UnitsManager.Instance.AllUnits[i])) continue;
+                    UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().Overall = UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().CalculateOverall();
+                }    
             }
 
             // Czekaj na zakończenie ładowania, potem leci dalej

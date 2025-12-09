@@ -132,11 +132,6 @@ public class Stats : MonoBehaviour
 
     public List<SpellEffect> ActiveSpellEffects = new List<SpellEffect>();
 
-    private void Awake()
-    {
-        Overall = CalculateOverall();
-    }
-
     public void SetBaseStats()
     {
         CalculateMaxHealth();
@@ -157,6 +152,8 @@ public class Stats : MonoBehaviour
 
         // Aktualizuje udźwig
         MaxEncumbrance = Math.Max(1, 6 + S);
+
+        //Overall = CalculateOverall();
     }
 
     public void CalculateMaxHealth(bool isSizeChange = false)
@@ -233,44 +230,221 @@ public class Stats : MonoBehaviour
 
     public int CalculateOverall()
     {
-        // Sumowanie wszystkich cech głównych
-        int primaryStatsSum = S + K + Zw + Zr + Int + P + Ch + SW;
-        //Debug.Log("primaryStatsSum " + primaryStatsSum);
+        // --- 1. Ustalenie broni, której jednostka REALNIE użyje ---
 
-        //// Uwzględnienie rozmiaru (większy rozmiar = większy mnożnik)
-        //float sizeMultiplier = Mathf.Pow(2f, 1f + (int)Size) / 10; // Każdy poziom rozmiaru zwiększa overall
-        ////Debug.Log("sizeMultiplier " + sizeMultiplier);
+        Weapon weapon = null;
 
-        // Sumowanie zbroi
-        int totalArmor = Armor_head + Armor_arms + Armor_torso + Armor_legs;
-        //Debug.Log("totalArmor " + totalArmor);
-
-        // Uwzględnienie umiejętności
-        int skillSum = MeleeCombat + RangedCombat + Athletics + Spellcasting + Dodge;
-        //Debug.Log("skillSum " + skillSum);
-
-
-        // Uwzględnienie mocy broni
-        int weaponPower = 0;
-        Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(this.gameObject);
-        if (weapon != null)
+        if (InventoryManager.Instance != null)
         {
-            weaponPower += weapon.S * 8;
-            //Debug.Log("weaponPower " + weaponPower);
+            weapon = InventoryManager.Instance.ChooseWeaponToAttack(this.gameObject);
         }
 
-        // Zliczanie aktywnych talentów
-        int activeTalentsCount = GetType()
-            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .Where(field => field.FieldType == typeof(bool) && (bool)field.GetValue(this))
-            .Count();
+        if (weapon == null)
+        {
+            // Fallback na naturalną broń z komponentu Weapon
+            weapon = GetComponent<Weapon>();
+        }
 
-        //Debug.Log("activeTalentsCount " + activeTalentsCount);
+        bool isRangedWeapon = weapon != null && (weapon.Type.Contains("ranged") || weapon.Type.Contains("throwing"));
+        bool isMeleeWeapon = weapon != null && weapon.Type.Contains("melee");
 
-        // Obliczanie Overall z uwzględnieniem mnożnika rozmiar
-        int overall = Mathf.RoundToInt(primaryStatsSum + weaponPower + MaxHealth + Sz + totalArmor + activeTalentsCount + skillSum); // * sizeMultiplier);
+        // --- 2. Modyfikatory ofensywne (atak) ---
 
-        //Debug.Log($"Overall {Name} to {overall}");
+        int meleeMod = Zr + MeleeCombat;
+        int rangedMod = Zr + RangedCombat;
+
+        float meleeAttackScore = 0f;
+        float rangedAttackScore = 0f;
+
+        if (isMeleeWeapon)
+        {
+            // 1 punkt różnicy to dużo – mnożnik 8
+            meleeAttackScore = meleeMod * 8f;
+        }
+
+        if (isRangedWeapon)
+        {
+            rangedAttackScore = rangedMod * 8f;
+        }
+
+        // Jeśli jednostka ma i sensowną walkę wręcz, i dystansową:
+        // bierzemy 100% lepszej i 50% gorszej opcji.
+        float attackScore = Mathf.Max(meleeAttackScore, rangedAttackScore);
+        float secondaryAttack = Mathf.Min(meleeAttackScore, rangedAttackScore);
+        attackScore += secondaryAttack * 0.5f;
+
+        // --- 3. Obrażenia z broni (średnia z kości) ---
+
+        float weaponDamageScore = 0f;
+
+        if (weapon != null && weapon.Damage != null && weapon.Damage.Count > 0)
+        {
+            foreach (int sides in weapon.Damage)
+            {
+                if (sides <= 0) continue;
+
+                // Średnia z kości kX to (X+1)/2
+                float avg = 0.5f * (sides + 1);
+                weaponDamageScore += avg;
+            }
+
+
+            // Przybliżenie dodatkowych kości za ROZMIAR + SIŁĘ
+            if (weapon.Type.Contains("melee") && Size > SizeCategory.Average && S > 0)
+            {
+                int s = S;
+                if (s == 1 || s == 2) weaponDamageScore += 2.5f;  // k4
+                else if (s == 3) weaponDamageScore += 3.5f;  // k6
+                else if (s == 4) weaponDamageScore += 4.5f;  // k8
+                else if (s == 5) weaponDamageScore += 5.5f;  // k10
+                else if (s == 6 || s == 7) weaponDamageScore += 6.5f;  // k12
+                else if (s >= 8) weaponDamageScore += 9f;    // 2k8
+            }
+
+            // Mnożnik – obrażenia są bardzo istotne, ale nie bardziej niż sam test trafienia
+            weaponDamageScore *= 5f;
+        }
+
+        // --- 4. Obrona: umiejętności, pancerz i punkty zdrowia ---
+
+        int parryBase = Zr + MeleeCombat + weapon.Defensive; 
+        int dodgeBase = Zw + Dodge; 
+
+        // Unik jest trochę lepszy (działa vs dystans, brak kary za rozmiar), więc dajemy mu mały „stały” bonus:
+        dodgeBase += 1;
+
+        // Przeliczamy oba na „siłę obrony”
+        float parryScore = parryBase * 6f;
+        float dodgeScore = dodgeBase * 6f;
+
+        // Finalna obrona: 100% lepszej opcji + 50% gorszej
+        float defenseScore = Mathf.Max(parryScore, dodgeScore) + Mathf.Min(parryScore, dodgeScore) * 0.5f;
+
+
+        int totalArmor =
+            Armor_head +
+            Armor_torso +
+            Armor_arms +
+            Armor_legs +
+            (NaturalArmor * 4);
+
+        // Każdy punkt pancerza to redukcja obrażeń z wielu trafień – dajemy solidny mnożnik
+        float armorScore = totalArmor * 5f;
+
+        // Punkty Zdrowia bazują na S, K i Rozmiarze, więc same w sobie już niosą sporą informację
+        float healthScore = MaxHealth * 2f;
+
+        // --- 5. Rozmiar ---
+
+        float sizeScore = 0f;
+
+        switch (Size)
+        {
+            case SizeCategory.Little:   // drobny
+                sizeScore -= 25f;
+                break;
+            case SizeCategory.Small:    // mały
+                sizeScore -= 10f;
+                break;
+            case SizeCategory.Average:  // średni
+                break;
+            case SizeCategory.Big:      // duży
+                sizeScore += 10f;
+                break;
+            case SizeCategory.Large:    // wielki
+                sizeScore += 25f;  
+                break;
+        }
+
+        // --- 6. Magia ofensywna (Rzucanie Zaklęć + SW) ---
+
+        float magicScore = 0f;
+
+        if (Spellcasting > 0)
+        {
+            int magicMod = SW + Spellcasting;
+            magicScore = magicMod * 7f;
+        }
+
+        // --- 7. Talenty, umiejetności i cechy specjalne istot ---
+
+        float talentScore = 0f;
+
+        // Talenty bojowe:
+        if (CombatMaster) talentScore += 30f; // Wojownik
+        if (Sharpshooter) talentScore += 30f; // Strzelec wyborowy
+        if (AccurateShot) talentScore += 10f; // Celny Strzał
+        if (Fencing) talentScore += 10f; // Celny Strzał
+        if (Fast) talentScore += 10f; // Szybki                       
+        if (Pitiless > 0) talentScore += Pitiless * 6f; // Bezlitosny
+        if (SurvivalInstinct > 0) talentScore += SurvivalInstinct * 6f; // Instynkt Przetrwania
+
+        // Twardziel / Wytrzymały mocno wzmacniają przeżywalność
+        if (Hardy) healthScore *= 1.25f;  // Twardziel – lepiej znosi krytyki
+        if (Tough) healthScore *= 1.5f;   // Wytrzymały – już podwaja PZ, ale jeszcze trochę premiujemy
+
+        //// Nieumarły: odporności, brak wielu stanów – bardzo mocny defensywnie
+        //if (Undead)
+        //{
+        //    defenseScore *= 1.2f;
+        //    talentScore += 10f;
+        //}
+
+        // Resistance – szczególnie fizyczne
+        if (Resistance != null)
+        {
+            foreach (var res in Resistance)
+            {
+                if (string.IsNullOrEmpty(res)) continue;
+
+                string r = res.ToLowerInvariant();
+
+                if (r.Contains("fizyczne"))
+                {
+                    // Prawie całkowita odporność na fizyczne obrażenia – to jest game changer
+                    defenseScore *= 2.5f;
+                }
+                else
+                {
+                    // Ogień, zimno itd. – wciąż znaczące, ale nie aż tak jak fizyczne
+                    talentScore += 10f;
+                }
+            }
+        }
+
+        // Umiejętności
+        talentScore += Endurance * 5f; // testy trucizn, wytrzymałość organizmu
+        talentScore += Cool * 5f;      // testy strachu, paniki
+        talentScore += Reflex * 5f;  // inicjatywa, szybkie reakcje
+
+
+        if (Scary > 0)
+        {
+            // typowe wartości: 12, 14, 16… im wyższy próg, tym częściej wrogowie będą spanikowani
+            talentScore += Mathf.Max(0, Scary - 8) * 3f;
+        }
+
+        // --- 8. Mobilność ---
+
+        // Szybkość daje przewagę pozycyjną, ucieczkę, gonienie – ale to bonus, nie core
+        float speedScore = Mathf.Max(Sz, Flight) * 3f;
+
+        // --- 9. Złożenie wszystkiego w jedną wartość ---
+
+        float overallFloat =
+            attackScore +
+            weaponDamageScore +
+            defenseScore +
+            armorScore +
+            healthScore +
+            magicScore +
+            sizeScore +
+            speedScore +
+            talentScore;
+
+        int overall = Mathf.Max(1, Mathf.RoundToInt(overallFloat));
+
+        //Debug.Log($"Overall {Name} = {overall} (Atk {attackScore:F1}, Dmg {weaponDamageScore:F1}, Def {defenseScore:F1}, Armor {armorScore:F1}, HP {healthScore:F1}, Magic {magicScore:F1}, Size {sizeScore:F1}, Speed {speedScore:F1}, Talents and Skills {talentScore:F1})");
 
         return overall;
     }

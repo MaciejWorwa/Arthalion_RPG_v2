@@ -42,8 +42,8 @@ public enum AttackType
     Run,   
     Null,         // Zwykły atak
     Charge,
+    AllOutAttack, 
 
-    DefensiveStance, 
     Aim,             
     Reload,          
     FinishTurn,      
@@ -108,7 +108,7 @@ public class ReinforcementLearningManager : MonoBehaviour
     [SerializeField] private TMP_Text _teamWinsDisplay;
 
     // Liczba dostępnych akcji
-    private const int ACTION_COUNT = 37;
+    private const int ACTION_COUNT = 43;
 
     // Liczba kombinacji stanów (2^(AIState.COUNT))
     private int totalStateCombinations;
@@ -281,7 +281,7 @@ public class ReinforcementLearningManager : MonoBehaviour
         {
             return new ActionChoice
             {
-                ActionId = 36,
+                ActionId = 42,
                 ChosenTarget = null,
                 ChosenStates = new bool[(int)AIState.COUNT]
             };
@@ -335,7 +335,6 @@ public class ReinforcementLearningManager : MonoBehaviour
             bool isRun = (aType == AttackType.Run || aType == AttackType.RunAway);
             bool isRetreat = aType == AttackType.Retreat;
             bool isAttack = (aType != AttackType.Move
-                            && aType != AttackType.DefensiveStance
                             && aType != AttackType.Aim
                             && aType != AttackType.Reload
                             && aType != AttackType.FinishTurn
@@ -345,9 +344,14 @@ public class ReinforcementLearningManager : MonoBehaviour
                             && aType != AttackType.ChangeWeaponToMelee
                             && aType != AttackType.ChangeWeaponToRanged);
 
-            if (isMove) // ruch wymaga CanMove
+            if (isMove)
             {
                 if (!unit.CanMove)
+                    continue;
+            }
+            if (isRun || isRetreat)
+            {
+                if (!unit.CanMove || !unit.CanDoAction)
                     continue;
             }
             else // każda inna akcja wymaga CanDoAction
@@ -367,7 +371,7 @@ public class ReinforcementLearningManager : MonoBehaviour
 
                 if (aType == AttackType.Charge)
                 {
-                    if (!isInChargeRange) continue;
+                    if (!isInChargeRange || !unit.CanMove) continue;
                     if (!(isBeyondAttackRange && !hasRangedWeapon)) continue;
                 }
                 else
@@ -444,7 +448,7 @@ public class ReinforcementLearningManager : MonoBehaviour
         {
             return new ActionChoice
             {
-                ActionId = 36,
+                ActionId = 42,
                 ChosenTarget = fallbackTarget,
                 ChosenStates = fallbackStates ?? new bool[(int)AIState.COUNT]
             };
@@ -847,6 +851,7 @@ public class ReinforcementLearningManager : MonoBehaviour
         {
             case AttackType.Null:    attackName = null; break;
             case AttackType.Charge:  attackName = "Charge"; break;
+            case AttackType.AllOutAttack: attackName = "AllOutAttack"; break;
         }
 
         reward += PerformAttack(unit.gameObject, target? target.gameObject:null, attackName);
@@ -881,51 +886,68 @@ public class ReinforcementLearningManager : MonoBehaviour
 
     private static readonly ActionDefinition[] AllActions = new ActionDefinition[]
     {
-        new ActionDefinition(TargetType.Closest,         AttackType.Move),             // 0: Ruch - Najbliższy
-        new ActionDefinition(TargetType.Furthest,        AttackType.Move),             // 1: Ruch - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,     AttackType.Move),             // 2: Ruch - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,    AttackType.Move),             // 3: Ruch - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,         AttackType.Move),             // 4: Ruch - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,       AttackType.Move),             // 5: Ruch - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby,AttackType.Move),             // 6: Ruch - Najwięcej sojuszników w pobliżu
+        // --- MOVE ---
+        new ActionDefinition(TargetType.Closest,          AttackType.Move),         // 0: Ruch - Najbliższy
+        new ActionDefinition(TargetType.Furthest,         AttackType.Move),         // 1: Ruch - Najdalszy
+        new ActionDefinition(TargetType.MostInjured,      AttackType.Move),         // 2: Ruch - Najbardziej ranny
+        new ActionDefinition(TargetType.LeastInjured,     AttackType.Move),         // 3: Ruch - Najmniej ranny
+        new ActionDefinition(TargetType.Weakest,          AttackType.Move),         // 4: Ruch - Najsłabszy
+        new ActionDefinition(TargetType.Strongest,        AttackType.Move),         // 5: Ruch - Najsilniejszy
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Move),         // 6: Ruch - Najwięcej sojuszników
 
-        new ActionDefinition(TargetType.Closest,         AttackType.Run),              // 7: Bieg - Najbliższy
-        new ActionDefinition(TargetType.Furthest,        AttackType.Run),              // 8: Bieg - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,     AttackType.Run),              // 9: Bieg - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,    AttackType.Run),              // 10: Bieg - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,         AttackType.Run),              // 11: Bieg - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,       AttackType.Run),              // 12: Bieg - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby,AttackType.Run),              // 13: Bieg - Najwięcej sojuszników w pobliżu
+        // --- RUN ---
+        new ActionDefinition(TargetType.Closest,          AttackType.Run),          // 7: Bieg - Najbliższy
+        new ActionDefinition(TargetType.Furthest,         AttackType.Run),          // 8: Bieg - Najdalszy
+        new ActionDefinition(TargetType.MostInjured,      AttackType.Run),          // 9: Bieg - Najbardziej ranny
+        new ActionDefinition(TargetType.LeastInjured,     AttackType.Run),          // 10: Bieg - Najmniej ranny
+        new ActionDefinition(TargetType.Weakest,          AttackType.Run),          // 11: Bieg - Najsłabszy
+        new ActionDefinition(TargetType.Strongest,        AttackType.Run),          // 12: Bieg - Najsilniejszy
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Run),          // 13: Bieg - Najwięcej sojuszników
 
-        new ActionDefinition(TargetType.Closest,     AttackType.Null),                 // 14: Zwykły atak - Najbliższy
-        new ActionDefinition(TargetType.Furthest,    AttackType.Null),                 // 15: Zwykły atak - Najdalszy
-        new ActionDefinition(TargetType.MostInjured, AttackType.Null),                 // 16: Zwykły atak - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,AttackType.Null),                 // 17: Zwykły atak - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,     AttackType.Null),                 // 18: Zwykły atak - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,   AttackType.Null),                 // 19: Zwykły atak - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby,AttackType.Null),            // 20: Zwykły atak - Najwięcej sojuszników w pobliżu
+        // --- NORMAL ATTACK ---
+        new ActionDefinition(TargetType.Closest,          AttackType.Null),         // 14: Zwykły atak - Najbliższy
+        new ActionDefinition(TargetType.Furthest,         AttackType.Null),         // 15: Zwykły atak - Najdalszy
+        new ActionDefinition(TargetType.MostInjured,      AttackType.Null),         // 16: Zwykły atak - Najbardziej ranny
+        new ActionDefinition(TargetType.LeastInjured,     AttackType.Null),         // 17: Zwykły atak - Najmniej ranny
+        new ActionDefinition(TargetType.Weakest,          AttackType.Null),         // 18: Zwykły atak - Najsłabszy
+        new ActionDefinition(TargetType.Strongest,        AttackType.Null),         // 19: Zwykły atak - Najsilniejszy
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Null),         // 20: Zwykły atak - Najwięcej sojuszników
 
-        new ActionDefinition(TargetType.Closest,     AttackType.Charge),               // 21: Szarża - Najbliższy
-        new ActionDefinition(TargetType.Furthest,    AttackType.Charge),               // 22: Szarża - Najdalszy
-        new ActionDefinition(TargetType.MostInjured, AttackType.Charge),               // 23: Szarża - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,AttackType.Charge),               // 24: Szarża - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,     AttackType.Charge),               // 25: Szarża - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,   AttackType.Charge),               // 26: Szarża - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby,AttackType.Charge),          // 27: Szarża - Najwięcej sojuszników w pobliżu
+        // --- CHARGE ---
+        new ActionDefinition(TargetType.Closest,          AttackType.Charge),       // 21: Szarża - Najbliższy
+        new ActionDefinition(TargetType.Furthest,         AttackType.Charge),       // 22: Szarża - Najdalszy
+        new ActionDefinition(TargetType.MostInjured,      AttackType.Charge),       // 23: Szarża - Najbardziej ranny
+        new ActionDefinition(TargetType.LeastInjured,     AttackType.Charge),       // 24: Szarża - Najmniej ranny
+        new ActionDefinition(TargetType.Weakest,          AttackType.Charge),       // 25: Szarża - Najsłabszy
+        new ActionDefinition(TargetType.Strongest,        AttackType.Charge),       // 26: Szarża - Najsilniejszy
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Charge),       // 27: Szarża - Najwięcej sojuszników
 
-        new ActionDefinition(TargetType.None, AttackType.DefensiveStance),            // 28: Pozycja Obronna
-        new ActionDefinition(TargetType.None, AttackType.Aim),                         // 29: Przycelowanie
-        new ActionDefinition(TargetType.None, AttackType.Reload),                      // 30: Przeładowanie
+        // --- ALL OUT ATTACK ---
+        new ActionDefinition(TargetType.Closest,          AttackType.AllOutAttack), // 28: Szaleńczy atak - Najbliższy
+        new ActionDefinition(TargetType.Furthest,         AttackType.AllOutAttack), // 29: Szaleńczy atak - Najdalszy
+        new ActionDefinition(TargetType.MostInjured,      AttackType.AllOutAttack), // 30: Szaleńczy atak - Najbardziej ranny
+        new ActionDefinition(TargetType.LeastInjured,     AttackType.AllOutAttack), // 31: Szaleńczy atak - Najmniej ranny
+        new ActionDefinition(TargetType.Weakest,          AttackType.AllOutAttack), // 32: Szaleńczy atak - Najsłabszy
+        new ActionDefinition(TargetType.Strongest,        AttackType.AllOutAttack), // 33: Szaleńczy atak - Najsilniejszy
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.AllOutAttack), // 34: Szaleńczy atak - Najwięcej sojuszników
 
-        new ActionDefinition(TargetType.Closest, AttackType.MoveAway),                // 31: Odejście od najbliższego przeciwnika
-        new ActionDefinition(TargetType.Closest, AttackType.RunAway),                 // 32: Bieg jak najdalej od najbliższego przeciwnika
-        new ActionDefinition(TargetType.Closest, AttackType.Retreat),                 // 33: Bezpieczny odwrót od najbliższego przeciwnika
+        // --- AIM / RELOAD ---
+        new ActionDefinition(TargetType.None,             AttackType.Aim),          // 35: Przycelowanie
+        new ActionDefinition(TargetType.None,             AttackType.Reload),       // 36: Przeładowanie
 
-        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToMelee),        // 34: Zmiana broni na melee
-        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToRanged),       // 35: Zmiana broni na ranged
+        // --- MOVE AWAY / RUN AWAY / RETREAT ---
+        new ActionDefinition(TargetType.Closest,          AttackType.MoveAway),     // 37: Odejście od najbliższego
+        new ActionDefinition(TargetType.Closest,          AttackType.RunAway),      // 38: Bieg jak najdalej od najbliższego
+        new ActionDefinition(TargetType.Closest,          AttackType.Retreat),      // 39: Bezpieczny odwrót
 
-        new ActionDefinition(TargetType.None, AttackType.FinishTurn),                 // 36: Zakończenie tury
+        // --- WEAPON CHANGE ---
+        new ActionDefinition(TargetType.None,             AttackType.ChangeWeaponToMelee),   // 40: Zmiana broni na melee
+        new ActionDefinition(TargetType.None,             AttackType.ChangeWeaponToRanged),  // 41: Zmiana broni na ranged
+
+        // --- FINISH TURN ---
+        new ActionDefinition(TargetType.None,             AttackType.FinishTurn),            // 42: Zakończenie tury
     };
+
 
     // ======================================================================
     //                      POMOCNICZE METODY
@@ -1337,6 +1359,8 @@ public class ReinforcementLearningManager : MonoBehaviour
 
             _trainedRaces.Add(data.raceName);
         }
+
+        Debug.Log($"QTables loaded from {filePath}");
     }
 
     

@@ -1168,7 +1168,20 @@ public class CombatManager : MonoBehaviour
         // Sprawdza, czy cel nie znajduje się zbyt blisko
         if (attackDistance <= 1.5f)
         {
-            Debug.Log($"{attacker.GetComponent<Stats>().Name} stoi zbyt blisko celu, aby wykonać atak dystansowy.");
+            if(!ReinforcementLearningManager.Instance.IsLearning)
+            {
+                Debug.Log($"{attacker.GetComponent<Stats>().Name} stoi zbyt blisko celu, aby wykonać atak dystansowy.");
+            }
+
+            return false;
+        }
+
+        if(attackDistance > attackerWeapon.AttackRange)
+        {
+            if (!ReinforcementLearningManager.Instance.IsLearning)
+            {
+                Debug.Log($"Cel znajduje się poza zasięgiem broni {attacker.GetComponent<Stats>().Name}.");
+            }
             return false;
         }
 
@@ -1986,6 +1999,12 @@ public class CombatManager : MonoBehaviour
     // pełna wersja – z metalem
     public int CalculateArmor(Stats targetStats, string hitLocation, Weapon attackerWeapon, out int metalArmorValue)
     {
+        if(targetStats == null)
+        {
+            metalArmorValue = 0;
+            return 0;
+        }
+
         string normalizedHitLocation = NormalizeHitLocation(hitLocation);
 
         int armor = normalizedHitLocation switch
