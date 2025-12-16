@@ -102555,7 +102555,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 440815477}
   m_HandleRect: {fileID: 440815476}
   m_Direction: 2
-  m_Value: 0
+  m_Value: 1
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -211693,7 +211693,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 481666393}
   m_Direction: 2
   m_Value: 1
-  m_Size: 0.99999994
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -213943,16 +213943,14 @@ MonoBehaviour:
   Epsilon: 0.2
   EpsilonStart: 1
   EpsilonEnd: 0.05
-  EpsilonDecayEpochs: 500
+  EpsilonDecayEpochs: 100
+  StepPenalty: -0.2
   ActionsPerEpoch: 600
   simpleGraph: {fileID: 1983358069}
   _playerWins: 0
   _enemyWins: 0
   _teamWinsDisplay: {fileID: 242916780}
   IsLearning: 0
-  Lambda: 0.8
-  ReplayBatchSize: 64
-  ReplayStartSize: 1000
 --- !u!114 &1983358071
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -213965,7 +213963,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e2c3b74d682c2149b3cf24cb0e0e76c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameSpeed: 30
+  gameSpeed: 1
 --- !u!4 &1983358072
 Transform:
   m_ObjectHideFlags: 0

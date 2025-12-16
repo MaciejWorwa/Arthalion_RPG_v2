@@ -11,22 +11,25 @@ namespace UnitStates
 {
     public enum AIState
     {
-        IsInMelee,
+        CanDoAction,
+        CanMove,
+        // IsInMelee - USUNIĘTE (zredukowano przestrzeń stanów o połowę)
         IsHeavilyWounded,
+        IsTargetHeavilyWounded,
         HasRangedWeapon,
         IsBeyondAttackRange,
         IsInChargeRange,
         TargetBehindObstacle,
         WeaponIsLoaded,
-        
-        // Dodaj tu kolejne stany
-        COUNT // Tyle mamy stanów
+        IsStrongerThanTarget,
+
+        COUNT
     }
 }
 
 public enum TargetType
 {
-    None = 0,    // dla akcji bez celu (DefensiveStance, Reload, itp.)
+    None = 0,
     Closest,
     Furthest,
     MostInjured,
@@ -38,15 +41,14 @@ public enum TargetType
 
 public enum AttackType
 {
-    Move = 0,  
-    Run,   
-    Null,         // Zwykły atak
+    Move = 0,
+    Run,
+    Null,
     Charge,
-    AllOutAttack, 
-
-    Aim,             
-    Reload,          
-    FinishTurn,      
+    AllOutAttack,
+    Aim,
+    Reload,
+    FinishTurn,
     MoveAway,
     RunAway,
     Retreat,
@@ -54,7 +56,6 @@ public enum AttackType
     ChangeWeaponToMelee
 }
 
-// Definiujemy parę (target, attack)
 public class ActionDefinition
 {
     public TargetType targetType;
@@ -72,179 +73,100 @@ public class ReinforcementLearningManager : MonoBehaviour
     public static ReinforcementLearningManager Instance { get; private set; }
 
     [Header("Q-learning parameters")]
-    [Tooltip("Współczynnik uczenia (learning rate)")]
     public float Alpha = 0.1f;
-
-    [Tooltip("Współczynnik dyskontowania (discount factor)")]
     public float Gamma = 0.9f;
-
-    [Tooltip("Szansa na losową akcję (eksploracja)")]
     public float Epsilon = 0.2f;
-
-    public float EpsilonStart = 1f;
+    public float EpsilonStart = 1.0f;
     public float EpsilonEnd = 0.05f;
-    public int EpsilonDecayEpochs = 500;
+    public int EpsilonDecayEpochs = 1000;
+
+    public float StepPenalty = -0.2f;
+
     private int currentEpoch = 0;
 
     [Header("Logging Parameters")]
-    [Tooltip("Number of actions per epoch before calculating average reward.")]
-    public int ActionsPerEpoch = 1000;
-
-    [Header("Graphing")]
+    public int ActionsPerEpoch = 500;
     public SimpleGraph simpleGraph;
 
-    // Logowanie nagród
     private List<float> epochRewards = new List<float>();
     private float currentEpochReward = 0f;
     private int actionsThisEpoch = 0;
 
-    private const int HISTORY_LIMIT = 10;
-    private Dictionary<Unit, Queue<(int state, int action, string race)>> unitActionHistory = new Dictionary<Unit, Queue<(int, int, string)>>();
     private const float WIN_REWARD = 100f;
-    private const float LOSS_REWARD = -20f;
+    private const float LOSS_REWARD = -30f;
 
     [SerializeField] private int _playerWins;
     [SerializeField] private int _enemyWins;
     [SerializeField] private TMP_Text _teamWinsDisplay;
 
-    // Liczba dostępnych akcji
     private const int ACTION_COUNT = 43;
 
-    // Liczba kombinacji stanów (2^(AIState.COUNT))
-    private int totalStateCombinations;
-
-    // klucz: nazwa rasy (np. "Human", "Orc", "Elf"), wartość: tablica Q
-    private Dictionary<string, float[,]> QTables = new Dictionary<string, float[,]>();
-
-    // Jak często dana akcja została użyta
-    private Dictionary<string, int[,]> ActionUsageCount = new Dictionary<string, int[,]>();
+    // ZMIANA: Zamiast float[,] używamy Dictionary.
+    // Klucz zewnętrzny: Rasa
+    // Klucz wewnętrzny: State Index (int)
+    // Wartość: Tablica Q-Values dla akcji (float[])
+    private Dictionary<string, Dictionary<int, float[]>> QTables = new Dictionary<string, Dictionary<int, float[]>>();
 
     public bool IsLearning;
-
-    // Lista lub zbiór wytrenowanych ras
     private HashSet<string> _trainedRaces = new HashSet<string>();
 
-    private PrioritizedReplayBuffer replayBuffer;
-    private Dictionary<string, float[,]> eligibilityTrace;
-    public float Lambda = 0.8f;  // śledzenie śladu
-    public int ReplayBatchSize = 64;
-    public int ReplayStartSize = 1000;  // zacznij replay dopiero po tylu przejściach
-
-    private float ComputePotential(bool[] states)
+    private struct LastStep
     {
-        // przykładowa: karanie odległości od najbliższego wroga
-        return -(states[(int)AIState.IsBeyondAttackRange] ? 1f : 0f);
+        public string Race;
+        public int State;
+        public int Action;
+        public Unit Target;
+        public bool TargetExisted;
+        public int PrevSelfHP;
+        public int PrevTargetHP;
+        public int TargetOverall;
+        public bool HasValue;
     }
+
+    private readonly Dictionary<Unit, LastStep> _lastStepByUnit = new();
 
     void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else if (Instance != this)
-        {
-            Destroy(gameObject);
-        }
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
     void Start()
     {
-        if(IsLearning)
-        {
-            LoadQTables();
-        }
-
-        // Obliczamy 2^(int)AIState.COUNT
-        totalStateCombinations = 1 << ((int)AIState.COUNT);
-
-        replayBuffer = new PrioritizedReplayBuffer(10000);
-        eligibilityTrace = new Dictionary<string, float[,]>();
+        if (IsLearning) LoadQTables();
     }
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R) && IsLearning)
-        {
-            SaveQTables();
-        }
+        if (Input.GetKeyDown(KeyCode.R) && IsLearning) SaveQTables();
     }
 
-    // Metoda do sprawdzania, czy rasa jest wytrenowana
-    public bool IsRaceTrained(string race)
-    {
-        return _trainedRaces.Contains(race);
-    }
-
-    public void ToggleLogs()
-    {
-        Debug.unityLogger.logEnabled = !Debug.unityLogger.logEnabled;
-    }
-    private void TrainFromReplay()
-    {
-        var batch = replayBuffer.Sample(ReplayBatchSize);
-        foreach (var t in batch)
-        {
-            var q = GetQTable(t.RaceName);
-            // inicjalizacja śladu jeśli brak
-            if (!eligibilityTrace.ContainsKey(t.RaceName))
-                eligibilityTrace[t.RaceName] = new float[q.GetLength(0), q.GetLength(1)];
-            var e = eligibilityTrace[t.RaceName];
-
-            // wylicz error TD
-            float maxQNext = 0f;
-            for (int a = 0; a < ACTION_COUNT; a++) maxQNext = Mathf.Max(maxQNext, q[t.NextState, a]);
-            float target = t.Reward + Gamma * maxQNext;
-            float error = target - q[t.State, t.Action];
-
-            // update śladu i Q
-            e[t.State, t.Action] += 1f;
-            for (int s = 0; s < q.GetLength(0); s++)
-            {
-                for (int a = 0; a < q.GetLength(1); a++)
-                {
-                    q[s, a] += Alpha * error * e[s, a];
-                    e[s, a] *= Gamma * Lambda;
-                }
-            }
-
-            // zaktualizuj priorytet
-            int idx = replayBuffer.buffer.FindIndex(x => x.State == t.State && x.Action == t.Action);
-            if (idx >= 0) replayBuffer.priorities[idx] = Math.Abs(error) + 0.01f;
-        }
-    }
     // ======================================================================
-    //             REJESTRACJA / POBIERANIE TABLICY Q DLA RASY
+    //             DOSTĘP DO TABLICY Q (SPARSE MATRIX)
     // ======================================================================
 
-    // Inicjalizuje (jeśli trzeba) Q-tabelę dla danej rasy.
     public void RegisterRace(string raceName)
     {
         if (string.IsNullOrEmpty(raceName)) return;
-
-        // 1) Zarejestruj w QTables
         if (!QTables.ContainsKey(raceName))
         {
-            float[,] table = new float[totalStateCombinations, ACTION_COUNT];
-            QTables[raceName] = table;
-            Debug.Log($"[RegisterRace] Dodano QTables dla '{raceName}'");
-        }
-
-        // 2) Zarejestruj w ActionUsageCount
-        if (!ActionUsageCount.ContainsKey(raceName))
-        {
-            int[,] usage = new int[totalStateCombinations, ACTION_COUNT];
-            ActionUsageCount[raceName] = usage;
-            Debug.Log($"[RegisterRace] Dodano ActionUsageCount dla '{raceName}'");
+            QTables[raceName] = new Dictionary<int, float[]>();
         }
     }
 
-    // Zwraca tablicę Q dla podanej rasy. Jeśli brak, tworzy nową.
-    private float[,] GetQTable(string raceName)
+    // Pobiera tablicę wartości Q dla danego stanu. Jeśli stan nie istnieje, tworzy go.
+    private float[] GetStateQValues(string raceName, int stateIndex)
     {
         RegisterRace(raceName);
-        
-        return QTables[raceName];
+        var raceTable = QTables[raceName];
+
+        if (!raceTable.ContainsKey(stateIndex))
+        {
+            // Leniwa inicjalizacja - tworzymy wpis tylko gdy jest potrzebny
+            raceTable[stateIndex] = new float[ACTION_COUNT];
+        }
+
+        return raceTable[stateIndex];
     }
 
     // ======================================================================
@@ -256,1038 +178,759 @@ public class ReinforcementLearningManager : MonoBehaviour
         int stateIndex = 0;
         for (int i = 0; i < states.Length; i++)
         {
-            if (states[i])
-            {
-                stateIndex |= (1 << i);
-            }
+            if (states[i]) stateIndex |= (1 << i);
         }
         return stateIndex;
     }
 
-    // Wybiera akcję epsilon-greedy na podstawie rasy i stanu.
-    private ActionChoice ChooseValidActionEpsilonGreedy(ActionContext context)
+    private bool[] DecodeState(int stateIndex)
     {
-        float[,] qTable = GetQTable(context.RaceName);
-        Unit unit = context.Unit;
-
-        Dictionary<Unit, bool[]> statesCache = new Dictionary<Unit, bool[]>();
-
-        // Cache na stany "bez celu"
-        Unit defaultTarget = GetTargetByType(context.Info, TargetType.Closest);
-        bool[] nonTargetStates = defaultTarget != null ? DetermineStates(unit, defaultTarget) : DetermineStates(unit, null);
-
-        // Sprawdzenie, czy jednostka ma jeszcze dostępne akcje
-        if (InitiativeQueueManager.Instance.InitiativeQueue.ContainsKey(unit) && !unit.CanDoAction && !unit.CanMove)
-        {
-            return new ActionChoice
-            {
-                ActionId = 42,
-                ChosenTarget = null,
-                ChosenStates = new bool[(int)AIState.COUNT]
-            };
-        }
-
-        List<int> validActions = new List<int>();
-        Unit fallbackTarget = null;
-        bool[] fallbackStates = new bool[(int)AIState.COUNT];
-
-        for (int i = 0; i < AllActions.Length; i++)
-        {
-            ActionDefinition def = AllActions[i];
-            TargetType tType = def.targetType;
-            AttackType aType = def.attackType;
-
-            bool requiresTarget = (tType != TargetType.None);
-            Unit potentialTarget = null;
-            bool[] states = null;
-
-            if (requiresTarget)
-            {
-                // jeśli potrzebujemy celu, pobierz go i policz stany dla tego celu (z cachingiem)
-                potentialTarget = GetTargetByType(context.Info, def.targetType);
-                if (potentialTarget == null)
-                    continue;
-
-                if (!statesCache.TryGetValue(potentialTarget, out states))
-                {
-                    states = DetermineStates(unit, potentialTarget);
-                    statesCache[potentialTarget] = states;
-                }
-            }
-            else
-            {
-                states = nonTargetStates;
-            }
-
-            // fallback – pierwszy potencjalny target
-            if (fallbackTarget == null && potentialTarget != null)
-            {
-                fallbackTarget = potentialTarget;
-                fallbackStates = (bool[])states.Clone();
-            }
-
-            bool isInMelee = states[(int)AIState.IsInMelee];
-            bool hasRangedWeapon = states[(int)AIState.HasRangedWeapon];
-            bool isBeyondAttackRange = states[(int)AIState.IsBeyondAttackRange];
-            bool isInChargeRange = states[(int)AIState.IsInChargeRange];
-
-            bool isMove = (aType == AttackType.Move || aType == AttackType.MoveAway);
-            bool isRun = (aType == AttackType.Run || aType == AttackType.RunAway);
-            bool isRetreat = aType == AttackType.Retreat;
-            bool isAttack = (aType != AttackType.Move
-                            && aType != AttackType.Aim
-                            && aType != AttackType.Reload
-                            && aType != AttackType.FinishTurn
-                            && aType != AttackType.MoveAway
-                            && aType != AttackType.RunAway
-                            && aType != AttackType.Retreat
-                            && aType != AttackType.ChangeWeaponToMelee
-                            && aType != AttackType.ChangeWeaponToRanged);
-
-            if (isMove)
-            {
-                if (!unit.CanMove)
-                    continue;
-            }
-            if (isRun || isRetreat)
-            {
-                if (!unit.CanMove || !unit.CanDoAction)
-                    continue;
-            }
-            else // każda inna akcja wymaga CanDoAction
-            {
-                if (!unit.CanDoAction)
-                    continue;
-            }
-
-            // ---- WARUNKI BLOKADY DLA ATAKÓW ----
-            if (isAttack)
-            {
-                if (!context.OpponentExist) continue;
-                if (context.CurrentWeapon == null) continue;
-                if (context.CurrentWeapon.ReloadLeft > 0) continue;
-                if (potentialTarget == null) continue;
-                if (!context.Info.Distances.ContainsKey(potentialTarget)) continue;
-
-                if (aType == AttackType.Charge)
-                {
-                    if (!isInChargeRange || !unit.CanMove) continue;
-                    if (!(isBeyondAttackRange && !hasRangedWeapon)) continue;
-                }
-                else
-                {
-                    if (hasRangedWeapon)
-                    {
-                        states[(int)AIState.IsBeyondAttackRange] =
-                            !CombatManager.Instance.ValidateRangedAttack(unit, potentialTarget, context.CurrentWeapon, 
-                                                                        context.Info.Distances[potentialTarget]);
-                    }
-                    else
-                    {
-                        states[(int)AIState.IsBeyondAttackRange] =
-                            context.Info.Distances[potentialTarget] > context.CurrentWeapon.AttackRange;
-                    }
-
-                    if (isBeyondAttackRange) continue;
-                }
-
-                if (hasRangedWeapon && (aType == AttackType.Charge)) continue;
-            }
-
-            // ---- WARUNKI BLOKADY DLA RUCHU ----
-            if (isMove || isRun || isRetreat)
-            {
-                if (tType == TargetType.Closest && !context.OpponentExist) continue;
-                if (tType == TargetType.Furthest && !context.FurthestUnitExist) continue;
-                if (tType == TargetType.MostInjured && !context.MostInjuredUnitExist) continue;
-                if (tType == TargetType.LeastInjured && !context.LeastInjuredUnitExist) continue;
-                if (tType == TargetType.Weakest && !context.WeakestUnitExist) continue;
-                if (tType == TargetType.Strongest && !context.StrongestUnitExist) continue;
-                if (tType == TargetType.MostAlliesNearby && !context.TargetWithMostAlliesExist) continue;
-            }
-
-            if(aType == AttackType.ChangeWeaponToRanged || aType == AttackType.ChangeWeaponToMelee)
-            {
-                string chosenWeaponType = aType == AttackType.ChangeWeaponToRanged ? "ranged" : "melee";
-                bool chosenTypeExist = false;
-
-                if(hasRangedWeapon && aType == AttackType.ChangeWeaponToRanged) continue;
-                if(!hasRangedWeapon && aType == AttackType.ChangeWeaponToMelee) continue;
-
-                // Sprawdzenie, czy jednostka posiada więcej niż jedną broń
-                if (unit.GetComponent<Inventory>().AllWeapons.Count > 1)
-                {
-                    //  Zmienia bronie dopóki nie znajdzie takiej, która posuje do wybranego typu
-                    foreach (Weapon w in  unit.GetComponent<Inventory>().AllWeapons)
-                    {
-                        if (w.Type.Contains(chosenWeaponType))
-                        {
-                            chosenTypeExist = true;
-                            break;
-                        }
-                    }
-                    
-                    if (chosenTypeExist == false) continue;
-                }
-                else continue;
-            }
-
-            if (aType == AttackType.Retreat && isInMelee == false) continue;
-
-            // ---- AKCJE SPECJALNE ----
-            if (aType == AttackType.Reload)
-            {
-                if (context.CurrentWeapon != null && context.WeaponIsLoaded) continue;
-            }
-
-            validActions.Add(i);
-        }
-
-        // Jeśli brak dozwolonych akcji => FinishTurn
-        if (validActions.Count == 0)
-        {
-            return new ActionChoice
-            {
-                ActionId = 42,
-                ChosenTarget = fallbackTarget,
-                ChosenStates = fallbackStates ?? new bool[(int)AIState.COUNT]
-            };
-        }
-
-        // --- EPSILON-GREEDY ---
-        int chosenActionId;
-        if (UnityEngine.Random.value < Epsilon)
-        {
-            int randomIndex = UnityEngine.Random.Range(0, validActions.Count);
-            chosenActionId = validActions[randomIndex];
-        }
-        else
-        {
-            float bestVal = float.NegativeInfinity;
-            List<int> bestActions = new List<int>();
-
-            foreach (int actID in validActions)
-            {
-                float val = qTable[context.StateIndex, actID];
-                if (val > bestVal)
-                {
-                    bestVal = val;
-                    bestActions.Clear();
-                    bestActions.Add(actID);
-                }
-                else if (Mathf.Approximately(val, bestVal))
-                {
-                    bestActions.Add(actID);
-                }
-            }
-
-            if (bestActions.Count > 0)
-            {
-                int randomBestIndex = UnityEngine.Random.Range(0, bestActions.Count);
-                chosenActionId = bestActions[randomBestIndex];
-            }
-            else
-            {
-                int randomIndex = UnityEngine.Random.Range(0, validActions.Count);
-                chosenActionId = validActions[randomIndex];
-            }
-        }
-
-        ActionDefinition chosenDef = AllActions[chosenActionId];
-        Unit chosenTarget = chosenDef.targetType != TargetType.None? GetTargetByType(context.Info, chosenDef.targetType) : null;
-        bool[] chosenStates = null;
-
-        if (chosenDef.targetType != TargetType.None)
-        {
-            if (!statesCache.TryGetValue(chosenTarget, out chosenStates))
-            {
-                chosenStates = DetermineStates(unit, chosenTarget);
-            }
-        }
-        else
-        {
-            chosenStates = nonTargetStates;
-        }
-
-        return new ActionChoice
-        {
-            ActionId = chosenActionId,
-            ChosenTarget = chosenTarget,
-            ChosenStates = chosenStates
-        };
+        int n = (int)AIState.COUNT;
+        bool[] s = new bool[n];
+        for (int i = 0; i < n; i++) s[i] = (stateIndex & (1 << i)) != 0;
+        return s;
     }
 
     public class ActionChoice
     {
-        public int ActionId;         // numer akcji w AllActions
-        public Unit ChosenTarget;    // docelowy target
-        public bool[] ChosenStates;  // stany dla (unit, target)
+        public int ActionId;
+        public Unit ChosenTarget;
+        public bool[] ChosenStates;
     }
 
-    /// Aktualizuje Q wg formuły Q-learningu dla danej rasy.
-    private void UpdateQ(string raceName, int oldState, int action, float reward, int newState)
+    // --- WYBÓR AKCJI ---
+    private ActionChoice ChooseValidActionEpsilonGreedy(ActionContext context, Unit unit)
     {
-        float[,] qTable = GetQTable(raceName);
-
-        float oldQ = qTable[oldState, action];
-        float maxQnext = float.NegativeInfinity;
-        for (int a = 0; a < ACTION_COUNT; a++)
+        // 1. Eksploracja
+        if (UnityEngine.Random.value < Epsilon)
         {
-            if (qTable[newState, a] > maxQnext)
+            List<int> potentialActions = new List<int>();
+            for (int i = 0; i < ACTION_COUNT; i++)
             {
-                maxQnext = qTable[newState, a];
+                Unit t = ResolveTargetFromAction(null, i, context.Info);
+                if (t != null || AllActions[i].targetType == TargetType.None)
+                {
+                    // Weryfikujemy, czy akcja jest fizycznie możliwa
+                    bool[] tempStates = DetermineStates(unit, t);
+                    if (IsActionValidForUnitAndTarget(unit, t, i, tempStates))
+                    {
+                        potentialActions.Add(i);
+                    }
+                }
+            }
+
+            if (potentialActions.Count > 0)
+            {
+                int rndIdx = potentialActions[UnityEngine.Random.Range(0, potentialActions.Count)];
+                Unit rndTarget = ResolveTargetFromAction(null, rndIdx, context.Info);
+                return new ActionChoice
+                {
+                    ActionId = rndIdx,
+                    ChosenTarget = rndTarget,
+                    ChosenStates = DetermineStates(unit, rndTarget)
+                };
+            }
+            // Fallback
+            return new ActionChoice { ActionId = (int)AttackType.FinishTurn, ChosenStates = DetermineStates(unit, null) };
+        }
+
+        // 2. Eksploatacja
+        float maxQ = float.MinValue;
+        List<ActionChoice> bestChoices = new List<ActionChoice>();
+
+        for (int actId = 0; actId < AllActions.Length; actId++)
+        {
+            Unit potentialTarget = ResolveTargetFromAction(null, actId, context.Info);
+
+            if (AllActions[actId].targetType != TargetType.None && potentialTarget == null)
+                continue;
+
+            bool[] currentStates = DetermineStates(unit, potentialTarget);
+
+            if (!IsActionValidForUnitAndTarget(unit, potentialTarget, actId, currentStates))
+                continue;
+
+            int stateIdx = EncodeState(currentStates);
+
+            // Pobieramy wartości Q ze słownika
+            float[] stateQValues = GetStateQValues(context.RaceName, stateIdx);
+            float q = stateQValues[actId];
+
+            if (q > maxQ)
+            {
+                maxQ = q;
+                bestChoices.Clear();
+                bestChoices.Add(new ActionChoice { ActionId = actId, ChosenTarget = potentialTarget, ChosenStates = currentStates });
+            }
+            else if (Mathf.Abs(q - maxQ) < 0.001f)
+            {
+                bestChoices.Add(new ActionChoice { ActionId = actId, ChosenTarget = potentialTarget, ChosenStates = currentStates });
             }
         }
 
-        // Zabezpieczenie przed float.NegativeInfinity
-        if (maxQnext == float.NegativeInfinity)
+        if (bestChoices.Count > 0)
+            return bestChoices[UnityEngine.Random.Range(0, bestChoices.Count)];
+
+        return new ActionChoice
         {
-            maxQnext = 0f;
+            ActionId = (int)AttackType.FinishTurn,
+            ChosenTarget = null,
+            ChosenStates = DetermineStates(unit, null)
+        };
+    }
+
+    private bool IsActionValidForUnitAndTarget(Unit unit, Unit target, int actionId, bool[] states)
+    {
+        if (unit == null) return false;
+        var def = AllActions[actionId];
+        var aType = def.attackType;
+
+        bool canMove = states[(int)AIState.CanMove];
+        bool canDoAction = states[(int)AIState.CanDoAction];
+        bool hasRanged = states[(int)AIState.HasRangedWeapon];
+        // bool inMelee = states[(int)AIState.IsInMelee]; // USUNIĘTE
+        bool inCharge = states[(int)AIState.IsInChargeRange];
+        bool beyondAttack = states[(int)AIState.IsBeyondAttackRange];
+        bool isLoaded = states[(int)AIState.WeaponIsLoaded];
+
+        if (aType == AttackType.FinishTurn) return true;
+
+        switch (aType)
+        {
+            case AttackType.Move:
+            case AttackType.MoveAway:
+                return canMove;
+            case AttackType.Run:
+            case AttackType.RunAway:
+            case AttackType.Retreat:
+                return canMove && canDoAction;
+            case AttackType.Reload:
+                return canDoAction && hasRanged && !isLoaded;
+            case AttackType.ChangeWeaponToMelee:
+                return canDoAction && hasRanged;
+            case AttackType.ChangeWeaponToRanged:
+                return canDoAction && !hasRanged;
+            case AttackType.Aim:
+                return canDoAction && unit.AimingBonus == 0;
+            case AttackType.Charge:
+                return canMove && canDoAction && inCharge;
+            case AttackType.AllOutAttack:
+                return canDoAction && !hasRanged && !beyondAttack;
+            case AttackType.Null:
+                if (beyondAttack) return false;
+                return canDoAction;
+            default:
+                return canDoAction;
         }
+    }
+
+    private bool IsActionValidForUnitAndTarget_Approx(bool[] states, int actionId)
+    {
+        return IsActionValidForUnitAndTarget(null, null, actionId, states);
+    }
+
+    private Unit ResolveTargetFromAction(Unit suggestedTarget, int actionId, TargetsInfo info)
+    {
+        var def = AllActions[actionId];
+        if (def.targetType == TargetType.None) return null;
+        if (suggestedTarget != null) return suggestedTarget;
+        return GetTargetByType(info, def.targetType);
+    }
+
+    private void UpdateQ(string raceName, int oldState, int action, float reward, int newState)
+    {
+        // Pobieramy tablice Q dla obu stanów
+        float[] qOldStateVals = GetStateQValues(raceName, oldState);
+
+        float oldQ = qOldStateVals[action];
+        float maxQnext = GetMaxQNextMasked(raceName, newState);
+
+        if (float.IsNegativeInfinity(maxQnext)) maxQnext = 0f;
 
         float newQ = oldQ + Alpha * (reward + Gamma * maxQnext - oldQ);
-        qTable[oldState, action] = newQ;
+
+        // Zapisujemy nową wartość
+        qOldStateVals[action] = newQ;
+    }
+
+    private float GetMaxQNextMasked(string race, int nextStateIndex)
+    {
+        // Sprawdzamy czy stan w ogóle istnieje w pamięci, jeśli nie -> maxQ = 0 (domyślnie)
+        if (!QTables.ContainsKey(race) || !QTables[race].ContainsKey(nextStateIndex))
+        {
+            // Nowy stan, wszystkie Q=0, więc max też 0.
+            // Sprawdzamy tylko poprawność akcji, ale przy Q=0 wynik to 0.
+            return 0f;
+        }
+
+        float[] qNextStateVals = QTables[race][nextStateIndex];
+        bool[] nextStates = DecodeState(nextStateIndex);
+
+        float best = float.MinValue;
+        bool found = false;
+
+        for (int a = 0; a < AllActions.Length; a++)
+        {
+            if (!IsActionValidForUnitAndTarget_Approx(nextStates, a)) continue;
+
+            float v = qNextStateVals[a];
+            if (!found || v > best) { best = v; found = true; }
+        }
+        return found ? best : 0f;
     }
 
     // ======================================================================
-    //         LOGIKA STANÓW ORAZ GŁÓWNA METODA SimulateUnit
+    //         PATHFINDING HELPERS (BFS + Manhattan)
+    // ======================================================================
+
+    private int GetManhattanDistance(Vector2 a, Vector2 b)
+    {
+        return Mathf.Abs((int)(a.x - b.x)) + Mathf.Abs((int)(a.y - b.y));
+    }
+
+    private int CalculateQuickPathLength(Vector2 startPos, Vector2 targetPos, int maxSearchDepth)
+    {
+        if (GetManhattanDistance(startPos, targetPos) > maxSearchDepth) return -1;
+        if (GetManhattanDistance(startPos, targetPos) == 1) return 1;
+
+        Queue<Vector2> queue = new Queue<Vector2>();
+        HashSet<Vector2> visited = new HashSet<Vector2>();
+        Dictionary<Vector2, int> depth = new Dictionary<Vector2, int>();
+
+        queue.Enqueue(startPos);
+        visited.Add(startPos);
+        depth[startPos] = 0;
+
+        Vector2[] directions = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
+
+        while (queue.Count > 0)
+        {
+            Vector2 current = queue.Dequeue();
+            int currentDepth = depth[current];
+
+            if (currentDepth >= maxSearchDepth) continue;
+
+            foreach (Vector2 dir in directions)
+            {
+                Vector2 neighbor = current + dir;
+                if (neighbor == targetPos) return currentDepth + 1;
+                if (visited.Contains(neighbor)) continue;
+
+                Collider2D col = Physics2D.OverlapPoint(neighbor);
+                bool isBlocked = false;
+
+                if (col != null)
+                {
+                    if (col.CompareTag("Tile"))
+                    {
+                        var tileComp = col.GetComponent<Tile>();
+                        if (tileComp != null && tileComp.IsOccupied) isBlocked = true;
+                    }
+                    else if (col.GetComponent<Unit>() != null || col.GetComponent<MapElement>() != null)
+                    {
+                        isBlocked = true;
+                    }
+                }
+                else isBlocked = true;
+
+                if (!isBlocked)
+                {
+                    visited.Add(neighbor);
+                    depth[neighbor] = currentDepth + 1;
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+        return -1;
+    }
+
+    // ======================================================================
+    //         LOGIKA STANÓW
     // ======================================================================
 
     public bool[] DetermineStates(Unit unit, Unit target)
     {
-        bool[] states = new bool[(int)AIState.COUNT];
+        bool[] s = new bool[(int)AIState.COUNT];
 
-        // Pobranie komponentów
         Stats stats = unit.GetComponent<Stats>();
         Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-
-        // Sprawdzenie, czy jednostka ma broń zasięgową
         bool hasRanged = weapon != null && weapon.Type.Contains("ranged");
-        states[(int)AIState.HasRangedWeapon] = hasRanged;
+
+        s[(int)AIState.CanDoAction] = unit.CanDoAction;
+        s[(int)AIState.CanMove] = unit.CanMove;
+        s[(int)AIState.HasRangedWeapon] = hasRanged;
+        s[(int)AIState.IsHeavilyWounded] = stats.TempHealth <= (stats.MaxHealth * 0.3f);
+        s[(int)AIState.WeaponIsLoaded] = (weapon != null) && weapon.ReloadLeft == 0;
 
         if (target != null)
         {
+            int manhattanDist = GetManhattanDistance(unit.transform.position, target.transform.position);
             float distance = CombatManager.Instance.CalculateDistance(unit.gameObject, target.gameObject);
+            float attackRange = weapon != null ? weapon.AttackRange : 1.5f;
+            int attackRangeInt = Mathf.CeilToInt(attackRange);
+            if (!hasRanged) attackRangeInt = 1;
 
-            // Ustawienie stanu IsInMelee
-            states[(int)AIState.IsInMelee] = distance <= 1.5f;
+            // Jeśli !HasRanged i !IsBeyondAttackRange -> jesteśmy w melee.
 
-            // Pobranie zasięgu ataku z broni
-            float attackRange = weapon != null ? weapon.AttackRange : 0f;
+            if (hasRanged)
+                s[(int)AIState.IsBeyondAttackRange] = distance > attackRange || distance <= 1.5f;
+            else
+                s[(int)AIState.IsBeyondAttackRange] = distance > attackRange;
 
-            // Ustawienie stanu IsBeyondAttackRange
+            // Charge Logic
+            int movement = stats.TempSz;
+            float minCharge = movement / 2f;
+            int maxCharge = movement * 2;
+
+            if (manhattanDist >= minCharge && manhattanDist <= maxCharge)
+            {
+                int realPathLength = CalculateQuickPathLength(unit.transform.position, target.transform.position, maxCharge);
+                s[(int)AIState.IsInChargeRange] = (realPathLength != -1 && realPathLength >= minCharge);
+            }
+            else
+            {
+                s[(int)AIState.IsInChargeRange] = false;
+            }
+
             if (hasRanged)
             {
-                // Dla broni zasięgowej
-                states[(int)AIState.IsBeyondAttackRange] = !CombatManager.Instance.ValidateRangedAttack(unit, target, weapon, distance);
-            }
-            else
-            {
-                // Dla broni bezzasięgowej, IsBeyondAttackRange jest prawdziwe, gdy odległość > attackRange
-                states[(int)AIState.IsBeyondAttackRange] = distance > attackRange;
+                float distFloat = Vector2.Distance(unit.transform.position, target.transform.position);
+                s[(int)AIState.TargetBehindObstacle] = IsTargetBehindObstacle(unit.gameObject, target.gameObject, distFloat);
             }
 
-            // Ustawienie stanu IsInChargeRange
-            float chargeRange = stats.TempSz * 2;
-            //Ścieżka ruchu szarżującego
-            GameObject targetTile = CombatManager.Instance.GetTileAdjacentToTarget(unit.gameObject, target.gameObject);
-            
-            if(targetTile == null)
+            Stats tStats = target.GetComponent<Stats>();
+            if (tStats != null)
             {
-                states[(int)AIState.IsInChargeRange] = false;
-            }
-            else
-            {
-                Vector2 targetTilePosition = targetTile.transform.position;
-                List<Vector2> path = MovementManager.Instance.FindPath(unit.transform.position, targetTilePosition);
-                if(path == null || path.Count == 0)
-                {
-                    states[(int)AIState.IsInChargeRange] = false;
-                }
-                else
-                {
-                    states[(int)AIState.IsInChargeRange] = path.Count <= chargeRange && path.Count >= 2;
-                }
-            }
-
-            // Ustalmy, że to ma sens tylko dla broni dystansowych:
-            if (hasRanged)
-            {
-                states[(int)AIState.TargetBehindObstacle] = IsTargetBehindObstacle(unit.gameObject, target.gameObject, distance);
-            }
-            else
-            {
-                states[(int)AIState.TargetBehindObstacle] = false;
+                s[(int)AIState.IsTargetHeavilyWounded] = tStats.TempHealth <= (tStats.MaxHealth * 0.3f);
+                s[(int)AIState.IsStrongerThanTarget] = stats.TempHealth > tStats.TempHealth;
             }
         }
 
-        // Ustawienie stanu IsHeavilyWounded
-        if (stats != null)
-        {
-            states[(int)AIState.IsHeavilyWounded] = stats.TempHealth <= stats.MaxHealth / 3f;
-        }
-
-        // Ustawienie stanu WeaponIsLoaded
-        states[(int)AIState.WeaponIsLoaded] = weapon.ReloadLeft == 0 ? true : false;
-
-        return states;
+        return s;
     }
 
-    // Główna metoda sterująca akcjami jednostki w turze – Q-learning.
     public void SimulateUnit(Unit unit)
     {
         if (unit == null) return;
         Stats stats = unit.GetComponent<Stats>();
-        if (stats == null || stats.TempHealth < 0) return; // martwy
+        if (stats == null || stats.TempHealth <= 0) return;
 
-        // (A) Zbierz info o celach i wyznacz stan bazowy
+        // Rozlicz poprzedni krok
+        if (_lastStepByUnit.TryGetValue(unit, out var prev) && prev.HasValue)
+        {
+            float delayedReward = ComputeDelayedReward(unit, prev);
+
+            Unit targetForNextState = prev.TargetExisted && prev.Target != null ? prev.Target : null;
+            if (targetForNextState == null)
+            {
+                var infoTemp = GatherTargetsInfo(unit);
+                targetForNextState = infoTemp.Closest;
+            }
+
+            bool[] statesNow = DetermineStates(unit, targetForNextState);
+            int stateNowIndex = EncodeState(statesNow);
+
+            UpdateQ(prev.Race, prev.State, prev.Action, delayedReward, stateNowIndex);
+
+            currentEpochReward += delayedReward;
+            actionsThisEpoch++;
+            _lastStepByUnit[unit] = new LastStep { HasValue = false };
+        }
+
         TargetsInfo info = GatherTargetsInfo(unit);
-        Unit defaultTarget = info.Closest;
-        bool[] baseStates = DetermineStates(unit, defaultTarget);
-        int baseStateIndex = EncodeState(baseStates);
+        ActionContext ctx = new ActionContext { Unit = unit, RaceName = stats.Race, Info = info };
 
-        // (B) Przygotuj kontekst decyzji
-        ActionContext ctx = new ActionContext
+        ActionChoice choice = ChooseValidActionEpsilonGreedy(ctx, unit);
+
+        int prevSelfHP = stats.TempHealth;
+        int prevTargetHP = 0;
+        int targetOverall = 0;
+        bool targetExisted = (choice.ChosenTarget != null);
+
+        if (targetExisted)
         {
-            Unit = unit,
-            RaceName = stats.Race,
-            StateIndex = baseStateIndex,
+            var ts = choice.ChosenTarget.GetComponent<Stats>();
+            if (ts != null) { prevTargetHP = ts.TempHealth; targetOverall = ts.Overall; }
+        }
 
-            HasRanged = baseStates[(int)AIState.HasRangedWeapon],
-            IsInMelee = baseStates[(int)AIState.IsInMelee],
-            IsBeyondAttackRange = baseStates[(int)AIState.IsBeyondAttackRange],
-            IsInChargeRange = baseStates[(int)AIState.IsInChargeRange],
-            TargetBehindObstacle = baseStates[(int)AIState.TargetBehindObstacle],
-            IsHeavilyWounded = baseStates[(int)AIState.IsHeavilyWounded],
-            WeaponIsLoaded = baseStates[(int)AIState.WeaponIsLoaded],
+        float immediateReward = PerformParameterAction(choice.ActionId, unit, choice.ChosenTarget, info, prevSelfHP);
+        immediateReward += StepPenalty;
 
-            OpponentExist = (info.Closest != null),
-            FurthestUnitExist = (info.Furthest != null),
-            MostInjuredUnitExist = (info.MostInjured != null),
-            LeastInjuredUnitExist = (info.LeastInjured != null),
-            WeakestUnitExist = (info.Weakest != null),
-            StrongestUnitExist = (info.Strongest != null),
-            TargetWithMostAlliesExist = (info.WithMostAllies != null),
-
-            CurrentWeapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject),
-            Info = info
+        _lastStepByUnit[unit] = new LastStep
+        {
+            Race = stats.Race,
+            State = EncodeState(choice.ChosenStates),
+            Action = choice.ActionId,
+            Target = choice.ChosenTarget,
+            TargetExisted = targetExisted,
+            PrevSelfHP = prevSelfHP,
+            PrevTargetHP = prevTargetHP,
+            TargetOverall = targetOverall,
+            HasValue = true
         };
 
-        // (C) Wybór i wykonanie akcji
-        ActionChoice choice = ChooseValidActionEpsilonGreedy(ctx);
-        int actionId = choice.ActionId;
-        Unit target = choice.ChosenTarget;
-        bool[] oldStates = choice.ChosenStates;
-        int oldState = EncodeState(oldStates);
-
-        // Historia dla terminal reward
-        if (!unitActionHistory.ContainsKey(unit))
-            unitActionHistory[unit] = new Queue<(int, int, string)>();
-        var history = unitActionHistory[unit];
-        history.Enqueue((oldState, actionId, ctx.RaceName));
-        if (history.Count > HISTORY_LIMIT)
-            history.Dequeue();
-
-        // (D) Wykonaj akcję i policz reward
-        int prevHP = stats.TempHealth;
-        float reward = PerformParameterAction(actionId, unit, info, prevHP);
-
-        // Potential-based shaping
-        float phiOld = ComputePotential(oldStates);
-        bool[] newStates = DetermineStates(unit, target);
-        float phiNew = ComputePotential(newStates);
-        reward += Gamma * phiNew - phiOld;
-
-        // Logowanie nagród
-        currentEpochReward += reward;
-        actionsThisEpoch++;
-
-        // (E) Dodaj transition do Replay z priorytetem
-        int nextState = EncodeState(newStates);
-        float initPrio = replayBuffer.Count > 0 ? replayBuffer.priorities.Max() : 1f;
-        var trans = new Transition
-        {
-            RaceName = ctx.RaceName,
-            State = oldState,
-            Action = actionId,
-            Reward = reward,
-            NextState = nextState,
-            Priority = initPrio
-        };
-        replayBuffer.Add(trans);
-
-        // (F) Aktualizacja Q: on-line lub batch z priorytetami i λ-traces
-        if (replayBuffer.Count >= ReplayStartSize)
-        {
-            TrainFromReplay();
-        }
-        else
-        {
-            UpdateQ(ctx.RaceName, oldState, actionId, reward, nextState);
-        }
-
-        // (G) Koniec epoki? Logi, decay ε i reset nagród
-        if (actionsThisEpoch >= ActionsPerEpoch)
-        {
-            float avgReward = currentEpochReward / actionsThisEpoch;
-            epochRewards.Add(avgReward);
-            Debug.Log($"Epoch completed. Avg Reward: {avgReward:F2}");
-
-            currentEpochReward = 0f;
-            actionsThisEpoch = 0;
-
-            currentEpoch++;
-            float t = Mathf.Min(1f, (float)currentEpoch / EpsilonDecayEpochs);
-            Epsilon = Mathf.Lerp(EpsilonStart, EpsilonEnd, t);
-
-            SaveAverageReward(avgReward);
-            SaveQTables();
-        }
+        if (actionsThisEpoch >= ActionsPerEpoch) AdvanceEpoch();
     }
 
-    private float PerformParameterAction(int actionID, Unit unit, TargetsInfo info, int oldHP)
+    private void AdvanceEpoch()
+    {
+        float avgReward = currentEpochReward / Mathf.Max(1, actionsThisEpoch);
+        epochRewards.Add(avgReward);
+        Debug.Log($"Epoch {currentEpoch} ended. Avg Reward: {avgReward:F2} | Epsilon: {Epsilon:F3}");
+
+        currentEpochReward = 0f;
+        actionsThisEpoch = 0;
+        currentEpoch++;
+
+        if (currentEpoch < EpsilonDecayEpochs)
+        {
+            float progress = (float)currentEpoch / EpsilonDecayEpochs;
+            Epsilon = Mathf.Lerp(EpsilonStart, EpsilonEnd, progress);
+        }
+        else Epsilon = EpsilonEnd;
+
+        SaveAverageReward(avgReward);
+        SaveQTables();
+    }
+
+    private float ComputeDelayedReward(Unit unit, LastStep ls)
     {
         float reward = 0f;
-        // Sprawdzamy definicję:
+        var selfStats = unit.GetComponent<Stats>();
+
+        int hpDiff = selfStats.TempHealth - ls.PrevSelfHP;
+        if (hpDiff < 0) reward += hpDiff * 2.0f;
+        if (selfStats.TempHealth <= 0) reward += LOSS_REWARD;
+
+        if (ls.TargetExisted)
+        {
+            bool targetDead = false;
+            int currentTargetHP = 0;
+
+            if (ls.Target == null || ls.Target.GetComponent<Stats>() == null) targetDead = true;
+            else
+            {
+                var tStats = ls.Target.GetComponent<Stats>();
+                currentTargetHP = tStats.TempHealth;
+                if (currentTargetHP <= 0) targetDead = true;
+            }
+
+            if (targetDead) reward += 20f + (ls.TargetOverall / 2f);
+            else
+            {
+                int dmgDealt = ls.PrevTargetHP - currentTargetHP;
+                if (dmgDealt > 0) reward += dmgDealt * 1.5f;
+            }
+        }
+        return reward;
+    }
+
+    private float PerformParameterAction(int actionID, Unit unit, Unit chosenTarget, TargetsInfo info, int oldHP)
+    {
+        float reward = 0f;
         if (actionID < 0 || actionID >= AllActions.Length)
         {
-            // out of range => FinishTurn
             RoundsManager.Instance.FinishTurn();
             return reward;
         }
 
         ActionDefinition def = AllActions[actionID];
-        TargetType tType = def.targetType;
         AttackType aType = def.attackType;
+        TargetType tType = def.targetType;
 
-        // Znajdujemy Unit target (jeśli w ogóle)
-        Unit target = GetTargetByType(info, tType);
+        Unit target = chosenTarget != null ? chosenTarget : GetTargetByType(info, tType);
 
-        // 1) Move
-        if (aType == AttackType.Move)
-        {
-            if (target != null)
-                MoveTowards(unit, target.gameObject);
-            reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-            return reward;
-        }
-
-        // 2) Run
-        if (aType == AttackType.Run)
-        {
-            if (target != null)
-                MoveTowards(unit, target.gameObject, 3);
-            reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-            return reward;
-        }
-
-        // 3) Specjalne akcje:
-        if (aType == AttackType.Aim)
-        {
-            CombatManager.Instance.SetAim();
-            return reward;
-        }
-        if (aType == AttackType.Reload)
-        {
-            CombatManager.Instance.Reload();
-            reward++; // drobna nagroda
-            return reward;
-        }
-        if (aType == AttackType.FinishTurn)
-        {
-            RoundsManager.Instance.FinishTurn();
-            return reward;
-        }
-        if (aType == AttackType.MoveAway)
-        {
-            GameObject retreatTile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-            if (retreatTile != null && target != null)
-                MoveTowards(unit, retreatTile, 1, true);
-            reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-            return reward;
-        }
-        if (aType == AttackType.RunAway)
-        {
-            GameObject retreatTile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-            if (retreatTile != null && target != null)
-                MoveTowards(unit, retreatTile, 3, true);
-            reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-            return reward;
-        }
-        if (aType == AttackType.Retreat)
-        {
-            GameObject retreatTile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-            if (retreatTile != null && target != null)
-            {
-                MovementManager.Instance.Retreat(true);
-                MoveTowards(unit, retreatTile, 1, true);
-            }
-            reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-            return reward;
-        }
-        if(aType == AttackType.ChangeWeaponToRanged)
-        {
-            ChangeWeapon(unit, "ranged");
-            return reward;
-        }
-        if(aType == AttackType.ChangeWeaponToMelee)
-        {
-            ChangeWeapon(unit, "melee");
-            return reward;
-        }
-
-        //Będziemy sprawdzać, czy zdołaliśmy zabić wroga i dać nagrodę, a jeśli my umarliśmy – karę]
-        // Najpierw zapisujemy HP wroga (jeśli jest)
-        int enemyOverall = 0;
-        if (target != null)
-        {
-            enemyOverall = target.GetComponent<Stats>().Overall; 
-        }
-
-        // 4) Różne typy ataku (zwykły, Charge, Feint, Swift, Guarded, AllOut)
-        // 'Null' = zwykły atak
-        string attackName = null;
         switch (aType)
         {
-            case AttackType.Null:    attackName = null; break;
-            case AttackType.Charge:  attackName = "Charge"; break;
-            case AttackType.AllOutAttack: attackName = "AllOutAttack"; break;
+            case AttackType.Move:
+                if (target != null) MoveTowards(unit, target.gameObject);
+                break;
+            case AttackType.Run:
+                if (target != null) MoveTowards(unit, target.gameObject, 3);
+                break;
+            case AttackType.MoveAway:
+                if (target != null)
+                {
+                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
+                    if (tile != null) MoveTowards(unit, tile, 1, true);
+                }
+                break;
+            case AttackType.RunAway:
+                if (target != null)
+                {
+                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
+                    if (tile != null) MoveTowards(unit, tile, 3, true);
+                }
+                break;
+            case AttackType.Retreat:
+                if (target != null)
+                {
+                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
+                    if (tile != null)
+                    {
+                        MovementManager.Instance.Retreat(true);
+                        MoveTowards(unit, tile, 1, true);
+                    }
+                }
+                break;
+            case AttackType.Aim:
+                CombatManager.Instance.SetAim();
+                return reward;
+            case AttackType.Reload:
+                CombatManager.Instance.Reload();
+                reward += 1f;
+                return reward;
+            case AttackType.ChangeWeaponToMelee:
+                ChangeWeapon(unit, "melee");
+                return reward;
+            case AttackType.ChangeWeaponToRanged:
+                ChangeWeapon(unit, "ranged");
+                return reward;
+            case AttackType.FinishTurn:
+                RoundsManager.Instance.FinishTurn();
+                return reward;
         }
 
-        reward += PerformAttack(unit.gameObject, target? target.gameObject:null, attackName);
+        string attackName = null;
+        if (aType == AttackType.Charge) attackName = "Charge";
+        else if (aType == AttackType.AllOutAttack) attackName = "AllOutAttack";
 
-        //Sprawdźmy, czy przeciwnik został zabity po ataku]
-        if (target == null ||  target.GetComponent<Stats>().TempHealth < 0)
+        if (aType == AttackType.Null || aType == AttackType.Charge || aType == AttackType.AllOutAttack)
         {
-            // Zakładam, że jeśli target jest null, został usunięty z gry (zabity)
-            // Nagroda proporcjonalna do overall wroga
-            reward += enemyOverall / 5;
+            PerformAttack(unit.gameObject, target != null ? target.gameObject : null, attackName);
         }
 
-        reward += RoundsManager.RoundNumber / 3f; //Nagroda za przeżycie jak najdłużej. Im dłużej przeżyje tym większą nagrodę dostaje za każdą rundę
-
+        reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
         return reward;
+    }
+
+    // --- HELPERS ---
+    private void MoveTowards(Unit unit, GameObject targetObject, int modifier = 1, bool retreat = false)
+    {
+        if (modifier != 1) MovementManager.Instance.UpdateMovementRange(modifier);
+        GameObject tile = retreat ? targetObject : CombatManager.Instance.GetTileAdjacentToTarget(unit.gameObject, targetObject);
+        if (tile != null)
+        {
+            MovementManager.Instance.MoveSelectedUnit(tile, unit.gameObject);
+            Physics2D.SyncTransforms();
+        }
+    }
+
+    private void PerformAttack(GameObject attacker, GameObject target, string attackType)
+    {
+        if (attacker == null || target == null) return;
+        var aUnit = attacker.GetComponent<Unit>();
+        var tUnit = target.GetComponent<Unit>();
+        if (attackType != null) CombatManager.Instance.ChangeAttackType(attackType);
+        CombatManager.Instance.Attack(aUnit, tUnit, false);
+    }
+
+    private void ChangeWeapon(Unit unit, string desiredType)
+    {
+        if (unit == null) return;
+        var inv = unit.GetComponent<Inventory>();
+        var unitWeapon = unit.GetComponent<Weapon>();
+        if (inv == null || unitWeapon == null) return;
+
+        Weapon current = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
+        if (current != null && !current.Broken && current.Type != null && current.Type.Contains(desiredType)) return;
+
+        Weapon candidate = inv.AllWeapons.FirstOrDefault(w => w != null && w.Armor == 0 && !w.Broken && w.Type != null && w.Type.Contains(desiredType));
+        if (candidate == null) return;
+
+        if (inv.EquippedWeapons == null || inv.EquippedWeapons.Length < 2) return;
+        inv.EquippedWeapons[0] = candidate;
+        inv.EquippedWeapons[1] = candidate.TwoHanded ? candidate : inv.EquippedWeapons[1];
+
+        var fields = typeof(Weapon).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+        foreach (var f in fields) f.SetValue(unitWeapon, f.GetValue(candidate));
+        Debug.Log($"{unit.name} dobył/a {candidate.Name}.");
+    }
+
+    private int CalculateRewardBasedOnUnitHealth(Stats stats, int oldAttackerHP)
+    {
+        int reward = 0;
+        int lostHP = oldAttackerHP - stats.TempHealth;
+        if (lostHP > 0) reward -= lostHP;
+        if (stats.TempHealth < 0) reward -= 15;
+        return reward;
+    }
+
+    public void GiveTerminalRewardToAll(bool didAIWin)
+    {
+        float terminal = didAIWin ? WIN_REWARD : LOSS_REWARD;
+
+        foreach (var kv in _lastStepByUnit.ToList())
+        {
+            Unit u = kv.Key;
+            LastStep ls = kv.Value;
+
+            if (u == null || !ls.HasValue)
+                continue;
+
+            TargetsInfo infoNow = GatherTargetsInfo(u);
+            Unit defaultTargetNow = infoNow != null ? infoNow.Closest : null;
+            bool[] statesNow = DetermineStates(u, defaultTargetNow);
+            int nextState = EncodeState(statesNow);
+
+            UpdateQ(ls.Race, ls.State, ls.Action, terminal, nextState);
+        }
+
+        _lastStepByUnit.Clear();
     }
 
     private Unit GetTargetByType(TargetsInfo info, TargetType t)
     {
         switch (t)
         {
-            case TargetType.Closest:     return info.Closest;
-            case TargetType.Furthest:    return info.Furthest;
+            case TargetType.Closest: return info.Closest;
+            case TargetType.Furthest: return info.Furthest;
             case TargetType.MostInjured: return info.MostInjured;
-            case TargetType.LeastInjured:return info.LeastInjured;
-            case TargetType.Weakest:     return info.Weakest;
-            case TargetType.Strongest:   return info.Strongest;
+            case TargetType.LeastInjured: return info.LeastInjured;
+            case TargetType.Weakest: return info.Weakest;
+            case TargetType.Strongest: return info.Strongest;
             case TargetType.MostAlliesNearby: return info.WithMostAllies;
-            default: return null; // None
+            default: return null;
         }
-    }
-
-    private static readonly ActionDefinition[] AllActions = new ActionDefinition[]
-    {
-        // --- MOVE ---
-        new ActionDefinition(TargetType.Closest,          AttackType.Move),         // 0: Ruch - Najbliższy
-        new ActionDefinition(TargetType.Furthest,         AttackType.Move),         // 1: Ruch - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,      AttackType.Move),         // 2: Ruch - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,     AttackType.Move),         // 3: Ruch - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,          AttackType.Move),         // 4: Ruch - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,        AttackType.Move),         // 5: Ruch - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Move),         // 6: Ruch - Najwięcej sojuszników
-
-        // --- RUN ---
-        new ActionDefinition(TargetType.Closest,          AttackType.Run),          // 7: Bieg - Najbliższy
-        new ActionDefinition(TargetType.Furthest,         AttackType.Run),          // 8: Bieg - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,      AttackType.Run),          // 9: Bieg - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,     AttackType.Run),          // 10: Bieg - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,          AttackType.Run),          // 11: Bieg - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,        AttackType.Run),          // 12: Bieg - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Run),          // 13: Bieg - Najwięcej sojuszników
-
-        // --- NORMAL ATTACK ---
-        new ActionDefinition(TargetType.Closest,          AttackType.Null),         // 14: Zwykły atak - Najbliższy
-        new ActionDefinition(TargetType.Furthest,         AttackType.Null),         // 15: Zwykły atak - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,      AttackType.Null),         // 16: Zwykły atak - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,     AttackType.Null),         // 17: Zwykły atak - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,          AttackType.Null),         // 18: Zwykły atak - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,        AttackType.Null),         // 19: Zwykły atak - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Null),         // 20: Zwykły atak - Najwięcej sojuszników
-
-        // --- CHARGE ---
-        new ActionDefinition(TargetType.Closest,          AttackType.Charge),       // 21: Szarża - Najbliższy
-        new ActionDefinition(TargetType.Furthest,         AttackType.Charge),       // 22: Szarża - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,      AttackType.Charge),       // 23: Szarża - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,     AttackType.Charge),       // 24: Szarża - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,          AttackType.Charge),       // 25: Szarża - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,        AttackType.Charge),       // 26: Szarża - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Charge),       // 27: Szarża - Najwięcej sojuszników
-
-        // --- ALL OUT ATTACK ---
-        new ActionDefinition(TargetType.Closest,          AttackType.AllOutAttack), // 28: Szaleńczy atak - Najbliższy
-        new ActionDefinition(TargetType.Furthest,         AttackType.AllOutAttack), // 29: Szaleńczy atak - Najdalszy
-        new ActionDefinition(TargetType.MostInjured,      AttackType.AllOutAttack), // 30: Szaleńczy atak - Najbardziej ranny
-        new ActionDefinition(TargetType.LeastInjured,     AttackType.AllOutAttack), // 31: Szaleńczy atak - Najmniej ranny
-        new ActionDefinition(TargetType.Weakest,          AttackType.AllOutAttack), // 32: Szaleńczy atak - Najsłabszy
-        new ActionDefinition(TargetType.Strongest,        AttackType.AllOutAttack), // 33: Szaleńczy atak - Najsilniejszy
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.AllOutAttack), // 34: Szaleńczy atak - Najwięcej sojuszników
-
-        // --- AIM / RELOAD ---
-        new ActionDefinition(TargetType.None,             AttackType.Aim),          // 35: Przycelowanie
-        new ActionDefinition(TargetType.None,             AttackType.Reload),       // 36: Przeładowanie
-
-        // --- MOVE AWAY / RUN AWAY / RETREAT ---
-        new ActionDefinition(TargetType.Closest,          AttackType.MoveAway),     // 37: Odejście od najbliższego
-        new ActionDefinition(TargetType.Closest,          AttackType.RunAway),      // 38: Bieg jak najdalej od najbliższego
-        new ActionDefinition(TargetType.Closest,          AttackType.Retreat),      // 39: Bezpieczny odwrót
-
-        // --- WEAPON CHANGE ---
-        new ActionDefinition(TargetType.None,             AttackType.ChangeWeaponToMelee),   // 40: Zmiana broni na melee
-        new ActionDefinition(TargetType.None,             AttackType.ChangeWeaponToRanged),  // 41: Zmiana broni na ranged
-
-        // --- FINISH TURN ---
-        new ActionDefinition(TargetType.None,             AttackType.FinishTurn),            // 42: Zakończenie tury
-    };
-
-
-    // ======================================================================
-    //                      POMOCNICZE METODY
-    // ======================================================================
-
-    private void MoveTowards(Unit unit, GameObject targetObject, int modifier = 1, bool retreat = false)
-    {
-        //Bieg
-        if(modifier != 1)
-        {
-            MovementManager.Instance.UpdateMovementRange(modifier);
-        }
-
-        GameObject tile;
-        if(retreat)
-        {
-            tile = targetObject;
-        }
-        else
-        {
-            tile = CombatManager.Instance.GetTileAdjacentToTarget(unit.gameObject, targetObject);
-        }
-
-        if (tile == null) return;
-        MovementManager.Instance.MoveSelectedUnit(tile, unit.gameObject);
-        Physics2D.SyncTransforms();
-    }
-
-    private int PerformAttack(GameObject attacker, GameObject target, string attackType)
-    {
-        if (attackType != null)
-        {
-            CombatManager.Instance.ChangeAttackType(attackType);
-        }
-
-        int oldHP = target.GetComponent<Stats>().TempHealth;
-       
-        CombatManager.Instance.Attack(attacker.GetComponent<Unit>(), target.GetComponent<Unit>(), false);
-
-        int newHP = target.GetComponent<Stats>().TempHealth;
-
-        int damageReward = oldHP - newHP;
-
-        return damageReward; // Nagroda równa różnicy w HP przeciwnika
-    }
-
-    private void ChangeWeapon(Unit unit, string chosenWeaponType)
-    {
-        Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-
-        if (weapon.Type.Contains(chosenWeaponType)) return;
-
-        // Sprawdzenie, czy jednostka posiada więcej niż jedną broń
-        if (InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count > 1)
-        {
-            int selectedIndex = 1;
-
-            //  Zmienia bronie dopóki nie znajdzie takiej, która posuje do wybranego typu
-            for (int i = 0; i < InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count; i++)
-            {
-                if (weapon.Type.Contains(chosenWeaponType)) break;
-
-                InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SetSelectedIndex(selectedIndex);
-                InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedButton = InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons[selectedIndex - 1];
-
-                InventoryManager.Instance.GrabWeapon();
-                weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-
-                selectedIndex++;
-            }
-        }
-    }
-
-    private int CalculateRewardBasedOnUnitHealth(Stats stats, int oldAttackerHP)
-    {
-        int reward = 0;
-
-        // Obliczamy utratę HP atakującego
-        int newAttackerHP = stats.TempHealth;
-        int lostHP = oldAttackerHP - newAttackerHP;
-
-        // Kara za utracone HP
-        if (lostHP > 0)
-        {
-            reward -= lostHP; // np. -1 za każdy utracony punkt
-        }
-
-        //Kara za śmierć
-        if (stats == null || stats.TempHealth < 0)
-        {
-            reward -= 15;
-        }
-
-        return reward;
-    }
-
-    public void GiveTerminalRewardToAll(bool didAIWin)
-    {
-        float shaped = didAIWin ? WIN_REWARD : LOSS_REWARD;
-        foreach (var queue in unitActionHistory.Values)
-        {
-            foreach (var (state, action, race) in queue)
-            {
-                var q = GetQTable(race);
-                q[state, action] += shaped;
-            }
-        }
-        SaveQTables();
-        unitActionHistory.Clear();
     }
 
     public TargetsInfo GatherTargetsInfo(Unit currentUnit)
     {
         TargetsInfo info = new TargetsInfo();
-
         foreach (Unit other in UnitsManager.Instance.AllUnits)
         {
-            if (!IsValidTarget(currentUnit, other)) 
-                continue;
+            if (other == null) continue;
+            var oStats = other.GetComponent<Stats>();
+            if (oStats == null || oStats.TempHealth < 0) continue;
+            if (!IsValidTarget(currentUnit, other)) continue;
 
-            // Oblicz distance
             float dist = Vector2.Distance(currentUnit.transform.position, other.transform.position);
             info.Distances[other] = dist;
 
-            // 1. Najbliższy
-            if (dist < info.ClosestDistance)
-            {
-                info.ClosestDistance = dist;
-                info.Closest = other;
-            }
+            if (dist < info.ClosestDistance) { info.ClosestDistance = dist; info.Closest = other; }
+            if (dist > info.FurthestDistance) { info.FurthestDistance = dist; info.Furthest = other; }
 
-            // 2. Najdalszy
-            if (dist > info.FurthestDistance)
-            {
-                info.FurthestDistance = dist;
-                info.Furthest = other;
-            }
+            float hp = oStats.TempHealth;
+            if (hp < info.MostInjuredHP) { info.MostInjuredHP = hp; info.MostInjured = other; }
+            if (hp > info.LeastInjuredHP) { info.LeastInjuredHP = hp; info.LeastInjured = other; }
 
-            // 3. Najbardziej ranny
-            float hp = other.GetComponent<Stats>().TempHealth;
-            if (hp < info.MostInjuredHP)
-            {
-                info.MostInjuredHP = hp;
-                info.MostInjured = other;
-            }
+            int ov = oStats.Overall;
+            if (ov < info.WeakestOverall) { info.WeakestOverall = ov; info.Weakest = other; }
+            if (ov > info.StrongestOverall) { info.StrongestOverall = ov; info.Strongest = other; }
 
-            // 4. Najmniej ranny
-            if (hp > info.LeastInjuredHP)
-            {
-                info.LeastInjuredHP = hp;
-                info.LeastInjured = other;
-            }
-
-            // 5. Najniższy Overall
-            int ov = other.GetComponent<Stats>().Overall;
-            if (ov < info.WeakestOverall)
-            {
-                info.WeakestOverall = ov;
-                info.Weakest = other;
-            }
-
-            // 6. Najwyższy Overall
-            if (ov > info.StrongestOverall)
-            {
-                info.StrongestOverall = ov;
-                info.Strongest = other;
-            }
-
-            // 7. targetWithMostAllies:
-            // Znajdujemy jednostkę z największą przewagą liczebną sojuszników
-            int adjacentAllies = 0;
-            int adjacentOpponents = 0;
-            CountAdjacentUnits(other.transform.position, currentUnit.tag, other.tag, ref adjacentAllies, ref adjacentOpponents);
-            int advantage = adjacentAllies - adjacentOpponents;
-            if (advantage > info.WithMostAlliesScore)
-            {
-                info.WithMostAlliesScore = advantage;
-                info.WithMostAllies = other;
-            }
+            int allies = 0, enemies = 0;
+            CountAdjacentUnits(other.transform.position, currentUnit.tag, other.tag, ref allies, ref enemies);
+            int adv = allies - enemies;
+            if (adv > info.WithMostAlliesScore) { info.WithMostAlliesScore = adv; info.WithMostAllies = other; }
         }
-
         return info;
     }
 
-    private bool IsTargetBehindObstacle(GameObject attacker, GameObject target, float attackDistance)
+    private bool IsValidTarget(Unit currentUnit, Unit other)
     {
-        if (attacker == null || target == null) return false;
+        if (other == null || currentUnit == null) return false;
+        if (other == currentUnit) return false;
+        if (other.CompareTag(currentUnit.tag)) return false;
+        return true;
+    }
 
-        Vector2 origin = attacker.transform.position;
-        Vector2 direction = target.transform.position - attacker.transform.position;
-        
-        // RaycastAll w stronę celu
-        RaycastHit2D[] raycastHits = Physics2D.RaycastAll(origin, direction, attackDistance);
-
-        foreach (var hit in raycastHits)
+    private void CountAdjacentUnits(Vector2 center, string allyTag, string opponentTag, ref int allies, ref int opponents)
+    {
+        Vector2[] offsets = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
+        foreach (var off in offsets)
         {
-            if (hit.collider == null) continue;
-
-            // Pomińmy samego siebie i cel:
-            if (hit.collider.gameObject == attacker || hit.collider.gameObject == target)
-                continue;
-
-            // Sprawdzamy przeszkodę
-            var mapElement = hit.collider.GetComponent<MapElement>();
-            var otherUnit  = hit.collider.GetComponent<Unit>();
-
-            if ((mapElement != null && mapElement.IsLowObstacle) || otherUnit != null)
-            {
-                // Zwracamy true - bo to znaczy, że jest co najmniej jedna przeszkoda
-                return true;
-            }
+            Collider2D col = Physics2D.OverlapPoint(center + off);
+            if (col == null) continue;
+            if (col.CompareTag(allyTag)) allies++;
+            else if (col.CompareTag(opponentTag)) opponents++;
         }
+    }
 
+    private bool IsTargetBehindObstacle(GameObject attacker, GameObject target, float dist)
+    {
+        var hits = Physics2D.RaycastAll(attacker.transform.position, target.transform.position - attacker.transform.position, dist);
+        foreach (var h in hits)
+        {
+            if (h.collider.gameObject == attacker || h.collider.gameObject == target) continue;
+            if (h.collider.GetComponent<MapElement>() != null || h.collider.GetComponent<Unit>() != null) return true;
+        }
         return false;
     }
 
     public GameObject GetTileFarthestFromTarget(GameObject attacker, GameObject target)
     {
         if (target == null) return null;
-
-        Vector2 attackerPos = attacker.transform.position;
-        Vector2 targetPos = target.transform.position;
-
-        // Pobierz zasięg ruchu jednostki
-        int movementRange = attacker.GetComponent<Stats>().TempSz;
-
-        Tile farthestTile = null;
-        float maxDistance = -1f;
-        int shortestPathLengthForFarthest = int.MaxValue;
+        Vector2 tPos = target.transform.position;
+        Tile bestTile = null;
+        float maxDist = -1f;
+        int moveRange = attacker.GetComponent<Stats>().TempSz;
+        Vector2 aPos = attacker.transform.position;
 
         foreach (Tile tile in GridManager.Instance.Tiles)
         {
-            if (tile.IsOccupied) continue; // Pomijamy zajęte pola
+            if (tile.IsOccupied) continue;
+            float dToSelf = GetManhattanDistance(aPos, tile.transform.position); // Optymalizacja
+            if (dToSelf > moveRange) continue;
 
-            Vector2 tilePos = tile.transform.position;
-
-            // Oblicz długość ścieżki do danego pola
-            List<Vector2> path = MovementManager.Instance.FindPath(attackerPos, tilePos);
-            if (path.Count == 0) continue; // Brak ścieżki
-            if (path.Count > movementRange) continue; // Poza zasięgiem ruchu
-
-            // Oblicz odległość od przeciwnika
-            float distanceToTarget = Vector2.Distance(tilePos, targetPos);
-
-            // Aktualizacja najdalszego pola
-            if (distanceToTarget > maxDistance)
+            float dToTarget = Vector2.Distance(tile.transform.position, tPos);
+            if (dToTarget > maxDist)
             {
-                maxDistance = distanceToTarget;
-                farthestTile = tile;
-                shortestPathLengthForFarthest = path.Count;
+                maxDist = dToTarget;
+                bestTile = tile;
             }
         }
-
-        if (farthestTile != null)
-        {
-            return farthestTile.gameObject;
-        }
-        else
-        {
-            return null;
-        }
-    }
-
-    private void CountAdjacentUnits(Vector2 center, string allyTag, string opponentTag, ref int allies, ref int opponents)
-    {
-        HashSet<Collider2D> countedOpponents = new HashSet<Collider2D>();
-        Vector2[] positions =
-        {
-            center + Vector2.right, center + Vector2.left,
-            center + Vector2.up, center + Vector2.down,
-            center + new Vector2(1,1), center + new Vector2(-1,-1),
-            center + new Vector2(-1,1), center + new Vector2(1,-1)
-        };
-
-        foreach (var pos in positions)
-        {
-            Collider2D col = Physics2D.OverlapPoint(pos);
-            if (col == null) continue;
-
-            if (col.CompareTag(allyTag))
-            {
-                allies++;
-            }
-            else if (col.CompareTag(opponentTag) && !countedOpponents.Contains(col))
-            {
-                opponents++;
-                countedOpponents.Add(col);
-            }
-        }
-    }
-
-    private bool IsValidTarget(Unit currentUnit, Unit other)
-    {
-        if (other == null) return false;
-        if (other == currentUnit) return false;
-        if (other.CompareTag(currentUnit.tag)) return false;
-        if (other.GetComponent<Stats>().TempHealth < 0) return false;
-
-        return true;
+        return bestTile != null ? bestTile.gameObject : null;
     }
 
     public bool BothTeamsExist()
     {
-        bool enemyUnitExists = false;
-        bool playerUnitExists = false;
-
-        foreach (Unit unit in UnitsManager.Instance.AllUnits)
+        bool p = false, e = false;
+        foreach (var u in UnitsManager.Instance.AllUnits)
         {
-            if (unit == null) continue;
-
-            if (unit.CompareTag("PlayerUnit")) playerUnitExists = true;
-            else if (unit.CompareTag("EnemyUnit")) enemyUnitExists = true;
-
-            // Jeśli obie drużyny istnieją, zwróć true natychmiast
-            if (playerUnitExists && enemyUnitExists) return true;
+            if (u == null) continue;
+            if (u.CompareTag("PlayerUnit") && u.Stats.TempHealth > 0) p = true;
+            if (u.CompareTag("EnemyUnit") && u.Stats.TempHealth > 0) e = true;
+            if (p && e) return true;
         }
+        if (p && !e) _playerWins++;
+        if (!p && e) _enemyWins++;
+        return false;
+    }
 
-        if(playerUnitExists == false && enemyUnitExists == true)
-        {    
-            _enemyWins ++;
-        }
-        else if(enemyUnitExists == false && playerUnitExists == true)
+    public void ToggleLogs()
+    {
+        var logger = Debug.unityLogger;
+
+        if (logger.filterLogType == LogType.Error)
         {
-            _playerWins ++;
+            // Przywróć pełne logi
+            logger.filterLogType = LogType.Log;
+        }
+        else
+        {
+            // Pokazuj tylko błędy i wyjątki
+            logger.filterLogType = LogType.Error;
         }
 
-        // Jeśli pętla się zakończy, sprawdź, czy którakolwiek drużyna nie istnieje
-        return playerUnitExists && enemyUnitExists;
+        //Debug.unityLogger.logEnabled = !Debug.unityLogger.logEnabled; // To wyłącza wszystkie logi, razem z errorami
     }
 
     // ======================================================================
-    // ZAPIS / ODCZYT tablic Q
+    // ZAPIS / ODCZYT JSON (SPARSE FORMAT)
     // ======================================================================
+
+    [System.Serializable]
+    public class QTableStateEntry
+    {
+        public int state;       // Index stanu
+        public float[] values;  // Tablica wartości Q (o długości ACTION_COUNT)
+    }
+
     [System.Serializable]
     public class QTableData
     {
         public string raceName;
-        public int rows;
-        public int cols;
-        public List<float> values = new List<float>();
+        public List<QTableStateEntry> entries = new List<QTableStateEntry>();
     }
 
     [System.Serializable]
@@ -1300,76 +943,55 @@ public class ReinforcementLearningManager : MonoBehaviour
     {
         QTablesContainer container = new QTablesContainer();
 
-        foreach (var kvp in QTables) // kvp.Key -> raceName, kvp.Value -> float[,]
+        foreach (var kvp in QTables)
         {
-            QTableData data = new QTableData();
-            data.raceName = kvp.Key;
+            QTableData data = new QTableData { raceName = kvp.Key };
 
-            int rows = kvp.Value.GetLength(0);
-            int cols = kvp.Value.GetLength(1);
-            data.rows = rows;
-            data.cols = cols;
-
-            for (int r=0; r<rows; r++)
+            // Iterujemy tylko po istniejących stanach w słowniku
+            foreach (var stateKvp in kvp.Value)
             {
-                for (int c=0; c<cols; c++)
+                data.entries.Add(new QTableStateEntry
                 {
-                    data.values.Add( kvp.Value[r,c] );
-                }
+                    state = stateKvp.Key,
+                    values = stateKvp.Value
+                });
             }
-
             container.tables.Add(data);
         }
 
         string json = JsonUtility.ToJson(container, true);
-
-        string filePath = Path.Combine(Application.persistentDataPath, "q_tables.json");
-        File.WriteAllText(filePath, json);
-
-        Debug.Log($"QTables saved to {filePath}");
+        File.WriteAllText(Path.Combine(Application.persistentDataPath, "q_tables.json"), json);
+        Debug.Log("QTables saved (Sparse Format).");
     }
 
     public void LoadQTables()
     {
-        string filePath = Path.Combine(Application.persistentDataPath, "q_tables.json");
-        if (!File.Exists(filePath))
+        string path = Path.Combine(Application.persistentDataPath, "q_tables.json");
+        if (!File.Exists(path)) return;
+
+        try
         {
-            Debug.LogWarning("No QTables file found to load.");
-            return;
-        }
+            var container = JsonUtility.FromJson<QTablesContainer>(File.ReadAllText(path));
 
-        string json = File.ReadAllText(filePath);
-        QTablesContainer container = JsonUtility.FromJson<QTablesContainer>(json);
-
-        foreach (var data in container.tables)
-        {
-            float[,] table = new float[data.rows, data.cols];
-            int idx = 0;
-
-            for (int r=0; r<data.rows; r++)
+            foreach (var data in container.tables)
             {
-                for (int c=0; c<data.cols; c++)
+                // Tworzymy słownik dla danej rasy
+                Dictionary<int, float[]> raceDict = new Dictionary<int, float[]>();
+
+                foreach (var entry in data.entries)
                 {
-                    table[r,c] = data.values[idx];
-                    idx++;
+                    raceDict[entry.state] = entry.values;
                 }
+
+                QTables[data.raceName] = raceDict;
+                _trainedRaces.Add(data.raceName);
             }
-
-            QTables[data.raceName] = table;
-
-            _trainedRaces.Add(data.raceName);
+            Debug.Log("QTables loaded (Sparse Format).");
         }
-
-        Debug.Log($"QTables loaded from {filePath}");
-    }
-
-    
-    // ======================================================================
-    //                        DEBUGOWANIE WYNIKÓW
-    // ======================================================================
-    public void UpdateTeamWins()
-    {
-        _teamWinsDisplay.text = $"Player wins: {_playerWins} Enemy wins: {_enemyWins}";
+        catch (Exception e)
+        {
+            Debug.LogError("Failed to load QTables: " + e.Message);
+        }
     }
 
     // ======================================================================
@@ -1384,7 +1006,6 @@ public class ReinforcementLearningManager : MonoBehaviour
 
     public void ExportAllQToCSV(string folderPath)
     {
-        // Sprawdzamy, czy folder istnieje
         if (!Directory.Exists(folderPath))
         {
             Directory.CreateDirectory(folderPath);
@@ -1392,8 +1013,7 @@ public class ReinforcementLearningManager : MonoBehaviour
 
         foreach (string raceName in QTables.Keys)
         {
-            // Tworzymy ścieżkę pliku np. "folderPath/Q_raceName.csv"
-            string sanitizedRace = raceName.Replace(" ", "_"); 
+            string sanitizedRace = raceName.Replace(" ", "_");
             string fileName = $"Q_{sanitizedRace}.csv";
             string filePath = Path.Combine(folderPath, fileName);
 
@@ -1405,46 +1025,47 @@ public class ReinforcementLearningManager : MonoBehaviour
     {
         if (!QTables.ContainsKey(raceName)) return;
 
-        float[,] table = QTables[raceName];
-        int numStates = table.GetLength(0);
-        int numActions = table.GetLength(1);
+        var table = QTables[raceName];
+        int numActions = ACTION_COUNT;
         int numberOfStates = (int)AIState.COUNT;
 
         using (StreamWriter sw = new StreamWriter(filePath))
         {
-            // Nagłówek: State;IsInMelee;IsHeavilyWounded;...
-            List<string> headers = new List<string> { "State" };
+            List<string> headers = new List<string> { "StateIndex" };
             for (int i = 0; i < numberOfStates; i++)
             {
                 headers.Add(((AIState)i).ToString());
             }
-            headers.Add("Action");
+            headers.Add("ActionIndex");
             headers.Add("QValue");
             sw.WriteLine(string.Join(";", headers));
 
-            for (int s = 0; s < numStates; s++)
+            // Iterujemy tylko po zapisanych stanach
+            foreach (var kvp in table)
             {
-                // Tworzenie wartości dla kolumn stanów
+                int s = kvp.Key;
+                float[] values = kvp.Value;
+
                 List<string> rowValues = new List<string> { s.ToString() };
                 for (int i = 0; i < numberOfStates; i++)
                 {
                     bool isSet = (s & (1 << i)) != 0;
-                    rowValues.Add(isSet.ToString().ToLower()); // true/false w małych literach
+                    rowValues.Add(isSet.ToString().ToLower());
                 }
 
                 for (int a = 0; a < numActions; a++)
                 {
-                    float val = table[s, a];
+                    // Eksportujemy tylko niezerowe, żeby oszczędzić miejsce w CSV,
+                    // albo wszystkie - tutaj wszystkie dla czytelności wykresów
                     List<string> actionValues = new List<string>(rowValues)
                     {
                         a.ToString(),
-                        val.ToString("F2") // Formatowanie Q-value do 2 miejsc po przecinku
+                        values[a].ToString("F2")
                     };
                     sw.WriteLine(string.Join(";", actionValues));
                 }
             }
         }
-
         Debug.Log($"Q-values for race '{raceName}' exported to: {filePath}");
     }
 
@@ -1461,21 +1082,77 @@ public class ReinforcementLearningManager : MonoBehaviour
         {
             if (!fileExists)
             {
-                // Nagłówki z separatorem ;
                 sw.WriteLine("Epoch;AverageReward");
             }
-
-            int currentEpoch = epochRewards.Count;
-            // Dane z separatorem ;
-            sw.WriteLine($"{currentEpoch};{averageReward}");
+            sw.WriteLine($"{epochRewards.Count};{averageReward}");
         }
 
-        Debug.Log($"Average reward for epoch {epochRewards.Count} saved to {filePath}");
-
-        // Aktualizacja wykresu
         if (simpleGraph != null)
         {
             simpleGraph.AddValue(averageReward);
         }
     }
+
+    public void UpdateTeamWins()
+    {
+        if (_teamWinsDisplay != null) _teamWinsDisplay.text = $"Player: {_playerWins} Enemy: {_enemyWins}";
+    }
+
+    private static readonly ActionDefinition[] AllActions = new ActionDefinition[]
+    {
+        // --- MOVE (RUCH) ---
+        new ActionDefinition(TargetType.Closest, AttackType.Move),          // 0: Ruch do najbliższego wroga
+        new ActionDefinition(TargetType.Furthest, AttackType.Move),         // 1: Ruch do najdalszego wroga
+        new ActionDefinition(TargetType.MostInjured, AttackType.Move),      // 2: Ruch do najbardziej rannego wroga
+        new ActionDefinition(TargetType.LeastInjured, AttackType.Move),     // 3: Ruch do najmniej rannego wroga
+        new ActionDefinition(TargetType.Weakest, AttackType.Move),          // 4: Ruch do najsłabszego wroga (statystyki)
+        new ActionDefinition(TargetType.Strongest, AttackType.Move),        // 5: Ruch do najsilniejszego wroga (statystyki)
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Move), // 6: Ruch do wroga, przy którym jest najwięcej sojuszników
+
+        // --- RUN (BIEG) ---
+        new ActionDefinition(TargetType.Closest, AttackType.Run),           // 7: Bieg do najbliższego wroga
+        new ActionDefinition(TargetType.Furthest, AttackType.Run),          // 8: Bieg do najdalszego wroga
+        new ActionDefinition(TargetType.MostInjured, AttackType.Run),       // 9: Bieg do najbardziej rannego wroga
+        new ActionDefinition(TargetType.LeastInjured, AttackType.Run),      // 10: Bieg do najmniej rannego wroga
+        new ActionDefinition(TargetType.Weakest, AttackType.Run),           // 11: Bieg do najsłabszego wroga
+        new ActionDefinition(TargetType.Strongest, AttackType.Run),         // 12: Bieg do najsilniejszego wroga
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Run),  // 13: Bieg do wroga, przy którym jest najwięcej sojuszników
+
+        // --- STANDARD ATTACK (ZWYKŁY ATAK) ---
+        new ActionDefinition(TargetType.Closest, AttackType.Null),          // 14: Zwykły atak na najbliższego wroga
+        new ActionDefinition(TargetType.Furthest, AttackType.Null),         // 15: Zwykły atak na najdalszego wroga
+        new ActionDefinition(TargetType.MostInjured, AttackType.Null),      // 16: Zwykły atak na najbardziej rannego wroga
+        new ActionDefinition(TargetType.LeastInjured, AttackType.Null),     // 17: Zwykły atak na najmniej rannego wroga
+        new ActionDefinition(TargetType.Weakest, AttackType.Null),          // 18: Zwykły atak na najsłabszego wroga
+        new ActionDefinition(TargetType.Strongest, AttackType.Null),        // 19: Zwykły atak na najsilniejszego wroga
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Null), // 20: Zwykły atak na wroga z przewagą liczebną sojuszników
+
+        // --- CHARGE (SZARŻA) ---
+        new ActionDefinition(TargetType.Closest, AttackType.Charge),          // 21: Szarża na najbliższego wroga
+        new ActionDefinition(TargetType.Furthest, AttackType.Charge),         // 22: Szarża na najdalszego wroga
+        new ActionDefinition(TargetType.MostInjured, AttackType.Charge),      // 23: Szarża na najbardziej rannego wroga
+        new ActionDefinition(TargetType.LeastInjured, AttackType.Charge),     // 24: Szarża na najmniej rannego wroga
+        new ActionDefinition(TargetType.Weakest, AttackType.Charge),          // 25: Szarża na najsłabszego wroga
+        new ActionDefinition(TargetType.Strongest, AttackType.Charge),        // 26: Szarża na najsilniejszego wroga
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Charge), // 27: Szarża na wroga z przewagą liczebną sojuszników
+
+        // --- ALL OUT ATTACK (SZALEŃCZY ATAK) ---
+        new ActionDefinition(TargetType.Closest, AttackType.AllOutAttack),          // 28: Szaleńczy atak na najbliższego wroga
+        new ActionDefinition(TargetType.Furthest, AttackType.AllOutAttack),         // 29: Szaleńczy atak na najdalszego wroga
+        new ActionDefinition(TargetType.MostInjured, AttackType.AllOutAttack),      // 30: Szaleńczy atak na najbardziej rannego wroga
+        new ActionDefinition(TargetType.LeastInjured, AttackType.AllOutAttack),     // 31: Szaleńczy atak na najmniej rannego wroga
+        new ActionDefinition(TargetType.Weakest, AttackType.AllOutAttack),          // 32: Szaleńczy atak na najsłabszego wroga
+        new ActionDefinition(TargetType.Strongest, AttackType.AllOutAttack),        // 33: Szaleńczy atak na najsilniejszego wroga
+        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.AllOutAttack), // 34: Szaleńczy atak na wroga z przewagą liczebną sojuszników
+
+        // --- SPECIAL / UTILITY (SPECJALNE / UŻYTKOWE) ---
+        new ActionDefinition(TargetType.None, AttackType.Aim),                  // 35: Przycelowanie (bonus do trafienia)
+        new ActionDefinition(TargetType.None, AttackType.Reload),               // 36: Przeładowanie broni
+        new ActionDefinition(TargetType.Closest, AttackType.MoveAway),          // 37: Odejście od najbliższego wroga (zwykły ruch)
+        new ActionDefinition(TargetType.Closest, AttackType.RunAway),           // 38: Ucieczka biegiem od najbliższego wroga
+        new ActionDefinition(TargetType.Closest, AttackType.Retreat),           // 39: Bezpieczny odwrót od najbliższego wroga
+        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToMelee),  // 40: Zmiana broni na białą (melee)
+        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToRanged), // 41: Zmiana broni na dystansową (ranged)
+        new ActionDefinition(TargetType.None, AttackType.FinishTurn),           // 42: Zakończenie tury (czekanie)
+    };
 }

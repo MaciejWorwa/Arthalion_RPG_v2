@@ -635,6 +635,25 @@
       "Unmeaning": true
     },
     {
+      "Race": "Tarczogrzbiet",
+      "Type": "Beast",
+      "Size": 2,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "S": 3,
+      "K": 4,
+      "Zw": 3,
+      "Zr": 0,
+      "Int": -3,
+      "P": 2,
+      "Ch": -3,
+      "SW": -2,
+      "Sz": 7,
+      "Athletics": 5,
+      "SurvivalInstinct": 1,
+      "Reflex": 3,
+      "NaturalArmor": 3
+    },
+    {
       "Race": "Topielica",
       "Type": "Undead",
       "Size": 2,

@@ -345,6 +345,17 @@
       "Entangle": true,
       "Penetrating": true
     },
+        {
+      "Name": "Słoneczna tarcza",
+      "Type": [
+        "melee",
+        "shield"
+      ],
+      "Damage": [4],
+      "Defensive": 3,
+      "Pummel": true,
+      "AttackRange": 1.5
+    },
     {
       "Name": "Szabla",
       "Type": [
@@ -529,6 +540,42 @@
       "Zw": -2
     },
     {
+      "Name": "Słoneczny hełm",
+      "Type": [
+        "head",
+        "plate"
+      ],
+      "Armor": 2,
+      "P": -1
+    },
+    {
+      "Name": "Słoneczne nagolenniki",
+      "Type": [
+        "legs",
+        "plate"
+      ],
+      "Armor": 2,
+      "Zw": -1
+    },
+    {
+      "Name": "Słoneczny napierśnik",
+      "Type": [
+        "torso",
+        "plate"
+      ],
+      "Armor": 2,
+      "Zw": -1
+    },
+    {
+      "Name": "Słoneczne naramienniki",
+      "Type": [
+        "arms",
+        "plate"
+      ],
+      "Armor": 2,
+      "Zw": -1
+    },
+    {
       "Name": "Hełm z Czerwonej Stali",
       "Type": [
         "head",
@@ -604,6 +651,19 @@
       "Armor": 2,
       "S": 2,
       "Zw": -2,
+      "P": -1
+    },
+    {
+      "Name": "Słoneczna zbroja",
+      "Type": [
+        "head",
+        "torso",
+        "arms",
+        "legs",
+        "plate"
+      ],
+      "Armor": 2,
+      "Zw": -1,
       "P": -1
     },
     {

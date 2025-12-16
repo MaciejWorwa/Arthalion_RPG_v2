@@ -167,12 +167,6 @@ public class CombatManager : MonoBehaviour
             StartCoroutine(MovementManager.Instance.UpdateMovementRange(1));
         }
 
-        if (attackTypeName == "Charge" && (!unit.CanDoAction || !unit.CanMove))
-        {
-            Debug.Log("Ta jednostka nie może wykonać szarży w obecnej rundzie.");
-            return;
-        }
-
         // Sprawdzamy, czy słownik zawiera podany typ ataku
         if (AttackTypes.ContainsKey(attackTypeName))
         {
@@ -213,14 +207,6 @@ public class CombatManager : MonoBehaviour
 
             if (AttackTypes["Charge"] == true && !unit.IsCharging)
             {
-                bool isEngagedInCombat = AdjacentOpponents(unit.transform.position, unit.tag).Any(opponent => opponent.Prone == false && opponent.Unconscious == false);
-
-                if (isEngagedInCombat == true)
-                {
-                    Debug.Log("Ta jednostka nie może wykonać szarży, bo jest związana walką.");
-                    return;
-                }
-
                 if (!unit.CanDoAction || !unit.CanMove)
                 {
                     Debug.Log("Ta jednostka nie może wykonać szarży w obecnej rundzie.");
@@ -556,8 +542,13 @@ public class CombatManager : MonoBehaviour
         //    defenceRollResult = DiceRollManager.Instance.TestSkill("S", targetStats, null, defenceRollResult);
         //}
         //else if
-        
-        // Zwykły atak bronią
+
+
+        if (target == null)
+        {
+            ChangeAttackType();
+            yield break;
+        }
 
         // Sprawdzenie, czy jednostka może próbować parować lub unikać ataku
         Inventory inventory = target.GetComponent<Inventory>();
@@ -754,7 +745,10 @@ public class CombatManager : MonoBehaviour
         if (attackSucceeded == false)
         {
             Debug.Log($"Atak {attackerStats.Name} chybił.");
-            StartCoroutine(AnimationManager.Instance.PlayAnimation("miss", null, target.gameObject));
+            if(target != null)
+            {
+                StartCoroutine(AnimationManager.Instance.PlayAnimation("miss", null, target.gameObject));
+            }
 
             // Nieudany szaleńczy atak
             if (AttackTypes["AllOutAttack"])
@@ -833,7 +827,7 @@ public class CombatManager : MonoBehaviour
 
 
         // 12) ANIMACJA ATAKU I OBSŁUGA ŚMIERCI
-
+        if(target == null || attacker == null) yield break;
         StartCoroutine(AnimationManager.Instance.PlayAnimation("attack", attacker.gameObject, target.gameObject));
 
         if (targetStats.TempHealth < 0)
@@ -853,6 +847,8 @@ public class CombatManager : MonoBehaviour
 
     public void ApplyDamageToTarget(int damage, int armor, Stats attackerStats, Stats targetStats, Unit target, Weapon attackerWeapon = null, string damageType = "Physical")
     {
+        if (target == null || targetStats == null || attackerStats == null) return;
+
         int finalDamage = 0;
 
         if (damage > armor)
@@ -1394,6 +1390,11 @@ public class CombatManager : MonoBehaviour
     #region Calculating damage
     public IEnumerator CalculateDamage(Stats attackerStats, Stats targetStats, Weapon attackerWeapon, Action<int> onComputed)
     {
+        if(attackerStats == null || targetStats == null)
+        {
+            onComputed?.Invoke(0);
+            yield break;
+        }
         // ===== Kości obrażeń broni =====
         List<int> damageDice = new List<int>(attackerWeapon.Damage ?? new List<int>());
 
@@ -1566,7 +1567,7 @@ public class CombatManager : MonoBehaviour
         // ===== Całkowite obrażenia =====
         int finalDamage = rolledDamage + strengthModifier;
 
-        if (targetStats.GetComponent<Unit>().Unconscious)
+        if (targetStats != null && targetStats.GetComponent<Unit>().Unconscious)
         {
             finalDamage *= 2;
             Debug.Log($"<color=#FF7F50>Obrażenia zostają podwojone, ponieważ cel ataku jest nieprzytomny.</color>");
@@ -1628,6 +1629,8 @@ public class CombatManager : MonoBehaviour
 
     public IEnumerator CriticalWoundRoll(Stats attackerStats, Stats targetStats, string hitLocation)
     {
+        if(attackerStats == null || targetStats == null) yield break;
+
         int rollResult = 0;
         int[] criticalWoundTest = null;
         if (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit"))
