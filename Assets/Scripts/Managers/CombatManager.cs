@@ -753,8 +753,10 @@ public class CombatManager : MonoBehaviour
 
 
                 // ANIMACJA ATAKU I OBSŁUGA ŚMIERCI
-
-                StartCoroutine(AnimationManager.Instance.PlayAnimation("attack", target.gameObject, attacker.gameObject));
+                if (target != null && attacker != null)
+                {
+                    StartCoroutine(AnimationManager.Instance.PlayAnimation("attack", target.gameObject, attacker.gameObject));
+                }
 
                 if (attackerStats.TempHealth < 0)
                 {
