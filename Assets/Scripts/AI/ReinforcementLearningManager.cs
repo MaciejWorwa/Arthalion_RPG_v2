@@ -13,15 +13,15 @@ namespace UnitStates
     {
         CanDoAction,
         CanMove,
-        // IsInMelee - USUNIĘTE (zredukowano przestrzeń stanów o połowę)
         IsHeavilyWounded,
         IsTargetHeavilyWounded,
-        HasRangedWeapon,
+        IsStrongerThanTarget,
         IsBeyondAttackRange,
         IsInChargeRange,
-        TargetBehindObstacle,
+        HasRangedWeapon,
         WeaponIsLoaded,
-        IsStrongerThanTarget,
+        TargetBehindObstacle,
+        IsAiming,
 
         COUNT
     }
@@ -461,6 +461,7 @@ public class ReinforcementLearningManager : MonoBehaviour
         s[(int)AIState.HasRangedWeapon] = hasRanged;
         s[(int)AIState.IsHeavilyWounded] = stats.TempHealth <= (stats.MaxHealth * 0.3f);
         s[(int)AIState.WeaponIsLoaded] = (weapon != null) && weapon.ReloadLeft == 0;
+        s[(int)AIState.IsAiming] = unit.AimingBonus > 0;
 
         if (target != null)
         {
@@ -502,7 +503,7 @@ public class ReinforcementLearningManager : MonoBehaviour
             if (tStats != null)
             {
                 s[(int)AIState.IsTargetHeavilyWounded] = tStats.TempHealth <= (tStats.MaxHealth * 0.3f);
-                s[(int)AIState.IsStrongerThanTarget] = stats.TempHealth > tStats.TempHealth;
+                s[(int)AIState.IsStrongerThanTarget] = stats.TempHealth * stats.Overall > tStats.TempHealth * tStats.Overall;
             }
         }
 

@@ -295,6 +295,8 @@ public class StatesManager : MonoBehaviour
         Stats stats = unit.GetComponent<Stats>();
 
         unit.Unconscious = value;
+        unit.CanMove = !value;
+        unit.CanDoAction = !value;
         if (unit.Unconscious)
         {
             Debug.Log($"<color=#FF7F50>{stats.Name} traci przytomność.</color>");

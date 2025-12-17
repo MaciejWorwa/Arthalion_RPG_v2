@@ -252,7 +252,21 @@ public class RoundsManager : MonoBehaviour
                 }
                 else
                 {
+                    // NORMALNA ROZGRYWKA
                     AutoCombatManager.Instance.Act(unit);
+
+                    // ROZGRYWKA VS AI
+                    //int iterationCount = 0;
+
+                    //while ((unit.CanDoAction || unit.CanMove) && !unit.IsTurnFinished && iterationCount < 5)
+                    //{
+                    //    ReinforcementLearningManager.Instance.SimulateUnit(unit);
+                    //    iterationCount++;
+                    //}
+                    //if (iterationCount >= 5 && !unit.IsTurnFinished)
+                    //{
+                    //    FinishTurn();
+                    //}
                 }
 
                 // Czeka, aż jednostka zakończy ruch

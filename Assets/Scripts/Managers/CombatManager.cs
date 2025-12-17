@@ -6,6 +6,7 @@ using TMPro;
 using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime.Misc;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI;
 using static UnityEngine.UI.CanvasScaler;
 
 public class CombatManager : MonoBehaviour
@@ -187,14 +188,6 @@ public class CombatManager : MonoBehaviour
             }
 
             AttackTypes[attackTypeName] = true;
-
-            ////Ograniczenie finty, szaleńczego ataku i rozbrajania do ataków w zwarciu
-            //if ((AttackTypes["Disarm"] || AttackTypes["AllOutAttack"] || AttackTypes["Charge"]) == true && unit.GetComponent<Inventory>().EquippedWeapons[0] != null && unit.GetComponent<Inventory>().EquippedWeapons[0].Type.Contains("ranged"))
-            //{
-            //    AttackTypes[attackTypeName] = false;
-            //    AttackTypes["StandardAttack"] = true;
-            //    Debug.Log("Jednostka walcząca bronią dystansową nie może wykonać tej akcji.");
-            //}
 
             // Podczas pochwycenia lub pochwytywania kogoś możemy tylko wykonywac atak typu Zapasy
             if (attackTypeName != "Grappling" && (unit.Grappled || unit.GrappledUnitId != 0))
@@ -414,13 +407,12 @@ public class CombatManager : MonoBehaviour
             _newTargetUnit = null;
         }
 
-        // POMYŚLEĆ, CZY TO WPROWADZIĆ
-        //// Modyfikator do trafienia, za wybór konkretnej lokacji
-        //if (HitLocation != null && HitLocation.Length > 0 && !((attackerWeapon.Pummel || attackerWeapon.Id == 4) && attackerStats.StrikeToStun > 0))
-        //{
-        //    attackModifier -= 20;
-        //    Debug.Log("Modyfikator -20 do trafienia za wybór konkretnej lokalizacji");
-        //}
+        // Modyfikator do trafienia, za wybór konkretnej lokacji
+        if (HitLocation != null && HitLocation.Length > 0)
+        {
+            attackModifier -= 3;
+            Debug.Log("Modyfikator -3 do trafienia za wybór konkretnej lokalizacji");
+        }
 
         //Zresetowanie celowania, jeżeli było aktywne
         if (attacker.AimingBonus != 0)
@@ -622,12 +614,12 @@ public class CombatManager : MonoBehaviour
                 Debug.Log($"{attackerStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 attackerStats.UnfortunateEvents++;
 
-                if (attackerWeapon.Quality == "Zwykła" && attackerWeapon.Id != 0)
+                if (attackerWeapon.Quality == "Zwykła" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
                 {
                     attackerWeapon.Broken = true;
                     Debug.Log($"{attackerStats.Name} uszkodził/a swoją broń ({attackerWeapon.Name}).");
                 }
-                else if (attackerWeapon.Quality == "Słaba" && attackerWeapon.Id != 0)
+                else if (attackerWeapon.Quality == "Słaba" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
                 {
                     attackerWeapon.Broken = true;
                     Debug.Log($"{attackerStats.Name} zniszczył/a swoją broń ({attackerWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
@@ -659,7 +651,7 @@ public class CombatManager : MonoBehaviour
                 bool hasArmorOnLocation = false;
 
                 // --- uszkodzenie zbroi na trafionej lokalizacji ---
-                if (!string.IsNullOrEmpty(hitLocation))
+                if (!string.IsNullOrEmpty(hitLocation) && targetStats != null)
                 {
                     string normalizedHitLocation = NormalizeHitLocation(hitLocation);
 
@@ -717,12 +709,12 @@ public class CombatManager : MonoBehaviour
                 {
                     string weaponQuality = string.IsNullOrEmpty(targetWeapon.Quality) ? "Zwykła" : targetWeapon.Quality;
 
-                    if (weaponQuality == "Zwykła")
+                    if (weaponQuality == "Zwykła" && !targetWeapon.Type.Contains("natural-weapon"))
                     {
                         targetWeapon.Broken = true;
                         Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
                     }
-                    else if (weaponQuality == "Słaba")
+                    else if (weaponQuality == "Słaba" && !targetWeapon.Type.Contains("natural-weapon"))
                     {
                         targetWeapon.Broken = true;
                         Debug.Log(
@@ -788,11 +780,11 @@ public class CombatManager : MonoBehaviour
             yield break;
         }
 
-        //// Sprawdzenie, czy atak ogłuszy przeciwnika
-        //if (hitLocation == "head" && (attackerWeapon.Pummel || (attackerWeapon.Id == 4 && attackerStats.StrikeToStun > 0)))
-        //{
-        //    StartCoroutine(Stun(attackerStats, targetStats));
-        //}
+        // Sprawdzenie, czy atak ogłuszy przeciwnika
+        if (hitLocation == "head" && attackerWeapon.Pummel)
+        {
+            StartCoroutine(Stun(attackerStats, targetStats));
+        }
 
         // ========= UNIERUCHOMIENIE ==========
 
@@ -1765,7 +1757,6 @@ public class CombatManager : MonoBehaviour
 
         // Uwzględniamy tylko krwawienie; CAŁĄ resztę MG/Gracz dopisuje ręcznie.
         // GŁOWA
-        // GŁOWA
         if (loc.Contains("głowa") || loc.Contains("glowa") || loc.Contains("head"))
         {
             if (value <= 7) Log($"Zamroczenie – {targetStats.Name} traci następną turę. <color=orange>Efekt uwzględnij ręcznie</color>.");
@@ -2716,6 +2707,8 @@ public class CombatManager : MonoBehaviour
     #region Stun
     private IEnumerator Stun(Stats attackerStats, Stats targetStats)
     {
+        if(attackerStats == null || targetStats == null) yield break;
+
         Unit attackerUnit = attackerStats.GetComponent<Unit>();
         Unit targetUnit = targetStats.GetComponent<Unit>();
 
@@ -2752,7 +2745,7 @@ public class CombatManager : MonoBehaviour
         if (attackerRoll > targetRoll)
         {
             Debug.Log($"<color=#FF7F50>Atak {attackerStats.Name} ogłuszył {targetStats.Name}.</color>");
-            targetUnit.Unconscious = true;
+            StatesManager.Instance.Unconscious(targetUnit, true);
         }
         else
         {
