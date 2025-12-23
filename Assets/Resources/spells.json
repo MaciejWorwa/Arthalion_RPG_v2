@@ -21,7 +21,7 @@
       "CastingNumber": 14,
       "Range": 1.5,
       "Targets": 1,
-      "SaveAttribute":  "K",
+      "SaveAttribute": "K",
       "SaveSkill": "Endurance",
       "ArmourIgnoring": true
     },
@@ -32,7 +32,7 @@
       "CastingNumber": 14,
       "Range": 1.5,
       "Targets": 1,
-      "SaveAttribute":  "SW"
+      "SaveAttribute": "SW"
     },
     {
       "Name": "Dotyk Zepsucia",
@@ -41,7 +41,7 @@
       "CastingNumber": 17,
       "Range": 1.5,
       "Targets": 1,
-      "SaveAttribute":  "K",
+      "SaveAttribute": "K",
       "SaveSkill": "Endurance",
       "Attributes": [
         {
@@ -55,7 +55,7 @@
       "Arcane": "Ścieżka Wody",
       "Type": [ "offensive" ],
       "DamageType": "Physical",
-      "Strength": [ 10, 10],
+      "Strength": [ 10, 10 ],
       "CastingNumber": 19,
       "Range": 15,
       "Targets": 1,
@@ -96,7 +96,7 @@
       "CastingNumber": 14,
       "Range": 7.5,
       "Targets": 1,
-      "SaveAttribute":  "Zw",
+      "SaveAttribute": "Zw",
       "SaveSkill": "Dodge"
     },
     {
@@ -130,6 +130,21 @@
       ]
     },
     {
+      "Name": "Latający Obłok",
+      "Arcane": "Ścieżka Powietrza",
+      "Type": [ "buff", "self-only" ],
+      "CastingNumber": 18,
+      "Range": 1.5,
+      "Targets": 1,
+      "Duration": 1,
+      "Attributes": [
+        {
+          "Key": "Flight",
+          "Value": 15
+        }
+      ]
+    },
+    {
       "Name": "Lodowy Kolec",
       "Arcane": "Ścieżka Lodu",
       "Type": [ "offensive" ],
@@ -137,7 +152,7 @@
       "CastingNumber": 14,
       "Range": 10,
       "Targets": 1,
-      "SaveAttribute":  "Zw",
+      "SaveAttribute": "Zw",
       "SaveSkill": "Dodge"
     },
     {
@@ -221,11 +236,31 @@
       ]
     },
     {
+      "Name": "Petryfikacja",
+      "Arcane": "Ścieżka Ziemi",
+      "Type": [ "offensive", "no-damage" ],
+      "CastingNumber": 21,
+      "Range": 10,
+      "Targets": 1,
+      "Duration": 3,
+      "SaveAttribute": "SW",
+      "Attributes": [
+        {
+          "Key": "Unconscious",
+          "Value": 1
+        },
+        {
+          "Key": "Petrified",
+          "Value": 1
+        }
+      ]
+    },
+    {
       "Name": "Pożoga",
       "Arcane": "Ścieżka Ognia",
       "Type": [ "offensive" ],
       "DamageType": "Fire",
-      "Strength": [ 10, 10],
+      "Strength": [ 10, 10 ],
       "CastingNumber": 22,
       "Range": 15,
       "Targets": 1,
@@ -270,13 +305,13 @@
       "Name": "Tornado",
       "Arcane": "Ścieżka Powietrza",
       "Type": [ "offensive" ],
-      "Strength": [ 10],
+      "Strength": [ 10 ],
       "DamageType": "Physical",
       "CastingNumber": 24,
       "Range": 15,
       "Targets": 1,
       "AreaSize": 5,
-      "SaveAttribute":  "S",
+      "SaveAttribute": "S",
       "SaveDifficulty": 18,
       "Attributes": [
         {
@@ -289,13 +324,13 @@
       "Name": "Trzęsienie Ziemi",
       "Arcane": "Ścieżka Ziemi",
       "Type": [ "offensive" ],
-      "Strength": [ 10, 10],
+      "Strength": [ 10, 10 ],
       "DamageType": "Physical",
       "CastingNumber": 24,
       "Range": 15,
       "Targets": 1,
       "AreaSize": 5,
-      "SaveAttribute":  "Zw",
+      "SaveAttribute": "Zw",
       "SaveDifficulty": 16,
       "Attributes": [
         {
@@ -338,7 +373,7 @@
       "Range": 1.5,
       "Targets": 1,
       "Duration": 3,
-      "SaveAttribute":  "K",
+      "SaveAttribute": "K",
       "SaveSkill": "Endurance",
       "ArmourIgnoring": true,
       "Attributes": [
@@ -353,13 +388,13 @@
       "Arcane": "Ścieżka Lodu",
       "Type": [ "offensive" ],
       "DamageType": "Ice",
-      "Strength": [ 10, 10],
+      "Strength": [ 10, 10 ],
       "CastingNumber": 21,
       "Range": 10,
       "Targets": 1,
       "AreaSize": 4,
       "Duration": 6,
-      "SaveAttribute":  "K",
+      "SaveAttribute": "K",
       "SaveSkill": "Endurance",
       "SaveDifficulty": 16,
       "ArmourIgnoring": true,

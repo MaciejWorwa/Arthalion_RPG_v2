@@ -29,6 +29,35 @@
       "ExtraPoints": 4
     },
     {
+      "Race": "Bagienny Golem",
+      "Type": "Giant",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 3,
+      "K": 3,
+      "Zw": -2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 4,
+      "MeleeCombat": 1,
+      "Endurance": 4,
+      "Hardy": true,
+      "Stink": true,
+      "Unmeaning": true,
+      "Slow": true,
+      "Undead": true,
+      "Resistance": [ "Poison" ]
+    },
+    {
       "Race": "Demon",
       "Type": "Undead",
       "Size": 4,
@@ -169,6 +198,34 @@
       "Reflex": 4
     },
     {
+      "Race": "Kamienny Golem",
+      "Type": "Giant",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 3,
+      "K": 3,
+      "Zw": -2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 4,
+      "MeleeCombat": 1,
+      "Endurance": 4,
+      "Hardy": true,
+      "Unmeaning": true,
+      "Slow": true,
+      "Undead": true,
+      "NaturalArmor": 5
+    },
+    {
       "Race": "Koń",
       "Type": "Beast",
       "Size": 3,
@@ -189,6 +246,30 @@
       "SW": 0,
       "Sz": 7,
       "Athletics": 2
+    },
+    {
+      "Race": "Koszmar",
+      "Type": "Undead",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "S": 5,
+      "K": 5,
+      "Zw": 3,
+      "Zr": 2,
+      "Int": 3,
+      "P": 2,
+      "Ch": 0,
+      "SW": 6,
+      "Sz": 5,
+      "Scary": 20,
+      "Undead": true,
+      "Flight":  6,
+      "Tough": true,
+      "Spellcasting": 1,
+      "MeleeCombat": 2,
+      "Dodge":  2,
+      "Magic": [ "Death" ],
+      "Resistance": [ "Physical" ]
     },
     {
       "Race": "Krwiopij",
@@ -273,7 +354,7 @@
       "Athletics": 5,
       "Reflex": 3,
       "Hungry": true,
-      "MeleeCombat":  1
+      "MeleeCombat": 1
     },
     {
       "Race": "Licz",
@@ -320,6 +401,62 @@
       "Flight": 8
     },
     {
+      "Race": "Lodowy Golem",
+      "Type": "Giant",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 10
+        }
+      ],
+      "S": 3,
+      "K": 3,
+      "Zw": -2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 4,
+      "MeleeCombat": 1,
+      "Endurance": 4,
+      "Hardy": true,
+      "Unmeaning": true,
+      "Slow": true,
+      "Undead": true,
+      "Resistance": [ "Ice" ]
+    },
+    {
+      "Race": "Magmowy Golem",
+      "Type": "Giant",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 10
+        }
+      ],
+      "S": 3,
+      "K": 3,
+      "Zw": -2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 4,
+      "MeleeCombat": 1,
+      "Endurance": 4,
+      "Hardy": true,
+      "Unmeaning": true,
+      "Slow": true,
+      "Undead": true,
+      "Resistance": [ "Fire" ]
+    },
+    {
       "Race": "Mamut",
       "Type": "Beast",
       "Size": 4,
@@ -340,7 +477,7 @@
       "Race": "Morgras",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy"],
+      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy" ],
       "S": 2,
       "K": 3,
       "Zw": 0,
@@ -620,7 +757,7 @@
       "Race": "Szkielet",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice"],
+      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
       "S": -1,
       "K": -1,
       "Zw": 0,
@@ -869,7 +1006,7 @@
       "Resistance": [ "Poison" ]
     },
     {
-      "Race": "Żywiołak",
+      "Race": "Żywiołak Lodu",
       "Size": 3,
       "PrimaryWeaponNames": [ "Broń naturalna" ],
       "PrimaryWeaponAttributes": [
@@ -889,8 +1026,104 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Fire", "Ice", "Earth", "Water", "Air" ],
-      "Resistance": [ "Fire", "Ice", "Physical", "Electric", "Poison" ]
+      "Magic": [ "Ice" ],
+      "Resistance": [ "Ice" ]
+    },
+    {
+      "Race": "Żywiołak Ognia",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 2,
+      "K": 4,
+      "Zw": 2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 3,
+      "Sz": 4,
+      "Undead": true,
+      "Spellcasting": 2,
+      "Magic": [ "Fire" ],
+      "Resistance": [ "Fire" ]
+    },
+    {
+      "Race": "Żywiołak Powietrza",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 2,
+      "K": 4,
+      "Zw": 2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 3,
+      "Sz": 4,
+      "Undead": true,
+      "Spellcasting": 2,
+      "Magic": [ "Air" ],
+      "Resistance": [ "Electric" ]
+    },
+    {
+      "Race": "Żywiołak Wody",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 2,
+      "K": 4,
+      "Zw": 2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 3,
+      "Sz": 4,
+      "Undead": true,
+      "Spellcasting": 2,
+      "Magic": [ "Water" ],
+      "Resistance": [ "Fire" ]
+    },
+    {
+      "Race": "Żywiołak Ziemi",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 4
+        }
+      ],
+      "S": 2,
+      "K": 4,
+      "Zw": 2,
+      "Zr": 0,
+      "Int": -5,
+      "P": 0,
+      "Ch": -3,
+      "SW": 3,
+      "Sz": 4,
+      "Undead": true,
+      "Spellcasting": 2,
+      "Magic": [ "Earth" ],
+      "Resistance": [ "Poison" ]
     }
   ]
 }

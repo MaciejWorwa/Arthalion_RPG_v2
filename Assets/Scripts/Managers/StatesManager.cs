@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TMPro;
+using Unity.VisualScripting;
 using Unity.VisualScripting.Antlr3.Runtime.Misc;
 using UnityEngine;
 
@@ -261,30 +262,33 @@ public class StatesManager : MonoBehaviour
         }
     }
 
-    public void Entangled(Unit unit, int value = 0)
+    public void Entangled(Unit unit, bool value)
     {
-        if (value > 0)
+        unit.Entangled = value;
+        unit.CanMove = !unit.Entangled;
+
+        if(Unit.SelectedUnit == unit.gameObject)
         {
-            unit.Entangled = true;
+            MovementManager.Instance.SetCanMoveToggle(unit.CanMove);
+            GridManager.Instance.HighlightTilesInMovementRange(unit.GetComponent<Stats>());
         }
-
-        if (unit.Entangled) unit.CanMove = false;
     }
-
 
     public void Prone(Unit unit, bool value = true)
     {
         Stats stats = unit.GetComponent<Stats>();
 
         unit.Prone = value;
-        if (unit.Unconscious)
+        if (unit.Prone)
         {
+            StartCoroutine(MovementManager.Instance.UpdateMovementRange(1, null, false));
             Debug.Log($"<color=#FF7F50>{stats.Name} zostaje powalony.</color>");
         }
         else
         {
             unit.Prone = false;
             unit.CanMove = false;
+            stats.TempSz = stats.Sz;
             MovementManager.Instance.SetCanMoveToggle(false);
             Debug.Log($"<color=green>{unit.GetComponent<Stats>().Name} podnosi się z ziemi.</color>");
         }
@@ -297,6 +301,13 @@ public class StatesManager : MonoBehaviour
         unit.Unconscious = value;
         unit.CanMove = !value;
         unit.CanDoAction = !value;
+
+        if(Unit.SelectedUnit == unit.gameObject)
+        {
+            MovementManager.Instance.SetCanMoveToggle(unit.CanMove);
+            RoundsManager.Instance.SetCanDoActionToggle(unit.CanDoAction);
+        }
+
         if (unit.Unconscious)
         {
             Debug.Log($"<color=#FF7F50>{stats.Name} traci przytomność.</color>");
@@ -393,10 +404,26 @@ public class StatesManager : MonoBehaviour
         else if (field.FieldType == typeof(bool))
         {
             bool boolValue = textInput.GetComponent<UnityEngine.UI.Toggle>().isOn;
-            field.SetValue(unit, boolValue);
 
-            // Przy usuwaniu Unieruchomienia związanego z pochwyceniem usuwamy również stan Grappled
-            if(field.Name == "Entangle" && boolValue == false) unit.Grappled = boolValue;
+            if (field.Name == "Unconscious")
+            {
+                Unconscious(unit, boolValue);
+            }
+            else if (field.Name == "Prone")
+            {
+                Prone(unit, boolValue);
+            }
+            else if (field.Name == "Entangled")
+            {
+                Entangled(unit, boolValue);
+
+                // Przy usuwaniu Unieruchomienia związanego z pochwyceniem usuwamy również stan Grappled
+                if (boolValue == false) unit.Grappled = boolValue;
+            }
+            else
+            {
+                field.SetValue(unit, boolValue);
+            }
         }
         else
         {

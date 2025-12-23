@@ -235,6 +235,8 @@ public class MovementManager : MonoBehaviour
 
     public List<Vector2> FindPath(Vector2 start, Vector2 goal)
     {
+        bool isFlyingUnit = Unit.SelectedUnit != null && Unit.SelectedUnit.GetComponent<Unit>().IsFlying;
+
         // Tworzy listę otwartych węzłów
         List<Node> openNodes = new List<Node>();
 
@@ -308,7 +310,7 @@ public class MovementManager : MonoBehaviour
                         isTile = true;
                     }
 
-                    if (isTile)
+                    if (isTile || isFlyingUnit)
                     {
                         // Oblicza koszt G dla sąsiada
                         int gCost = current.G + 1;
@@ -418,13 +420,13 @@ public class MovementManager : MonoBehaviour
             if (unit.Mount.GetComponent<Stats>().Flight != 0) unit.Stats.TempSz = unit.Mount.GetComponent<Stats>().Flight;
         }
 
-        //Sprawdza, czy jednostka może wykonać bieg, lot lub szarże
-        if (modifier > 1 && !unit.CanDoAction)
+        //Sprawdza, czy jednostka może wykonać bieg lub szarże
+        if (modifier > 1 && !unit.CanDoAction && !isFlying)
         {
             Debug.Log("Ta jednostka nie może w tej rundzie wykonać więcej akcji.");
             yield break;
         }
-        else if (modifier > 1 && stats.Slow)
+        else if (modifier > 1 && stats.Slow && !isFlying)
         {
             Debug.Log("Ta jednostka nie może wykonywać akcji biegu.");
             yield break;
@@ -528,7 +530,8 @@ public class MovementManager : MonoBehaviour
             foreach (Vector2 tilePosition in path)
             {
                 Collider2D collider = Physics2D.OverlapPoint(tilePosition);
-                collider.gameObject.GetComponent<Tile>().HighlightTile();
+                if (collider == null || collider.GetComponent<Tile>() == null) continue;
+                collider.GetComponent<Tile>().HighlightTile();
             }
         }
     }

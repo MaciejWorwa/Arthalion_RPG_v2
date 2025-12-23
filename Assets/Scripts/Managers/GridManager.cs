@@ -194,11 +194,14 @@ public class GridManager : MonoBehaviour
         int movementRange = unitStats.TempSz;
         if (movementRange == 0) return;
 
-        // Zestaw do przechowywania pól w zasięgu ruchu (unikamy duplikatów)
-        HashSet<GameObject> objectsInMovementRange = new HashSet<GameObject>();
+        bool isFlyingUnit = Unit.SelectedUnit != null && Unit.SelectedUnit.GetComponent<Unit>().IsFlying;
 
-        // Dodaje pole startowe
-        objectsInMovementRange.Add(unitStats.gameObject);
+        // Zestaw do przechowywania pól w zasięgu ruchu (unikamy duplikatów)
+        HashSet<GameObject> objectsInMovementRange = new HashSet<GameObject>
+        {
+            // Dodaje pole startowe
+            unitStats.gameObject
+        };
 
         // Lista do przeszukiwania kolejnych warstw
         Queue<GameObject> tilesToProcess = new Queue<GameObject>();
@@ -223,7 +226,7 @@ public class GridManager : MonoBehaviour
                     Vector2 targetPosition = (Vector2)currentTile.transform.position + direction;
                     Collider2D collider = Physics2D.OverlapPoint(targetPosition);
 
-                    if (collider != null && collider.gameObject.CompareTag("Tile"))
+                    if (collider != null && (collider.gameObject.CompareTag("Tile") || isFlyingUnit))
                     {
                         GameObject neighborTile = collider.gameObject;
 

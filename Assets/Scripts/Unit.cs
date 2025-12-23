@@ -32,6 +32,8 @@ public class Unit : MonoBehaviour
     public bool Scared; // Strach
     public bool Unconscious; // Utrata Przytomności
 
+    public bool Petrified; // Spetryfikowany - sprawia, że przy Utracie Przytomności nie podwajamy otrzymywanych obrażeń
+
     public bool Grappled; // Pochwycenie
     public int GrappledUnitId; // Cel pochwycenia
     public int EntangledUnitId; // Cel unieruchomienia
@@ -216,6 +218,12 @@ public class Unit : MonoBehaviour
             {
                 GrappledUnitId = 0;
             }
+        }
+
+        if(IsSelected && Unconscious)
+        {
+            CanMove = false;
+            CanDoAction = false;
         }
 
         // Dla jednostek z Szybkością 0, unieruchomionych lub pochwyconych wyłącza możliwość poruszania się

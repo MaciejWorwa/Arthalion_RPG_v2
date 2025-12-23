@@ -578,8 +578,8 @@ public class CombatManager : MonoBehaviour
         }
 
         // 10) Rozstrzygnięcie trafienia
-
-        bool attackSucceeded = attackRollResult >= DefenceResults[2];
+        int difficultyLevel = attackDistance > attackerWeapon.AttackRange * (2f / 3f) ? 14 : attackDistance > attackerWeapon.AttackRange * (1f / 3f) ? 12 : 10;
+        bool attackSucceeded = attackRollResult >= DefenceResults[2] || (isMeleeAttack && target.Unconscious) || (isRangedAttack && target.Unconscious && attackRollResult >= difficultyLevel);
 
         // Sprawdzamy Szczęście i Pecha
 
@@ -1561,7 +1561,7 @@ public class CombatManager : MonoBehaviour
         // ===== Całkowite obrażenia =====
         int finalDamage = rolledDamage + strengthModifier;
 
-        if (targetStats != null && targetStats.GetComponent<Unit>().Unconscious)
+        if (targetStats != null && targetStats.GetComponent<Unit>().Unconscious && !targetStats.GetComponent<Unit>().Petrified)
         {
             finalDamage *= 2;
             Debug.Log($"<color=#FF7F50>Obrażenia zostają podwojone, ponieważ cel ataku jest nieprzytomny.</color>");

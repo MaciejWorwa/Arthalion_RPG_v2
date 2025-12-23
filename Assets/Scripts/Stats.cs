@@ -88,13 +88,13 @@ public class Stats : MonoBehaviour
 
     [Header("Talenty")]
     public bool AccurateShot; // Celny strzał
-    public bool Chosen; //Wybraniec Boży ----------------------------- Do wprowadzenia
+    public bool Chosen; //Wybraniec Boży
     public bool CombatMaster; // Wojownik
     public bool Fast; // Szybki
     public bool Fencing; // Szermierka
     public bool Hardy; // Twardziel
     public int Pitiless; // Bezlitosny
-    public int Religious; // Pobożny ----------------------------- Do wprowadzenia
+    public int Religious; // Pobożny
     public bool Sharpshooter; // Strzelec wyborowy
     public int SurvivalInstinct; // Instynkt Przetrwania
 

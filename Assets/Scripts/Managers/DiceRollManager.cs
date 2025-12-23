@@ -358,7 +358,7 @@ public class DiceRollManager : MonoBehaviour
                 oldValue = roll2;
                 roll2 = Mathf.Min(roll2 * 2, 10);
             }
-            Debug.Log($"{stats.Name} korzysta z talentu Twardziel – niższa kość zostaje zwiększona z <color=#4dd2ff>{oldValue}</color> na <color=#4dd2ff>{oldValue * 2}</color>.");
+            Debug.Log($"{stats.Name} korzysta z talentu Twardziel – niższa kość zostaje zwiększona z <color=#4dd2ff>{oldValue}</color> na <color=#4dd2ff>{Mathf.Min(oldValue * 2, 10)}</color>.");
         }
 
         if (string.IsNullOrEmpty(rollContext))

@@ -590,7 +590,6 @@ public class UnitData
     public bool IsFlying; // Leci
     public bool IsRetreating; // Wycofuje się
 
-
     public bool Ablaze; // Podpalenie
     public int Bleeding; // Krwawienie
     public bool Blinded; // Oślepienie
@@ -599,6 +598,8 @@ public class UnitData
     public bool Prone; // Powalenie
     public bool Scared; // Strach
     public bool Unconscious; // Utrata Przytomności
+
+    public bool Petrified; // Spetryfikowany - sprawia, że przy Utracie Przytomności nie podwajamy otrzymywanych obrażeń
 
     public bool Grappled; // Pochwycenie
     public int GrappledUnitId; // Cel pochwycenia

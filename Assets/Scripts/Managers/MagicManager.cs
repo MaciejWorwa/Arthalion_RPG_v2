@@ -51,6 +51,11 @@ public class MagicManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _extraAreaSizeButton;
     [SerializeField] private UnityEngine.UI.Button _extraDurationButton;
 
+    [Header("Talent: Instynkt Przetrwania")]
+    [SerializeField] private GameObject _religiousPanel;
+    [SerializeField] private TMP_InputField _religiousInput;
+    [SerializeField] private UnityEngine.UI.Button _religiousButton;
+
     void Start()
     {
         //Wczytuje listę wszystkich zaklęć
@@ -126,6 +131,21 @@ public class MagicManager : MonoBehaviour
             castingTest = DiceRollManager.Instance.TestSkill(stats, "Rzucanie Zaklęć", "SW", "Spellcasting");
         }
         rollResult = castingTest[2];
+
+        // Talent Wybraniec Boży
+        if (stats.Chosen)
+        {
+            int lowerIndex = castingTest[0] <= castingTest[1] ? 0 : 1;
+
+            // podwojenie niższej kości, ale maksymalnie do 10
+            int doubled = Mathf.Min(castingTest[lowerIndex] * 2, 10);
+
+            rollResult += doubled - castingTest[lowerIndex];
+
+            Debug.Log($"{stats.Name} korzysta z talentu Wybraniec Boży. " +
+                        $"Wartość niższej kości k10 zostaje zwiększona z <color=#4dd2ff>{castingTest[lowerIndex]}</color> " +
+                        $"na <color=#4dd2ff>{doubled}</color>. Nowy łączny wynik: <color=green>{rollResult}</color>.");
+        }
 
         bool spellFailed = spell.CastingNumber - rollResult > 0;
         Debug.Log(spellFailed ? $"Rzucanie zaklęcia {spell.Name} nie powiodło się." : $"Zaklęcie {spell.Name} zostało rzucone pomyślnie.");
@@ -336,7 +356,7 @@ public class MagicManager : MonoBehaviour
                 {
                     bool boolValue = value != 0;
                     field.SetValue(targetObject, boolValue);
-                    Debug.Log($"{affectedStats.Name} zmienia cechę {attributeName} na {(boolValue ? "aktywną" : "nieaktywną")}.");
+                    Debug.Log($"Zaklęcie {spell.Name} zmienia u {affectedStats.Name} cechę {attributeName} na {(boolValue ? "aktywną" : "nieaktywną")}.");
 
                     //if (field.Name == "Entangled")
                     //{
@@ -612,18 +632,73 @@ public class MagicManager : MonoBehaviour
     #region Gods Wrath
     public IEnumerator GodsWrath(Stats stats, int spellLevel)
     {
+        int modifier = spellLevel;
+
+
+        // --- Talent: Pobożny (redukcja k4/k6/k8)
+        int religiousDieSize = 0;
+        switch (Mathf.Clamp(stats.Religious, 0, 3))
+        {
+            case 1: religiousDieSize = 4; break;
+            case 2: religiousDieSize = 6; break;
+            case 3: religiousDieSize = 8; break;
+            default: religiousDieSize = 0; break;
+        }
+
+        if (religiousDieSize > 0)
+        {
+            if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))
+            {
+                yield return StartCoroutine(WaitForRoll());
+
+                IEnumerator WaitForRoll()
+                {
+                    int rollResult = 0;
+                    _religiousInput.text = "";
+                    _religiousPanel.SetActive(true);
+
+                    // podpinamy listener pod button
+                    _religiousButton.onClick.RemoveAllListeners();
+                    _religiousButton.onClick.AddListener(() =>
+                    {
+                        if (int.TryParse(_religiousInput.text, out int value))
+                        {
+                            rollResult = value;
+                        }
+                        else
+                        {
+                            Debug.Log("<color=red>Musisz wpisać liczbę!</color>");
+                        }
+                    });
+
+                    // czekamy aż gracz zatwierdzi
+                    while (rollResult == 0)
+                        yield return null;
+
+                    Debug.Log($"{stats.Name} korzysta z talentu Pobożny i obniża wartość Gniewu Bożego o {rollResult}.");
+                    modifier -= rollResult;
+                    _religiousPanel.SetActive(false);
+                }
+            }
+            else
+            {
+                int roll = UnityEngine.Random.Range(1, religiousDieSize + 1);
+                Debug.Log($"{stats.Name} korzysta z talentu Pobożny i obniża wartość Gniewu Bożego o {roll}.");
+                modifier -= roll;
+            }
+        }
+
         // Jeżeli jesteśmy w trybie manualnych rzutów kośćmi i wybrana jednostka to sojusznik to czekamy na wynik rzutu
         int[] test = null;
         if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Gniew Boży", null, "Religious", spellLevel, callback: result => test = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Gniew Boży", null, null, modifier, callback: result => test = result));
             if (test == null) yield break;
         }
         else
         {
-            test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, "Religious", spellLevel);
+            test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, null, modifier);
         }
-
         int score = test[2];
 
         // Notka dołączana do każdego loga

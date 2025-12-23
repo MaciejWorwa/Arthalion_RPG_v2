@@ -88,7 +88,7 @@ public class RoundsManager : MonoBehaviour
                 unit.CanMove = true;
             }
 
-            if (unit.Unconscious)
+            if (unit.Unconscious && !unit.Petrified)
             {
                 StartCoroutine(StatesManager.Instance.Recover(unit));
             }
