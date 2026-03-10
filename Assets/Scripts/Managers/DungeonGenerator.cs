@@ -59,6 +59,7 @@ public class DungeonGenerator : MonoBehaviour
     {
         public string Race = string.Empty;
         public int Weight = 1;
+        public int MaxPerGroup = 0;
         public bool CanAppearOnFoot = true;
         public float MountedChance = 0f;
         public EncounterMountData[] Mounts = Array.Empty<EncounterMountData>();
@@ -84,6 +85,7 @@ public class DungeonGenerator : MonoBehaviour
     {
         public EnemyTemplate Template;
         public int Weight;
+        public int MaxPerGroup;
         public bool CanAppearOnFoot;
         public float MountedChance;
         public List<EnemyTemplate> MountTemplates = new List<EnemyTemplate>();
@@ -956,6 +958,7 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     Template = riderTemplate,
                     Weight = Mathf.Max(1, memberData.Weight),
+                    MaxPerGroup = Mathf.Max(0, memberData.MaxPerGroup),
                     CanAppearOnFoot = memberData.CanAppearOnFoot && !IsStandaloneRaceBlocked(riderTemplate.Race, blockedStandaloneRaces),
                     MountedChance = Mathf.Clamp01(memberData.MountedChance)
                 };
@@ -1024,13 +1027,14 @@ public class DungeonGenerator : MonoBehaviour
         {
             Group = group
         };
+        Dictionary<int, int> spawnedPerUnitId = new Dictionary<int, int>();
 
         HashSet<string> uniqueRaces = new HashSet<string>();
         int buildAttempts = desiredUnits * 6;
 
         while (candidate.Spawns.Count < desiredUnits && buildAttempts-- > 0)
         {
-            PlannedEnemySpawn spawn = CreatePlannedSpawn(group, remainingTiles, rng);
+            PlannedEnemySpawn spawn = CreatePlannedSpawn(group, remainingTiles, spawnedPerUnitId, rng);
             if (spawn == null)
             {
                 break;
@@ -1046,6 +1050,19 @@ public class DungeonGenerator : MonoBehaviour
             candidate.PredictedOverall += Mathf.Max(1, spawn.PredictedOverall);
             candidate.TileUsage += tileCost;
             remainingTiles -= tileCost;
+
+            if (spawn.RiderTemplate != null)
+            {
+                int riderUnitId = spawn.RiderTemplate.UnitId;
+                if (spawnedPerUnitId.TryGetValue(riderUnitId, out int currentCount))
+                {
+                    spawnedPerUnitId[riderUnitId] = currentCount + 1;
+                }
+                else
+                {
+                    spawnedPerUnitId[riderUnitId] = 1;
+                }
+            }
 
             if (spawn.RiderTemplate != null && !string.IsNullOrWhiteSpace(spawn.RiderTemplate.Race))
             {
@@ -1087,7 +1104,11 @@ public class DungeonGenerator : MonoBehaviour
         return candidate;
     }
 
-    private PlannedEnemySpawn CreatePlannedSpawn(EncounterGroupRuntime group, int remainingTiles, System.Random rng)
+    private PlannedEnemySpawn CreatePlannedSpawn(
+        EncounterGroupRuntime group,
+        int remainingTiles,
+        Dictionary<int, int> spawnedPerUnitId,
+        System.Random rng)
     {
         if (group == null || group.Members == null || group.Members.Count == 0) return null;
         if (remainingTiles <= 0) return null;
@@ -1099,6 +1120,20 @@ public class DungeonGenerator : MonoBehaviour
         {
             EncounterMemberRuntime member = group.Members[i];
             if (member == null || member.Template == null) continue;
+
+            if (member.MaxPerGroup > 0)
+            {
+                int spawnedCount = 0;
+                if (spawnedPerUnitId != null)
+                {
+                    spawnedPerUnitId.TryGetValue(member.Template.UnitId, out spawnedCount);
+                }
+
+                if (spawnedCount >= member.MaxPerGroup)
+                {
+                    continue;
+                }
+            }
 
             bool canMounted = member.MountTemplates != null && member.MountTemplates.Count > 0 && remainingTiles >= 2;
             bool canFoot = member.CanAppearOnFoot && remainingTiles >= 1;
@@ -1699,7 +1734,7 @@ public class DungeonGenerator : MonoBehaviour
 
         if (string.IsNullOrEmpty(target.Quality))
         {
-            target.Quality = "Zwykla";
+            target.Quality = "Zwykła";
         }
     }
 
@@ -1912,6 +1947,8 @@ public class DungeonGenerator : MonoBehaviour
         return true;
     }
 }
+
+
 
 
 

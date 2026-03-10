@@ -40,6 +40,8 @@ public class MountsManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _mountButton;
     [SerializeField] private GameObject _mountsPanel; // Panel do wyboru wierzchowca
 
+    [SerializeField] private GameObject _mountInfo; // Informacja w panelu jednostki na temat nazwy wierzchowca
+
     public void DisplayMountsList()
     {
         if (Unit.SelectedUnit == null) return;
@@ -281,6 +283,7 @@ public class MountsManager : MonoBehaviour
         }
 
         UpdateMountIcon(unit);
+        DisplayMountName(unit);
     }
 
     public void UpdateMountIcon(Unit unit)
@@ -302,6 +305,36 @@ public class MountsManager : MonoBehaviour
             tooltip.ChangeTooltipText(mountStats.Name);
         }
     }
+
+    public void DisplayMountName(Unit unit)
+    {
+        if (_mountInfo == null) return;
+
+        TMP_Text label = _mountInfo.GetComponentInChildren<TMP_Text>(true);
+
+        if (unit == null || !unit.IsMounted || unit.Mount == null)
+        {
+            _mountInfo.SetActive(false);
+            if (label != null) label.text = string.Empty;
+            return;
+        }
+
+        Stats mountStats = unit.Mount.Stats != null
+            ? unit.Mount.Stats
+            : unit.Mount.GetComponent<Stats>();
+
+        if (mountStats != null && !string.IsNullOrWhiteSpace(mountStats.Name))
+        {
+            _mountInfo.SetActive(true);
+            if (label != null) label.text = mountStats.Name;
+        }
+        else
+        {
+            _mountInfo.SetActive(false);
+            if (label != null) label.text = string.Empty;
+        }
+    }
+
 
     public void DisplayAllMountIcons()
     {

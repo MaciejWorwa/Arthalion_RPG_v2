@@ -12,7 +12,8 @@
                                                "MountedChance":  0,
                                                "Mounts":  [
 
-                                                          ]
+                                                          ],
+                                               "MaxPerGroup":  1
                                            },
                                            {
                                                "Race":  "Pomiot Kainera",
@@ -293,7 +294,8 @@
                                                "MountedChance":  0,
                                                "Mounts":  [
 
-                                                          ]
+                                                          ],
+                                               "MaxPerGroup":  1
                                            },
                                            {
                                                "Race":  "Olbrzymi Pająk",
@@ -726,7 +728,8 @@
                                                "MountedChance":  0,
                                                "Mounts":  [
 
-                                                          ]
+                                                          ],
+                                               "MaxPerGroup":  1
                                            }
                                        ]
                        },
