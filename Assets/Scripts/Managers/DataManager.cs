@@ -728,10 +728,11 @@ public class StatsData
     public bool Sharpshooter; // Strzelec wyborowy
     public int SurvivalInstinct; // Instynkt Przetrwania
 
-    public string[] Magic = new string[5]; // ścieżki magii
-    public string[] Resistance = new string[4]; // np. ["Fizyczne", "Ogień"]
+    public string[] Magic = new string[6]; // ścieżki magii
+    public string[] Resistance = new string[5]; // Odporny (50% obrażeń) np. ["Fizyczne", "Ogień"]
     public string[] Slayer = new string[3];
     public string[] Specialist = new string[3]; // null/"" = pusty slot
+    public string[] Unaffected = new string[5]; // Niewrażliwy np. ["Fizyczne", "Ogień"]
 
 
     [Header("Cechy stworzeń")]

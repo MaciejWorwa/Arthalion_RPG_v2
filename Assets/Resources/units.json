@@ -2,6 +2,7 @@
   "Units": [
     {
       "Race": "Człowiek",
+      "Type": "Humanoid",
       "Size": 2,
       "PrimaryWeaponNames": [ "Miecz", "Pałka" ],
       "Sz": 4,
@@ -9,6 +10,7 @@
     },
     {
       "Race": "Elf",
+      "Type": "Humanoid",
       "Size": 2,
       "PrimaryWeaponNames": [ "Miecz", "Łuk" ],
       "Sz": 5,
@@ -16,6 +18,7 @@
     },
     {
       "Race": "Gnom",
+      "Type": "Humanoid",
       "Size": 1,
       "PrimaryWeaponNames": [ "Miecz", "Krótki łuk" ],
       "Sz": 3,
@@ -23,6 +26,7 @@
     },
     {
       "Race": "Krasnolud",
+      "Type": "Humanoid",
       "Size": 2,
       "PrimaryWeaponNames": [ "Buława", "Miecz", "Topór", "Młot bojowy" ],
       "Sz": 3,
@@ -55,7 +59,7 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Resistance": [ "Poison" ]
+      "Unaffected": [ "Poison" ]
     },
     {
       "Race": "Demon",
@@ -119,7 +123,7 @@
       "Sz": 4,
       "Undead": true,
       "Flight": 4,
-      "Resistance": [ "Physical" ],
+      "Unaffected": [ "Physical" ],
       "Scary": 14,
       "Dodge": 1
     },
@@ -185,7 +189,8 @@
           "Value": 2
         }
       ],
-      "Resistance": [ "Ice", "Poison" ],
+      "Resistance": [ "Ice" ],
+      "Unaffected":  [ "Poison" ],
       "S": 1,
       "K": 3,
       "Zw": 4,
@@ -263,13 +268,13 @@
       "Sz": 5,
       "Scary": 20,
       "Undead": true,
-      "Flight":  6,
+      "Flight": 6,
       "Tough": true,
       "Spellcasting": 1,
       "MeleeCombat": 2,
-      "Dodge":  2,
+      "Dodge": 2,
       "Magic": [ "Death" ],
-      "Resistance": [ "Physical" ]
+      "Unaffected": [ "Physical" ]
     },
     {
       "Race": "Krwiopij",
@@ -426,7 +431,7 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Resistance": [ "Ice" ]
+      "Unaffected": [ "Ice" ]
     },
     {
       "Race": "Magmowy Golem",
@@ -454,7 +459,7 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Resistance": [ "Fire" ]
+      "Unaffected": [ "Fire" ]
     },
     {
       "Race": "Mamut",
@@ -569,7 +574,7 @@
       "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 1,
-      "Resistance": [ "Poison" ],
+      "Unaffected": [ "Poison" ],
       "MeleeCombat": 2
     },
     {
@@ -596,7 +601,7 @@
       "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 2,
-      "Resistance": [ "Poison" ],
+      "Unaffected": [ "Poison" ],
       "MeleeCombat": 2
     },
     {
@@ -637,6 +642,37 @@
       "SW": -4,
       "Sz": 4,
       "SurvivalInstinct": 3
+    },
+    {
+      "Race": "Pokutnik",
+      "Type": "Plant",
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 8
+        },
+        {
+          "Key": "Pummel",
+          "Value": true
+        }
+      ],
+      "Size": 3,
+      "S": 4,
+      "K": 6,
+      "Zw": -3,
+      "Zr": -2,
+      "Int": 3,
+      "P": -2,
+      "Ch": 0,
+      "SW": 1,
+      "Sz": 4,
+      "MeleeCombat": 1,
+      "Spellcasting": 2,
+      "Magic": [ "Earth" ],
+      "Hardy": true,
+      "Unaffected": [ "Poison" ],
+      "NaturalArmor": 2
     },
     {
       "Race": "Pomiot Kainera",
@@ -711,6 +747,37 @@
       "Cool": 5
     },
     {
+      "Race": "Skamielec",
+      "Type": "Plant",
+      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 8
+        },
+        {
+          "Key": "Pummel",
+          "Value": true
+        }
+      ],
+      "Size": 3,
+      "S": 5,
+      "K": 7,
+      "Zw": -3,
+      "Zr": -2,
+      "Int": 0,
+      "P": -2,
+      "Ch": -2,
+      "SW": 0,
+      "Sz": 3,
+      "MeleeCombat": 2,
+      "Endurance": 2,
+      "Hardy": true,
+      "Resistance": [ "Fire", "Ice" ],
+      "Unaffected": [ "Poison" ],
+      "NaturalArmor": 3
+    },
+    {
       "Race": "Smok",
       "Type": "Dragon",
       "Size": 4,
@@ -727,7 +794,7 @@
       "Scary": 18,
       "Tough": true,
       "Flight": 10,
-      "Resistance": [ "Fire", "Poison", "Ice", "Electricity" ],
+      "Unaffected": [ "Fire", "Poison", "Ice", "Electricity" ],
       "NaturalArmor": 3,
       "MeleeCombat": 5,
       "Cool": 5
@@ -926,6 +993,25 @@
       "Reflex": 3
     },
     {
+      "Race": "Xit'lan'",
+      "Type": "Humanoid",
+      "Size": 3,
+      "PrimaryWeaponNames": [ "Szabla", "Buława", "Miecz", "Sztylet", "Włócznia", "Nadziak" ],
+      "S": -1,
+      "K": 1,
+      "Zw": 3,
+      "Zr": 1,
+      "Int": 2,
+      "P": 3,
+      "Ch": -2,
+      "SW": 1,
+      "Sz": 4,
+      "MeleeCombat": 3,
+      "Reflex": 2,
+      "Dodge": 2,
+      "Flight":  6
+    },
+    {
       "Race": "Złodziej Myśli",
       "Type": "Beast",
       "Size": 1,
@@ -970,6 +1056,7 @@
     },
     {
       "Race": "Żmijorośl",
+      "Type": "Plant",
       "Size": 3,
       "PrimaryWeaponNames": [ "Broń naturalna" ],
       "PrimaryWeaponAttributes": [
@@ -1003,7 +1090,7 @@
       "Unmeaning": true,
       "Slow": true,
       "Stink": true,
-      "Resistance": [ "Poison" ]
+      "Unaffected": [ "Poison" ]
     },
     {
       "Race": "Żywiołak Lodu",
@@ -1027,7 +1114,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Ice" ],
-      "Resistance": [ "Ice" ]
+      "Unaffected": [ "Ice" ]
     },
     {
       "Race": "Żywiołak Ognia",
@@ -1051,7 +1138,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Fire" ],
-      "Resistance": [ "Fire" ]
+      "Unaffected": [ "Fire" ]
     },
     {
       "Race": "Żywiołak Powietrza",
@@ -1075,7 +1162,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Air" ],
-      "Resistance": [ "Electric" ]
+      "Unaffected": [ "Electric" ]
     },
     {
       "Race": "Żywiołak Wody",
@@ -1099,7 +1186,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Water" ],
-      "Resistance": [ "Fire" ]
+      "Unaffected": [ "Fire" ]
     },
     {
       "Race": "Żywiołak Ziemi",
@@ -1123,7 +1210,7 @@
       "Undead": true,
       "Spellcasting": 2,
       "Magic": [ "Earth" ],
-      "Resistance": [ "Poison" ]
+      "Unaffected": [ "Poison" ]
     }
   ]
 }

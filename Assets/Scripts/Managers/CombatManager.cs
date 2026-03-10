@@ -858,12 +858,12 @@ public class CombatManager : MonoBehaviour
             }
         }
 
+        string resistanceLog = null;
         if (finalDamage > 0)
         {
-            // --- ODPORNOŚCI (Resistance) — pełna odporność: 0 dmg ---
+            // --- ODPORNOŚCI I NIEWRAŻLIWOŚCI ---
             // Zasada: jeśli to atak bronią i broń NIE jest magiczna → Physical.
             // Jeśli broń jest Magical → NIE traktujemy jako Physical (brak typu).
-            if (targetStats.Resistance != null && targetStats.Resistance.Length > 0)
             {
                 string effectiveDamageType = !string.IsNullOrEmpty(damageType) ? damageType : null;
 
@@ -872,24 +872,59 @@ public class CombatManager : MonoBehaviour
                     effectiveDamageType = null;
                 }
 
-                // Jeśli nie mamy typu (np. magiczna broń bez typu) – odporności nie mają do czego się odnieść
+                // Jeśli nie mamy typu (np. magiczna broń bez typu) – cechy nie mają do czego się odnieść
                 if (!string.IsNullOrEmpty(effectiveDamageType))
                 {
-                    bool immune = false;
-                    foreach (var r in targetStats.Resistance)
+                    // --- UNAFFECTED = całkowita niewrażliwość ---
+                    bool unaffected = false;
+                    if (targetStats.Unaffected != null && targetStats.Unaffected.Length > 0)
                     {
-                        if (string.IsNullOrWhiteSpace(r)) continue;
-                        var rEn = UnitsManager.ResistancePlToEn.TryGetValue(r, out var map) ? map : r; // znormalizuj do EN
-                        if (string.Equals(rEn, damageType, StringComparison.OrdinalIgnoreCase)) { immune = true; break; }
+                        foreach (var u in targetStats.Unaffected)
+                        {
+                            if (string.IsNullOrWhiteSpace(u)) continue;
+
+                            var uEn = UnitsManager.ResistancePlToEn.TryGetValue(u, out var mappedU) ? mappedU : u;
+                            if (string.Equals(uEn, effectiveDamageType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                unaffected = true;
+                                break;
+                            }
+                        }
                     }
 
-                    if (immune)
+                    if (unaffected)
                     {
-                        var dmgPl = UnitsManager.ResistanceEnToPl.TryGetValue(damageType, out var pl) ? pl : damageType;
-                        Debug.Log($"{targetStats.Name} jest odporny/a na {dmgPl}. Obrażenia zostały zignorowane.");
+                        var dmgPl = UnitsManager.ResistanceEnToPl.TryGetValue(effectiveDamageType, out var pl) ? pl : effectiveDamageType;
+                        Debug.Log($"{targetStats.Name} jest niewrażliwy/a na {dmgPl}. Obrażenia zostały zignorowane.");
 
                         StartCoroutine(AnimationManager.Instance.PlayAnimation("parry", null, target.gameObject));
                         return;
+                    }
+
+                    // --- RESISTANCE = połowa obrażeń, zaokrąglając w dół ---
+                    bool resistant = false;
+                    if (targetStats.Resistance != null && targetStats.Resistance.Length > 0)
+                    {
+                        foreach (var r in targetStats.Resistance)
+                        {
+                            if (string.IsNullOrWhiteSpace(r)) continue;
+
+                            var rEn = UnitsManager.ResistancePlToEn.TryGetValue(r, out var mappedR) ? mappedR : r;
+                            if (string.Equals(rEn, effectiveDamageType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                resistant = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (resistant)
+                    {
+                        int originalDamage = finalDamage;
+                        finalDamage = Mathf.Max(1, finalDamage / 2);
+
+                        var dmgPl = UnitsManager.ResistanceEnToPl.TryGetValue(effectiveDamageType, out var pl) ? pl : effectiveDamageType;
+                        resistanceLog = $"{targetStats.Name} jest odporny/a na {dmgPl}. Obrażenia zmniejszono z {originalDamage} do {finalDamage}.";
                     }
                 }
             }
@@ -899,6 +934,11 @@ public class CombatManager : MonoBehaviour
             if (armor != 0)
             {
                 Debug.Log($"{targetStats.Name} znegował {armor} obrażeń.");
+            }
+
+            if (!string.IsNullOrEmpty(resistanceLog))
+            {
+                Debug.Log(resistanceLog);
             }
 
             //Informacja o punktach żywotności po zadaniu obrażeń
@@ -939,16 +979,21 @@ public class CombatManager : MonoBehaviour
             if (attackerWeapon != null && attackerWeapon.Poisonous > 0)
             {
                 // sprawdzamy odporności celu
-                bool immuneToPoison = (targetStats.Resistance != null && targetStats.Resistance.Contains("Poison")) || targetStats.Undead;
+                bool unaffected = (targetStats.Unaffected?.Contains("Poison") ?? false) || targetStats.Undead;
+                bool resistant = targetStats.Resistance?.Contains("Poison") ?? false;
 
-                if (!immuneToPoison && target.Poison < attackerWeapon.Poisonous)
+                if (unaffected)
                 {
-                    target.Poison = attackerWeapon.Poisonous;
-                    Debug.Log($"<color=#FF7F50>{targetStats.Name} dostaje stan Zatrucia (poziom {target.Poison}).</color>");
+                    Debug.Log($"<color=#FF7F50>{targetStats.Name} jest niewrażliwy/a na zatrucie.</color>");
+                    return;
                 }
-                else if (immuneToPoison)
+
+                int poisonLevel = resistant ? attackerWeapon.Poisonous / 2 : attackerWeapon.Poisonous;
+
+                if (poisonLevel > 0 && target.Poison < poisonLevel)
                 {
-                    Debug.Log($"<color=#FF7F50>{targetStats.Name} jest odporny na zatrucie.</color>");
+                    target.Poison = poisonLevel;
+                    Debug.Log($"<color=#FF7F50>{targetStats.Name} dostaje stan Zatrucia (poziom {target.Poison}).</color>");
                 }
             }
         }

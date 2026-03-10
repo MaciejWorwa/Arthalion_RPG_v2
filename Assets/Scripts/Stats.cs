@@ -99,9 +99,10 @@ public class Stats : MonoBehaviour
     public int SurvivalInstinct; // Instynkt Przetrwania
 
     public string[] Magic = new string[6]; // ścieżki magii ----------------------------- Do wprowadzenia
-    public string[] Resistance = new string[5]; // np. ["Fizyczne", "Ogień"]
+    public string[] Resistance = new string[5]; // Odporny (50% obrażeń) np. ["Fizyczne", "Ogień"]
     public string[] Slayer = new string[3];
     public string[] Specialist = new string[3]; // null/"" = pusty slot
+    public string[] Unaffected = new string[5]; // Niewrażliwy np. ["Fizyczne", "Ogień"]
 
 
     [Header("Cechy stworzeń")]
@@ -390,10 +391,32 @@ public class Stats : MonoBehaviour
         //    talentScore += 10f;
         //}
 
-        // Resistance – szczególnie fizyczne
+        // Odporność – szczególnie fizyczna
         if (Resistance != null)
         {
             foreach (var res in Resistance)
+            {
+                if (string.IsNullOrEmpty(res)) continue;
+
+                string r = res.ToLowerInvariant();
+
+                if (r.Contains("fizyczne"))
+                {
+                    // Prawie całkowita odporność na fizyczne obrażenia – to jest game changer
+                    defenseScore *= 1.5f;
+                }
+                else
+                {
+                    // Ogień, zimno itd. – wciąż znaczące, ale nie aż tak jak fizyczne
+                    talentScore += 5f;
+                }
+            }
+        }
+
+        // Niewrażliwość – szczególnie fizyczna
+        if (Unaffected != null)
+        {
+            foreach (var res in Unaffected)
             {
                 if (string.IsNullOrEmpty(res)) continue;
 

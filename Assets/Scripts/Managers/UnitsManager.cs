@@ -948,6 +948,16 @@ public class UnitsManager : MonoBehaviour
             }
             return; // nie wchodzimy w refleksję
         }
+        if (HandleTalentListEdit("Unaffected", attributeName, textInput, stats, ToResistanceKey, slots: 5))
+        {
+            UpdateUnitPanel(Unit.SelectedUnit);
+            if (!SaveAndLoadManager.Instance.IsLoading)
+            {
+                int newOverall = stats.CalculateOverall();
+                InitiativeQueueManager.Instance.CalculateDominance();
+            }
+            return; // nie wchodzimy w refleksję
+        }
         if (HandleTalentListEdit("Magic", attributeName, textInput, stats, ToMagicKey, slots: 6))
         {
             UpdateUnitPanel(Unit.SelectedUnit);
@@ -1195,12 +1205,14 @@ public class UnitsManager : MonoBehaviour
             {
                 string attributeName = inputField.name.Replace("_input", "");
 
-                // --- Talenty/cechy w formie tablic 3-slotowych (bez eventów!) ---
+                // --- Talenty/cechy w formie tablic slotowych (bez eventów!) ---
                 if (HandleTalentListLoad("Specialist", attributeName, inputField, stats, ToPolishSkill))
                     continue;
                 if (HandleTalentListLoad("Slayer", attributeName, inputField, stats, ToPolishSlayer))
                     continue;
                 if (HandleTalentListLoad("Resistance", attributeName, inputField, stats, ToPolishResistance, slots: 5))
+                    continue;
+                if (HandleTalentListLoad("Unaffected", attributeName, inputField, stats, ToPolishResistance, slots: 5))
                     continue;
                 if (HandleTalentListLoad("Magic", attributeName, inputField, stats, ToPolishMagic, slots: 6))
                     continue;
