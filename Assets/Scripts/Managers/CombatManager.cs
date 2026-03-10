@@ -1220,6 +1220,16 @@ public class CombatManager : MonoBehaviour
             return false;
         }
 
+        // Sprawdza, czy linia strzału nie przechodzi przez wyłączone pola (ściany)
+        if (IsLineBlockedByDisabledTiles(attacker.transform.position, target.transform.position))
+        {
+            if (!ReinforcementLearningManager.Instance.IsLearning)
+            {
+                Debug.Log($"Na linii strzału {attacker.GetComponent<Stats>().Name} znajduje się ściana.");
+            }
+            return false;
+        }
+
         // Sprawdza, czy na linii strzału znajduje się przeszkoda
         RaycastHit2D[] raycastHits = Physics2D.RaycastAll(attacker.transform.position, target.transform.position - attacker.transform.position, attackDistance);
 
@@ -1240,6 +1250,48 @@ public class CombatManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool IsLineBlockedByDisabledTiles(Vector2 startWorldPosition, Vector2 endWorldPosition)
+    {
+        if (GridManager.Instance == null || GridManager.Instance.Tiles == null)
+        {
+            return false;
+        }
+
+        Vector2 gridPosition = GridManager.Instance.transform.position;
+        Vector2 startLocalPosition = startWorldPosition - gridPosition;
+        Vector2 endLocalPosition = endWorldPosition - gridPosition;
+        float lineLength = Vector2.Distance(startLocalPosition, endLocalPosition);
+
+        if (lineLength <= Mathf.Epsilon)
+        {
+            return false;
+        }
+
+        // Próbkujemy linię co ok. 0.1 pola, żeby wykryć przejście przez ścianę.
+        int sampleCount = Mathf.Max(2, Mathf.CeilToInt(lineLength * 10f));
+
+        for (int sampleIndex = 1; sampleIndex < sampleCount; sampleIndex++)
+        {
+            float t = sampleIndex / (float)sampleCount;
+            Vector2 samplePosition = Vector2.Lerp(startLocalPosition, endLocalPosition, t);
+            int tileX = Mathf.RoundToInt(samplePosition.x);
+            int tileY = Mathf.RoundToInt(samplePosition.y);
+
+            if (tileX < 0 || tileY < 0 || tileX >= GridManager.Width || tileY >= GridManager.Height)
+            {
+                return true;
+            }
+
+            Tile sampledTile = GridManager.Instance.Tiles[tileX, tileY];
+            if (sampledTile == null || !sampledTile.gameObject.activeInHierarchy)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     #endregion

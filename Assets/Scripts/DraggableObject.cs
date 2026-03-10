@@ -7,15 +7,54 @@ public class DraggableObject : MonoBehaviour
     private Camera _mainCamera;
     private Vector3 _startPosition; // Pozycja przed przesunięciem
     public static DraggableObject CurrentlyDragging = null;
+    private static DraggableObject _inputDriver;
 
 
-    private void Start()
+        private void Start()
     {
         _mainCamera = Camera.main;
+
+        if (_inputDriver == null)
+        {
+            _inputDriver = this;
+        }
     }
 
-    void Update()
+    private void OnDestroy()
     {
+        if (_inputDriver == this)
+        {
+            _inputDriver = null;
+            var objects = FindObjectsByType<DraggableObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < objects.Length; i++)
+            {
+                if (objects[i] != null)
+                {
+                    _inputDriver = objects[i];
+                    break;
+                }
+            }
+        }
+
+        if (CurrentlyDragging == this)
+        {
+            CurrentlyDragging = null;
+            IsDragging = false;
+        }
+    }
+
+        void Update()
+    {
+        if (_inputDriver != null && _inputDriver != this)
+        {
+            return;
+        }
+
+        if (_inputDriver == null)
+        {
+            _inputDriver = this;
+        }
+
         if (Input.GetMouseButtonDown(0) && !GameManager.Instance.IsPointerOverUI())
         {
             DraggableObject obj = GetDraggableObjectUnderMouse();
@@ -41,21 +80,33 @@ public class DraggableObject : MonoBehaviour
         }
     }
 
-    private DraggableObject GetDraggableObjectUnderMouse()
+        private DraggableObject GetDraggableObjectUnderMouse()
     {
+        if (_mainCamera == null)
+        {
+            _mainCamera = Camera.main;
+            if (_mainCamera == null)
+            {
+                return null;
+            }
+        }
+
         Vector3 mousePos = Input.mousePosition;
-        Ray ray = Camera.main.ScreenPointToRay(mousePos);
+        Ray ray = _mainCamera.ScreenPointToRay(mousePos);
         RaycastHit2D[] hits = Physics2D.GetRayIntersectionAll(ray);
 
-        // Przeglądaj wszystkie trafienia i wybierz najbardziej odpowiedni obiekt
-        foreach (var hit in hits)
+        for (int i = 0; i < hits.Length; i++)
         {
+            RaycastHit2D hit = hits[i];
+            if (hit.collider == null) continue;
+
             DraggableObject draggable = hit.collider.GetComponent<DraggableObject>();
             if (draggable != null)
             {
                 return draggable;
             }
         }
+
         return null;
     }
 
@@ -304,3 +355,5 @@ public class DraggableObject : MonoBehaviour
         return occupiedCount - 1;
     }
 }
+
+

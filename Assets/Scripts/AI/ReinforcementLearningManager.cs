@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Linq;
 using System.IO;
 using System;
+using System.Globalization;
 using UnitStates;
 using TMPro;
 
@@ -87,7 +88,42 @@ public class ReinforcementLearningManager : MonoBehaviour
     [Header("Logging Parameters")]
     public int ActionsPerEpoch = 500;
     public SimpleGraph simpleGraph;
+    [Tooltip("Co ile epok zapisywac automatycznie Q-tabele. 0 = brak autozapisu.")]
+    public int AutoSaveEveryEpochs = 10;
+    [Header("Training Debug")]
+    [SerializeField] private TMP_Text _trainingDebugDisplay;
+    [Min(1)] public int LearningSettleFrames = 2;
+    [Min(10)] public int LearningStepTimeoutFrames = 240;
+    [Min(1)] public int MaxLearningIterationsPerUnitTurn = 8;
+    public bool EnableStepCsvLogging = true;
 
+    [Header("Periodic Evaluation")]
+    public bool EnablePeriodicEvaluation = true;
+    [Min(1)] public int EvaluateEveryEpisodes = 50;
+    [Min(1)] public int EvaluationEpisodesCount = 20;
+
+    private int _totalEpisodeCount = 0;
+    private int _trainingEpisodeCount = 0;
+    private int _evaluationEpisodeCount = 0;
+    private int _globalStepIndex = 0;
+    private int _currentEpisodeStepCount = 0;
+    private int _invalidActionCount = 0;
+    private int _noOpStepCount = 0;
+    private int _timeoutCount = 0;
+    private float _currentEpisodeReward = 0f;
+
+    private bool _isEvaluationMode = false;
+    private int _evaluationEpisodesLeft = 0;
+    private int _evaluationWins = 0;
+    private int _evaluationPlayed = 0;
+    private bool _stepTimeoutFlag = false;
+
+    private readonly Queue<int> _recentEpisodeWins = new();
+    private readonly Queue<float> _recentEpisodeRewards = new();
+    private const int RECENT_EPISODES_WINDOW = 100;
+
+    private string _currentRunFolder = string.Empty;
+    private string _stepLogPath = string.Empty;
     private List<float> epochRewards = new List<float>();
     private float currentEpochReward = 0f;
     private int actionsThisEpoch = 0;
@@ -115,11 +151,14 @@ public class ReinforcementLearningManager : MonoBehaviour
         public string Race;
         public int State;
         public int Action;
+        public float ImmediateReward;
         public Unit Target;
         public bool TargetExisted;
         public int PrevSelfHP;
         public int PrevTargetHP;
         public int TargetOverall;
+        public int ValidActionsCount;
+        public bool ForcedFallback;
         public bool HasValue;
     }
 
@@ -133,12 +172,199 @@ public class ReinforcementLearningManager : MonoBehaviour
 
     void Start()
     {
-        if (IsLearning) LoadQTables();
+        if (!IsLearning) return;
+
+        LoadQTables();
+        InitializeTrainingRun();
+        UpdateTrainingDebugUI();
     }
 
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.R) && IsLearning) SaveQTables();
+    }
+
+    void OnApplicationQuit()
+    {
+        if (IsLearning) SaveQTables();
+    }
+    public int GetMaxLearningIterationsPerUnitTurn()
+    {
+        return Mathf.Max(1, MaxLearningIterationsPerUnitTurn);
+    }
+
+    public int GetLearningSettleFrames()
+    {
+        return Mathf.Max(1, LearningSettleFrames);
+    }
+
+    public int GetLearningStepTimeoutFrames()
+    {
+        return Mathf.Max(10, LearningStepTimeoutFrames);
+    }
+
+    public bool ConsumeStepTimeoutFlag()
+    {
+        bool value = _stepTimeoutFlag;
+        _stepTimeoutFlag = false;
+        return value;
+    }
+
+    private float CurrentExplorationRate()
+    {
+        return _isEvaluationMode ? 0f : Epsilon;
+    }
+
+    public void ReportLearningStepTimeout(Unit unit)
+    {
+        _stepTimeoutFlag = true;
+        _timeoutCount++;
+        LogStepRow("timeout", unit, null, -1, 0f, 0f, 0f);
+        UpdateTrainingDebugUI();
+    }
+
+    public void NotifyEpisodeEnd(bool didAIWin)
+    {
+        _totalEpisodeCount++;
+
+        if (_isEvaluationMode)
+        {
+            _evaluationEpisodeCount++;
+            _evaluationPlayed++;
+            if (didAIWin) _evaluationWins++;
+            _evaluationEpisodesLeft--;
+
+            if (_evaluationEpisodesLeft <= 0)
+            {
+                float evalWinRate = _evaluationPlayed > 0 ? (float)_evaluationWins / _evaluationPlayed : 0f;
+                Debug.Log($"[RL] Evaluation finished: wins={_evaluationWins}/{_evaluationPlayed} ({evalWinRate:P1}).");
+                _isEvaluationMode = false;
+                _evaluationPlayed = 0;
+                _evaluationWins = 0;
+            }
+        }
+        else
+        {
+            _trainingEpisodeCount++;
+            PushWindow(_recentEpisodeWins, didAIWin ? 1 : 0, RECENT_EPISODES_WINDOW);
+            PushWindow(_recentEpisodeRewards, _currentEpisodeReward, RECENT_EPISODES_WINDOW);
+
+            if (EnablePeriodicEvaluation && EvaluateEveryEpisodes > 0 && _trainingEpisodeCount % EvaluateEveryEpisodes == 0)
+            {
+                _isEvaluationMode = true;
+                _evaluationEpisodesLeft = Mathf.Max(1, EvaluationEpisodesCount);
+                _evaluationPlayed = 0;
+                _evaluationWins = 0;
+                Debug.Log($"[RL] Starting evaluation block: {_evaluationEpisodesLeft} episodes (epsilon=0, learning OFF).");
+            }
+        }
+
+        _currentEpisodeReward = 0f;
+        _currentEpisodeStepCount = 0;
+        UpdateTrainingDebugUI();
+    }
+
+    private static void PushWindow<T>(Queue<T> queue, T value, int window)
+    {
+        queue.Enqueue(value);
+        while (queue.Count > window) queue.Dequeue();
+    }
+
+    private float GetRecentWinRate()
+    {
+        if (_recentEpisodeWins.Count == 0) return 0f;
+        return (float)_recentEpisodeWins.Average();
+    }
+
+    private float GetRecentEpisodeReward()
+    {
+        if (_recentEpisodeRewards.Count == 0) return 0f;
+        return _recentEpisodeRewards.Average();
+    }
+
+    private void UpdateTrainingDebugUI()
+    {
+        if (_trainingDebugDisplay == null) return;
+
+        string mode = _isEvaluationMode ? "EVAL" : "TRAIN";
+        float winRate = GetRecentWinRate() * 100f;
+        float avgReward = GetRecentEpisodeReward();
+        float invalidRate = _globalStepIndex > 0 ? (100f * _invalidActionCount / _globalStepIndex) : 0f;
+        float timeoutRate = _globalStepIndex > 0 ? (100f * _timeoutCount / _globalStepIndex) : 0f;
+        float noOpRate = _globalStepIndex > 0 ? (100f * _noOpStepCount / _globalStepIndex) : 0f;
+
+        _trainingDebugDisplay.text =
+                    $"Episodes T/E/All: {_trainingEpisodeCount}/{_evaluationEpisodeCount}/{_totalEpisodeCount}\n" +
+                    $"Epoch: {currentEpoch}\n" +
+                    $"WinRate(100): {winRate:F1}%  AvgReward(100): {avgReward:F2}\n" +
+                    $"Fallback%: {invalidRate:F1}  Timeout%: {timeoutRate:F1}  NoOp%: {noOpRate:F1}";
+    }
+
+    private void InitializeTrainingRun()
+    {
+        if (!EnableStepCsvLogging) return;
+
+        string root = Path.Combine(Application.persistentDataPath, "training_runs");
+        Directory.CreateDirectory(root);
+
+        _currentRunFolder = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+        Directory.CreateDirectory(_currentRunFolder);
+
+        _stepLogPath = Path.Combine(_currentRunFolder, "steps.csv");
+        File.WriteAllText(_stepLogPath,
+            "event;mode;episode;round;global_step;episode_step;unit_id;race;state;action;next_state;target_id;valid_actions;fallback;reward;old_q;new_q;epsilon;self_hp;target_hp\n");
+
+        Debug.Log($"[RL] Step log file: {_stepLogPath}");
+    }
+
+    private void LogStepRow(string eventType, Unit unit, LastStep? prevNullable, int nextState, float reward, float oldQ, float newQ)
+    {
+        if (!EnableStepCsvLogging || string.IsNullOrEmpty(_stepLogPath)) return;
+
+        LastStep prev = prevNullable ?? default;
+        int unitId = unit != null ? unit.UnitId : -1;
+        string race = (unit != null && unit.Stats != null && !string.IsNullOrEmpty(unit.Stats.Race))
+            ? unit.Stats.Race
+            : (!string.IsNullOrEmpty(prev.Race) ? prev.Race : "unknown");
+        int state = prev.State;
+        int action = prev.Action;
+        int targetId = prev.Target != null ? prev.Target.UnitId : -1;
+        int validActions = prev.ValidActionsCount;
+        int fallback = prev.ForcedFallback ? 1 : 0;
+        int selfHp = unit != null && unit.Stats != null ? unit.Stats.TempHealth : -1;
+        int targetHp = prev.Target != null && prev.Target.Stats != null ? prev.Target.Stats.TempHealth : -1;
+        string mode = _isEvaluationMode ? "EVAL" : "TRAIN";
+
+        string line = string.Join(";", new string[]
+        {
+            eventType,
+            mode,
+            _totalEpisodeCount.ToString(),
+            RoundsManager.RoundNumber.ToString(),
+            _globalStepIndex.ToString(),
+            _currentEpisodeStepCount.ToString(),
+            unitId.ToString(),
+            race,
+            state.ToString(),
+            action.ToString(),
+            nextState.ToString(),
+            targetId.ToString(),
+            validActions.ToString(),
+            fallback.ToString(),
+            F(reward),
+            F(oldQ),
+            F(newQ),
+            F(CurrentExplorationRate()),
+            selfHp.ToString(),
+            targetHp.ToString(),
+        });
+
+        File.AppendAllText(_stepLogPath, line + Environment.NewLine);
+    }
+
+    private static string F(float value)
+    {
+        return value.ToString("F4", CultureInfo.InvariantCulture);
     }
 
     // ======================================================================
@@ -196,13 +422,17 @@ public class ReinforcementLearningManager : MonoBehaviour
         public int ActionId;
         public Unit ChosenTarget;
         public bool[] ChosenStates;
+        public int ValidActionCount;
+        public bool ForcedFallback;
     }
 
     // --- WYBÓR AKCJI ---
     private ActionChoice ChooseValidActionEpsilonGreedy(ActionContext context, Unit unit)
     {
+        float explorationRate = CurrentExplorationRate();
+
         // 1. Eksploracja
-        if (UnityEngine.Random.value < Epsilon)
+        if (UnityEngine.Random.value < explorationRate)
         {
             List<int> potentialActions = new List<int>();
             for (int i = 0; i < ACTION_COUNT; i++)
@@ -210,7 +440,6 @@ public class ReinforcementLearningManager : MonoBehaviour
                 Unit t = ResolveTargetFromAction(null, i, context.Info);
                 if (t != null || AllActions[i].targetType == TargetType.None)
                 {
-                    // Weryfikujemy, czy akcja jest fizycznie możliwa
                     bool[] tempStates = DetermineStates(unit, t);
                     if (IsActionValidForUnitAndTarget(unit, t, i, tempStates))
                     {
@@ -227,16 +456,26 @@ public class ReinforcementLearningManager : MonoBehaviour
                 {
                     ActionId = rndIdx,
                     ChosenTarget = rndTarget,
-                    ChosenStates = DetermineStates(unit, rndTarget)
+                    ChosenStates = DetermineStates(unit, rndTarget),
+                    ValidActionCount = potentialActions.Count,
+                    ForcedFallback = false
                 };
             }
-            // Fallback
-            return new ActionChoice { ActionId = (int)AttackType.FinishTurn, ChosenStates = DetermineStates(unit, null) };
+
+            return new ActionChoice
+            {
+                ActionId = (int)AttackType.FinishTurn,
+                ChosenTarget = null,
+                ChosenStates = DetermineStates(unit, null),
+                ValidActionCount = 0,
+                ForcedFallback = true
+            };
         }
 
         // 2. Eksploatacja
         float maxQ = float.MinValue;
         List<ActionChoice> bestChoices = new List<ActionChoice>();
+        int validActionsCount = 0;
 
         for (int actId = 0; actId < AllActions.Length; actId++)
         {
@@ -250,9 +489,9 @@ public class ReinforcementLearningManager : MonoBehaviour
             if (!IsActionValidForUnitAndTarget(unit, potentialTarget, actId, currentStates))
                 continue;
 
+            validActionsCount++;
             int stateIdx = EncodeState(currentStates);
 
-            // Pobieramy wartości Q ze słownika
             float[] stateQValues = GetStateQValues(context.RaceName, stateIdx);
             float q = stateQValues[actId];
 
@@ -260,38 +499,58 @@ public class ReinforcementLearningManager : MonoBehaviour
             {
                 maxQ = q;
                 bestChoices.Clear();
-                bestChoices.Add(new ActionChoice { ActionId = actId, ChosenTarget = potentialTarget, ChosenStates = currentStates });
+                bestChoices.Add(new ActionChoice
+                {
+                    ActionId = actId,
+                    ChosenTarget = potentialTarget,
+                    ChosenStates = currentStates,
+                    ValidActionCount = validActionsCount,
+                    ForcedFallback = false
+                });
             }
             else if (Mathf.Abs(q - maxQ) < 0.001f)
             {
-                bestChoices.Add(new ActionChoice { ActionId = actId, ChosenTarget = potentialTarget, ChosenStates = currentStates });
+                bestChoices.Add(new ActionChoice
+                {
+                    ActionId = actId,
+                    ChosenTarget = potentialTarget,
+                    ChosenStates = currentStates,
+                    ValidActionCount = validActionsCount,
+                    ForcedFallback = false
+                });
             }
         }
 
         if (bestChoices.Count > 0)
-            return bestChoices[UnityEngine.Random.Range(0, bestChoices.Count)];
+        {
+            ActionChoice selected = bestChoices[UnityEngine.Random.Range(0, bestChoices.Count)];
+            selected.ValidActionCount = validActionsCount;
+            return selected;
+        }
 
         return new ActionChoice
         {
             ActionId = (int)AttackType.FinishTurn,
             ChosenTarget = null,
-            ChosenStates = DetermineStates(unit, null)
+            ChosenStates = DetermineStates(unit, null),
+            ValidActionCount = 0,
+            ForcedFallback = true
         };
     }
 
     private bool IsActionValidForUnitAndTarget(Unit unit, Unit target, int actionId, bool[] states)
     {
-        if (unit == null) return false;
         var def = AllActions[actionId];
         var aType = def.attackType;
 
         bool canMove = states[(int)AIState.CanMove];
         bool canDoAction = states[(int)AIState.CanDoAction];
         bool hasRanged = states[(int)AIState.HasRangedWeapon];
-        // bool inMelee = states[(int)AIState.IsInMelee]; // USUNIĘTE
         bool inCharge = states[(int)AIState.IsInChargeRange];
         bool beyondAttack = states[(int)AIState.IsBeyondAttackRange];
         bool isLoaded = states[(int)AIState.WeaponIsLoaded];
+        bool targetBehindObstacle = states[(int)AIState.TargetBehindObstacle];
+        bool isAiming = states[(int)AIState.IsAiming];
 
         if (aType == AttackType.FinishTurn) return true;
 
@@ -311,14 +570,15 @@ public class ReinforcementLearningManager : MonoBehaviour
             case AttackType.ChangeWeaponToRanged:
                 return canDoAction && !hasRanged;
             case AttackType.Aim:
-                return canDoAction && unit.AimingBonus == 0;
+                return canDoAction && !isAiming;
             case AttackType.Charge:
-                return canMove && canDoAction && inCharge;
+                return canMove && canDoAction && inCharge && !hasRanged;
             case AttackType.AllOutAttack:
                 return canDoAction && !hasRanged && !beyondAttack;
             case AttackType.Null:
-                if (beyondAttack) return false;
-                return canDoAction;
+                if (!canDoAction || beyondAttack) return false;
+                if (hasRanged) return isLoaded && !targetBehindObstacle;
+                return true;
             default:
                 return canDoAction;
         }
@@ -337,19 +597,17 @@ public class ReinforcementLearningManager : MonoBehaviour
         return GetTargetByType(info, def.targetType);
     }
 
-    private void UpdateQ(string raceName, int oldState, int action, float reward, int newState)
+    private void UpdateQ(string raceName, int oldState, int action, float reward, int newState, bool isTerminal = false)
     {
-        // Pobieramy tablice Q dla obu stanów
+        // Pobieramy tablice Q dla obu stanow
         float[] qOldStateVals = GetStateQValues(raceName, oldState);
 
         float oldQ = qOldStateVals[action];
-        float maxQnext = GetMaxQNextMasked(raceName, newState);
-
-        if (float.IsNegativeInfinity(maxQnext)) maxQnext = 0f;
+        float maxQnext = isTerminal ? 0f : GetMaxQNextMasked(raceName, newState);
 
         float newQ = oldQ + Alpha * (reward + Gamma * maxQnext - oldQ);
 
-        // Zapisujemy nową wartość
+        // Zapisujemy nowa wartosc
         qOldStateVals[action] = newQ;
     }
 
@@ -531,10 +789,27 @@ public class ReinforcementLearningManager : MonoBehaviour
             bool[] statesNow = DetermineStates(unit, targetForNextState);
             int stateNowIndex = EncodeState(statesNow);
 
-            UpdateQ(prev.Race, prev.State, prev.Action, delayedReward, stateNowIndex);
+            float oldQ = GetStateQValues(prev.Race, prev.State)[prev.Action];
 
-            currentEpochReward += delayedReward;
-            actionsThisEpoch++;
+            if (!_isEvaluationMode)
+            {
+                UpdateQ(prev.Race, prev.State, prev.Action, delayedReward, stateNowIndex);
+                currentEpochReward += delayedReward;
+                actionsThisEpoch++;
+            }
+
+            float newQ = GetStateQValues(prev.Race, prev.State)[prev.Action];
+
+            _currentEpisodeReward += delayedReward;
+            _currentEpisodeStepCount++;
+            _globalStepIndex++;
+
+            if (Mathf.Abs(delayedReward) < 0.001f)
+            {
+                _noOpStepCount++;
+            }
+
+            LogStepRow("transition", unit, prev, stateNowIndex, delayedReward, oldQ, newQ);
             _lastStepByUnit[unit] = new LastStep { HasValue = false };
         }
 
@@ -542,6 +817,22 @@ public class ReinforcementLearningManager : MonoBehaviour
         ActionContext ctx = new ActionContext { Unit = unit, RaceName = stats.Race, Info = info };
 
         ActionChoice choice = ChooseValidActionEpsilonGreedy(ctx, unit);
+        if (choice.ForcedFallback && (unit.CanDoAction || unit.CanMove))
+        {
+            _invalidActionCount++;
+
+            LastStep fallbackStep = new LastStep
+            {
+                Race = stats.Race,
+                State = EncodeState(choice.ChosenStates),
+                Action = choice.ActionId,
+                ValidActionsCount = choice.ValidActionCount,
+                ForcedFallback = true,
+                HasValue = false
+            };
+
+            LogStepRow("fallback", unit, fallbackStep, fallbackStep.State, 0f, 0f, 0f);
+        }
 
         int prevSelfHP = stats.TempHealth;
         int prevTargetHP = 0;
@@ -562,15 +853,23 @@ public class ReinforcementLearningManager : MonoBehaviour
             Race = stats.Race,
             State = EncodeState(choice.ChosenStates),
             Action = choice.ActionId,
+            ImmediateReward = immediateReward,
             Target = choice.ChosenTarget,
             TargetExisted = targetExisted,
             PrevSelfHP = prevSelfHP,
             PrevTargetHP = prevTargetHP,
             TargetOverall = targetOverall,
+            ValidActionsCount = choice.ValidActionCount,
+            ForcedFallback = choice.ForcedFallback,
             HasValue = true
         };
 
-        if (actionsThisEpoch >= ActionsPerEpoch) AdvanceEpoch();
+        if (!_isEvaluationMode && actionsThisEpoch >= ActionsPerEpoch)
+        {
+            AdvanceEpoch();
+        }
+
+        UpdateTrainingDebugUI();
     }
 
     private void AdvanceEpoch()
@@ -591,13 +890,19 @@ public class ReinforcementLearningManager : MonoBehaviour
         else Epsilon = EpsilonEnd;
 
         SaveAverageReward(avgReward);
-        SaveQTables();
+        if (AutoSaveEveryEpochs > 0 && (currentEpoch % AutoSaveEveryEpochs == 0))
+        {
+            SaveQTables();
+        }
+
+        UpdateTrainingDebugUI();
     }
 
     private float ComputeDelayedReward(Unit unit, LastStep ls)
     {
-        float reward = 0f;
+        float reward = ls.ImmediateReward;
         var selfStats = unit.GetComponent<Stats>();
+        if (selfStats == null) return reward;
 
         int hpDiff = selfStats.TempHealth - ls.PrevSelfHP;
         if (hpDiff < 0) reward += hpDiff * 2.0f;
@@ -708,7 +1013,7 @@ public class ReinforcementLearningManager : MonoBehaviour
     // --- HELPERS ---
     private void MoveTowards(Unit unit, GameObject targetObject, int modifier = 1, bool retreat = false)
     {
-        if (modifier != 1) MovementManager.Instance.UpdateMovementRange(modifier);
+        if (modifier != 1) StartCoroutine(MovementManager.Instance.UpdateMovementRange(modifier));
         GameObject tile = retreat ? targetObject : CombatManager.Instance.GetTileAdjacentToTarget(unit.gameObject, targetObject);
         if (tile != null)
         {
@@ -766,18 +1071,45 @@ public class ReinforcementLearningManager : MonoBehaviour
             Unit u = kv.Key;
             LastStep ls = kv.Value;
 
-            if (u == null || !ls.HasValue)
+            if (!ls.HasValue)
                 continue;
 
-            TargetsInfo infoNow = GatherTargetsInfo(u);
-            Unit defaultTargetNow = infoNow != null ? infoNow.Closest : null;
-            bool[] statesNow = DetermineStates(u, defaultTargetNow);
-            int nextState = EncodeState(statesNow);
+            int nextState = ls.State;
+            float terminalReward;
 
-            UpdateQ(ls.Race, ls.State, ls.Action, terminal, nextState);
+            if (u == null)
+            {
+                terminalReward = ls.ImmediateReward + terminal;
+            }
+            else
+            {
+                TargetsInfo infoNow = GatherTargetsInfo(u);
+                Unit defaultTargetNow = infoNow != null ? infoNow.Closest : null;
+                bool[] statesNow = DetermineStates(u, defaultTargetNow);
+                nextState = EncodeState(statesNow);
+                terminalReward = ComputeDelayedReward(u, ls) + terminal;
+            }
+
+            float oldQ = GetStateQValues(ls.Race, ls.State)[ls.Action];
+
+            if (!_isEvaluationMode)
+            {
+                UpdateQ(ls.Race, ls.State, ls.Action, terminalReward, nextState, true);
+                currentEpochReward += terminalReward;
+                actionsThisEpoch++;
+            }
+
+            float newQ = GetStateQValues(ls.Race, ls.State)[ls.Action];
+
+            _currentEpisodeReward += terminalReward;
+            _currentEpisodeStepCount++;
+            _globalStepIndex++;
+
+            LogStepRow("terminal", u, ls, nextState, terminalReward, oldQ, newQ);
         }
 
         _lastStepByUnit.Clear();
+        UpdateTrainingDebugUI();
     }
 
     private Unit GetTargetByType(TargetsInfo info, TargetType t)
@@ -802,7 +1134,7 @@ public class ReinforcementLearningManager : MonoBehaviour
         {
             if (other == null) continue;
             var oStats = other.GetComponent<Stats>();
-            if (oStats == null || oStats.TempHealth < 0) continue;
+            if (oStats == null || oStats.TempHealth <= 0) continue;
             if (!IsValidTarget(currentUnit, other)) continue;
 
             float dist = Vector2.Distance(currentUnit.transform.position, other.transform.position);
@@ -1157,3 +1489,10 @@ public class ReinforcementLearningManager : MonoBehaviour
         new ActionDefinition(TargetType.None, AttackType.FinishTurn),           // 42: Zakończenie tury (czekanie)
     };
 }
+
+
+
+
+
+
+

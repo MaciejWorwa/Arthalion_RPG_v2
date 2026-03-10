@@ -1,37 +1,74 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class GameSpeedController : MonoBehaviour
 {
     [Range(1f, 100f)]
-    public float gameSpeed = 1f;  // Prędkość gry kontrolowana z inspektora
+    public float gameSpeed = 1f;
 
-    void Update()
+    private float _lastAppliedSpeed = -1f;
+    private readonly List<Animator> _uiAnimators = new List<Animator>();
+
+    private void OnEnable()
     {
-        // Ustawianie prędkości gry
-        Time.timeScale = gameSpeed;
-        if (Time.timeScale < 0.1f)
-            Time.timeScale = 0.1f;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
 
-        // Zarządzanie animatorami UI
-        if (gameSpeed >= 5)
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void Start()
+    {
+        CacheUiAnimators();
+    }
+
+    private void Update()
+    {
+        float targetTimeScale = gameSpeed < 0.1f ? 0.1f : gameSpeed;
+        Time.timeScale = targetTimeScale;
+
+        if (Mathf.Approximately(_lastAppliedSpeed, gameSpeed))
         {
-            ToggleUI(false);
+            return;
         }
-        else
-        {
-            ToggleUI(true);
-        }
+
+        _lastAppliedSpeed = gameSpeed;
+        ToggleUI(gameSpeed < 5f);
     }
 
     private void ToggleUI(bool value)
     {
-        var animators = FindObjectsByType<Animator>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var anim in animators)
+        for (int i = 0; i < _uiAnimators.Count; i++)
         {
-            if (anim.GetComponentInParent<Canvas>() != null)
+            Animator anim = _uiAnimators[i];
+            if (anim != null)
+            {
                 anim.enabled = value;
+            }
         }
+    }
+
+    private void CacheUiAnimators()
+    {
+        _uiAnimators.Clear();
+
+        Animator[] animators = FindObjectsByType<Animator>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < animators.Length; i++)
+        {
+            Animator anim = animators[i];
+            if (anim != null && anim.GetComponentInParent<Canvas>() != null)
+            {
+                _uiAnimators.Add(anim);
+            }
+        }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        CacheUiAnimators();
+        _lastAppliedSpeed = -1f;
     }
 }

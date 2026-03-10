@@ -168,7 +168,11 @@ public class UnitsManager : MonoBehaviour
         }
 
         // Pole na którym chcemy stworzyć jednostkę
-        GameObject selectedTile = GameObject.Find($"Tile {position.x - GridManager.Instance.transform.position.x} {position.y - GridManager.Instance.transform.position.y}");
+        int tileX = Mathf.RoundToInt(position.x - GridManager.Instance.transform.position.x);
+        int tileY = Mathf.RoundToInt(position.y - GridManager.Instance.transform.position.y);
+        GameObject selectedTile = (tileX >= 0 && tileY >= 0 && tileX < GridManager.Width && tileY < GridManager.Height && GridManager.Instance.Tiles[tileX, tileY] != null)
+            ? GridManager.Instance.Tiles[tileX, tileY].gameObject
+            : null;
 
         //Gdy próbujemy wczytać jednostkę na polu, które nie istnieje (bo np. siatka jest obecnie mniejsza niż siatka, na której były zapisywane jednostki) lub jest zajęte to wybiera im losową pozycję
         if ((selectedTile == null || selectedTile.GetComponent<Tile>().IsOccupied) && SaveAndLoadManager.Instance.IsLoading == true)
@@ -185,7 +189,11 @@ public class UnitsManager : MonoBehaviour
             int randomIndex = UnityEngine.Random.Range(0, availablePositions.Count);
             position = availablePositions[randomIndex];
 
-            selectedTile = GameObject.Find($"Tile {position.x - GridManager.Instance.transform.position.x} {position.y - GridManager.Instance.transform.position.y}");
+            tileX = Mathf.RoundToInt(position.x - GridManager.Instance.transform.position.x);
+            tileY = Mathf.RoundToInt(position.y - GridManager.Instance.transform.position.y);
+            selectedTile = (tileX >= 0 && tileY >= 0 && tileX < GridManager.Width && tileY < GridManager.Height && GridManager.Instance.Tiles[tileX, tileY] != null)
+                ? GridManager.Instance.Tiles[tileX, tileY].gameObject
+                : null;
         }
         else if (selectedTile == null)
         {
@@ -456,6 +464,72 @@ public class UnitsManager : MonoBehaviour
         }
 
         return newUnitObject;
+    }
+
+    public GameObject CreateUnitById(int unitId, Vector2 position, bool isPlayerUnit, string unitName = "")
+    {
+        if (_unitsDropdown == null)
+        {
+            Debug.LogError("Brak referencji do listy jednostek.");
+            return null;
+        }
+
+        if (unitId < 1 || unitId > _unitsDropdown.Buttons.Count)
+        {
+            Debug.LogError($"Nieprawidlowe unitId: {unitId}. Zakres to 1..{_unitsDropdown.Buttons.Count}.");
+            return null;
+        }
+
+        bool previousIsTileSelecting = IsTileSelecting;
+        bool previousIsSavedUnitsManaging = IsSavedUnitsManaging;
+        bool previousTagToggle = _unitTagToggle != null && _unitTagToggle.isOn;
+        bool previousLoadingState = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
+        int previousSelectedIndex = _unitsDropdown.SelectedIndex;
+        UnityEngine.UI.Button previousSelectedButton = _unitsDropdown.SelectedButton;
+        GameObject previousSelectedUnit = Unit.SelectedUnit;
+        GameObject previousLastSelectedUnit = Unit.LastSelectedUnit;
+
+        try
+        {
+            IsSavedUnitsManaging = false;
+            IsTileSelecting = true;
+
+            if (_unitTagToggle != null)
+            {
+                _unitTagToggle.isOn = isPlayerUnit;
+            }
+
+            if (SaveAndLoadManager.Instance != null)
+            {
+                SaveAndLoadManager.Instance.IsLoading = false;
+            }
+
+            _unitsDropdown.SelectedIndex = unitId;
+            _unitsDropdown.SelectedButton = _unitsDropdown.Buttons[unitId - 1];
+
+            return CreateUnit(unitId, unitName, position);
+        }
+        finally
+        {
+            if (SaveAndLoadManager.Instance != null)
+            {
+                SaveAndLoadManager.Instance.IsLoading = previousLoadingState;
+            }
+
+            IsTileSelecting = previousIsTileSelecting;
+            IsSavedUnitsManaging = previousIsSavedUnitsManaging;
+
+            if (_unitTagToggle != null)
+            {
+                _unitTagToggle.isOn = previousTagToggle;
+            }
+
+            _unitsDropdown.SelectedIndex = previousSelectedIndex;
+            _unitsDropdown.SelectedButton = previousSelectedButton;
+
+            Unit.SelectedUnit = previousSelectedUnit;
+            Unit.LastSelectedUnit = previousLastSelectedUnit;
+        }
     }
 
     public void SetSavedUnitsManaging(bool value)
@@ -1569,3 +1643,4 @@ public class UnitsManager : MonoBehaviour
         return true;
     }
 }
+
