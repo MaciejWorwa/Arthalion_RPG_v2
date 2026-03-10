@@ -41,6 +41,7 @@ public class MovementManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _advantageButton;
     [SerializeField] private UnityEngine.UI.Button _dodgeButton;
     private string _retreatWay;
+    private static readonly Vector2[] PathDirections = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
 
     void Start()
     {
@@ -237,116 +238,106 @@ public class MovementManager : MonoBehaviour
     {
         bool isFlyingUnit = Unit.SelectedUnit != null && Unit.SelectedUnit.GetComponent<Unit>().IsFlying;
 
-        // Tworzy listę otwartych węzłów
         List<Node> openNodes = new List<Node>();
+        Dictionary<Vector2, Node> openNodesByPosition = new Dictionary<Vector2, Node>();
+        HashSet<Vector2> closedNodes = new HashSet<Vector2>();
 
-        // Dodaje węzeł początkowy do listy otwartych węzłów
+        int startH = CalculateDistance(start, goal);
         Node startNode = new Node
         {
             Position = start,
             G = 0,
-            H = CalculateDistance(start, goal),
-            F = 0 + CalculateDistance(start, goal),
-            Parent = default
+            H = startH,
+            F = startH,
+            Parent = null
         };
-        openNodes.Add(startNode);
 
-        // Tworzy listę zamkniętych węzłów
-        List<Vector2> closedNodes = new List<Vector2>();
+        openNodes.Add(startNode);
+        openNodesByPosition[start] = startNode;
 
         while (openNodes.Count > 0)
         {
-            // Znajduje węzeł z najmniejszym kosztem F i usuwa go z listy otwartych węzłów
-            Node current = openNodes.OrderBy(n => n.F).First();
-            openNodes.Remove(current);
+            int minIndex = 0;
+            Node current = openNodes[0];
+            for (int i = 1; i < openNodes.Count; i++)
+            {
+                Node candidate = openNodes[i];
+                if (candidate.F < current.F)
+                {
+                    minIndex = i;
+                    current = candidate;
+                }
+            }
 
-            // Dodaje bieżący węzeł do listy zamkniętych węzłów
+            openNodes.RemoveAt(minIndex);
+            openNodesByPosition.Remove(current.Position);
             closedNodes.Add(current.Position);
 
-            // Sprawdza, czy bieżący węzeł jest węzłem docelowym
             if (current.Position == goal)
             {
-                // Tworzy listę punktów i dodaje do niej węzły od węzła docelowego do początkowego
                 List<Vector2> path = new List<Vector2>();
                 Node node = current;
 
                 while (node.Position != start)
                 {
-                    path.Add(new Vector2(node.Position.x, node.Position.y));
+                    path.Add(node.Position);
                     node = node.Parent;
                 }
 
-                // Odwraca kolejność punktów w liście, aby uzyskać ścieżkę od początkowego do docelowego
                 path.Reverse();
-
                 return path;
             }
 
-            // Pobiera sąsiadów bieżącego węzła
-            List<Node> neighbors = new List<Node>();
-            neighbors.Add(new Node { Position = current.Position + Vector2.up });
-            neighbors.Add(new Node { Position = current.Position + Vector2.down });
-            neighbors.Add(new Node { Position = current.Position + Vector2.left });
-            neighbors.Add(new Node { Position = current.Position + Vector2.right });
-
-            // Przetwarza każdego sąsiada
-            foreach (Node neighbor in neighbors)
+            for (int i = 0; i < PathDirections.Length; i++)
             {
-                // Sprawdza, czy sąsiad jest w liście zamkniętych węzłów
-                if (closedNodes.Contains(neighbor.Position))
+                Vector2 neighborPosition = current.Position + PathDirections[i];
+
+                if (closedNodes.Contains(neighborPosition))
                 {
                     continue;
                 }
 
-                // Sprawdza, czy na miejscu sąsiada występuje inny collider niż tile
-                Collider2D collider = Physics2D.OverlapPoint(neighbor.Position);
-
-                if (collider != null)
+                Collider2D collider = Physics2D.OverlapPoint(neighborPosition);
+                if (collider == null)
                 {
-                    bool isTile = false;
+                    continue;
+                }
 
-                    if (collider.gameObject.CompareTag("Tile") && !collider.gameObject.GetComponent<Tile>().IsOccupied)
+                bool isTile = collider.CompareTag("Tile") && !collider.gameObject.GetComponent<Tile>().IsOccupied;
+                if (!isTile && !isFlyingUnit)
+                {
+                    continue;
+                }
+
+                int gCost = current.G + 1;
+
+                if (openNodesByPosition.TryGetValue(neighborPosition, out Node existingNode))
+                {
+                    if (gCost < existingNode.G)
                     {
-                        isTile = true;
+                        existingNode.G = gCost;
+                        existingNode.F = existingNode.G + existingNode.H;
+                        existingNode.Parent = current;
                     }
-
-                    if (isTile || isFlyingUnit)
+                }
+                else
+                {
+                    int hCost = CalculateDistance(neighborPosition, goal);
+                    Node newNode = new Node
                     {
-                        // Oblicza koszt G dla sąsiada
-                        int gCost = current.G + 1;
+                        Position = neighborPosition,
+                        G = gCost,
+                        H = hCost,
+                        F = gCost + hCost,
+                        Parent = current
+                    };
 
-                        // Sprawdza, czy sąsiad jest już na liście otwartych węzłów
-                        Node existingNode = openNodes.Find(n => n.Position == neighbor.Position);
-
-                        if (existingNode != null)
-                        {
-                            // Jeśli koszt G dla bieżącego węzła jest mniejszy niż dla istniejącego węzła, to aktualizuje go
-                            if (gCost < existingNode.G)
-                            {
-                                existingNode.G = gCost;
-                                existingNode.F = existingNode.G + existingNode.H;
-                                existingNode.Parent = current;
-                            }
-                        }
-                        else
-                        {
-                            // Jeśli sąsiad nie jest jeszcze na liście otwartych węzłów, to dodaje go
-                            Node newNode = new Node
-                            {
-                                Position = neighbor.Position,
-                                G = gCost,
-                                H = CalculateDistance(neighbor.Position, goal),
-                                F = gCost + CalculateDistance(neighbor.Position, goal),
-                                Parent = current
-                            };
-                            openNodes.Add(newNode);
-                        }
-                    }
+                    openNodes.Add(newNode);
+                    openNodesByPosition[neighborPosition] = newNode;
                 }
             }
         }
 
-        // Jeśli nie udało się znaleźć ścieżki, to zwraca pustą listę
         return new List<Vector2>();
     }
     #endregion
@@ -558,3 +549,4 @@ public class Node
     public int F; // Całkowity koszt (G + H)
     public Node Parent; // Węzeł nadrzędny w ścieżce
 }
+

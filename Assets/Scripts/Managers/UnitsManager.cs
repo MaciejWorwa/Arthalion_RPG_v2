@@ -168,7 +168,11 @@ public class UnitsManager : MonoBehaviour
         }
 
         // Pole na którym chcemy stworzyć jednostkę
-        GameObject selectedTile = GameObject.Find($"Tile {position.x - GridManager.Instance.transform.position.x} {position.y - GridManager.Instance.transform.position.y}");
+        int tileX = Mathf.RoundToInt(position.x - GridManager.Instance.transform.position.x);
+        int tileY = Mathf.RoundToInt(position.y - GridManager.Instance.transform.position.y);
+        GameObject selectedTile = (tileX >= 0 && tileY >= 0 && tileX < GridManager.Width && tileY < GridManager.Height && GridManager.Instance.Tiles[tileX, tileY] != null)
+            ? GridManager.Instance.Tiles[tileX, tileY].gameObject
+            : null;
 
         //Gdy próbujemy wczytać jednostkę na polu, które nie istnieje (bo np. siatka jest obecnie mniejsza niż siatka, na której były zapisywane jednostki) lub jest zajęte to wybiera im losową pozycję
         if ((selectedTile == null || selectedTile.GetComponent<Tile>().IsOccupied) && SaveAndLoadManager.Instance.IsLoading == true)
@@ -185,7 +189,11 @@ public class UnitsManager : MonoBehaviour
             int randomIndex = UnityEngine.Random.Range(0, availablePositions.Count);
             position = availablePositions[randomIndex];
 
-            selectedTile = GameObject.Find($"Tile {position.x - GridManager.Instance.transform.position.x} {position.y - GridManager.Instance.transform.position.y}");
+            tileX = Mathf.RoundToInt(position.x - GridManager.Instance.transform.position.x);
+            tileY = Mathf.RoundToInt(position.y - GridManager.Instance.transform.position.y);
+            selectedTile = (tileX >= 0 && tileY >= 0 && tileX < GridManager.Width && tileY < GridManager.Height && GridManager.Instance.Tiles[tileX, tileY] != null)
+                ? GridManager.Instance.Tiles[tileX, tileY].gameObject
+                : null;
         }
         else if (selectedTile == null)
         {
@@ -1557,3 +1565,4 @@ public class UnitsManager : MonoBehaviour
         return true;
     }
 }
+

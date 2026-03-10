@@ -167,6 +167,32 @@ public class GridManager : MonoBehaviour
         }
     }
 
+    public bool TryGetTileAtWorldPosition(Vector2 worldPosition, out Tile tile)
+    {
+        tile = null;
+        if (Tiles == null)
+        {
+            return false;
+        }
+
+        int x = Mathf.RoundToInt(worldPosition.x - transform.position.x);
+        int y = Mathf.RoundToInt(worldPosition.y - transform.position.y);
+
+        if (x < 0 || y < 0 || x >= Width || y >= Height)
+        {
+            return false;
+        }
+
+        tile = Tiles[x, y];
+        return tile != null;
+    }
+
+    public Tile GetTileAtWorldPosition(Vector2 worldPosition)
+    {
+        TryGetTileAtWorldPosition(worldPosition, out Tile tile);
+        return tile;
+    }
+
     public void SetAllTilesState(bool isActive)
     {
         if (Tiles == null) return;

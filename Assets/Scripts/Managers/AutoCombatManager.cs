@@ -365,9 +365,13 @@ public class AutoCombatManager : MonoBehaviour
             {
                 Vector2 pos = attackerPos + new Vector2(x, y);
 
-                GameObject tile = GameObject.Find($"Tile {pos.x - GridManager.Instance.transform.position.x} {pos.y - GridManager.Instance.transform.position.y}");
+                if (!GridManager.Instance.TryGetTileAtWorldPosition(pos, out Tile tileComponent))
+                {
+                    continue;
+                }
 
-                if (tile == null || tile.GetComponent<Tile>().IsOccupied) continue;
+                if (tileComponent.IsOccupied) continue;
+                GameObject tile = tileComponent.gameObject;
 
                 List<Vector2> path = MovementManager.Instance.FindPath(attackerPos, pos);
 
@@ -446,3 +450,5 @@ public class AutoCombatManager : MonoBehaviour
     }
 
 }
+
+

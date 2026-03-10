@@ -8,6 +8,7 @@ using SimpleFileBrowser;
 using UnityEngine.SceneManagement;
 using System.IO;
 using System.Linq;
+using System;
 
 public class GameManager : MonoBehaviour
 {
@@ -32,6 +33,8 @@ public class GameManager : MonoBehaviour
             // Jeśli instancja już istnieje, a próbujemy utworzyć kolejną, niszczymy nadmiarową
             Destroy(gameObject);
         }
+
+        _uiLayer = LayerMask.NameToLayer("UI");
     }
 
     [Header("Tryby gry")]
@@ -74,6 +77,13 @@ public class GameManager : MonoBehaviour
 
     [Header("Panele")]
     public GameObject[] activePanels;
+
+    private readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>(16);
+    private PointerEventData _pointerEventData;
+    private TMP_InputField[] _cachedInputFields = Array.Empty<TMP_InputField>();
+    private float _nextInputFieldsRefreshTime;
+    private const float InputFieldsRefreshInterval = 0.1f;
+    private int _uiLayer = -1;
     [SerializeField] private GameObject _mainMenuPanel;
     [SerializeField] private GameObject _tileCoveringPanel; //Panel z informacją o trybie ukrywania mapy
 
@@ -320,20 +330,26 @@ public class GameManager : MonoBehaviour
     }
     public bool IsPointerOverUI()
     {
-        // Tworzenie promienia od pozycji myszki
-        PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current)
+        if (EventSystem.current == null)
         {
-            position = Input.mousePosition
-        };
+            return false;
+        }
 
-        List<RaycastResult> results = new List<RaycastResult>();
-        // Wykonywanie promieniowania i dodawanie wyników do listy
-        EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
-
-        foreach (RaycastResult result in results)
+        if (_pointerEventData == null)
         {
-            // Sprawdzanie, czy warstwa obiektu to UI
-            if (result.gameObject.layer == LayerMask.NameToLayer("UI"))
+            _pointerEventData = new PointerEventData(EventSystem.current);
+        }
+
+        _pointerEventData.Reset();
+        _pointerEventData.position = Input.mousePosition;
+
+        _uiRaycastResults.Clear();
+        EventSystem.current.RaycastAll(_pointerEventData, _uiRaycastResults);
+
+        for (int i = 0; i < _uiRaycastResults.Count; i++)
+        {
+            RaycastResult result = _uiRaycastResults[i];
+            if (result.gameObject != null && result.gameObject.layer == _uiLayer)
             {
                 return true;
             }
@@ -727,15 +743,43 @@ public class GameManager : MonoBehaviour
 
     public bool IsAnyInputFieldFocused()
     {
-        TMP_InputField[] inputFields = FindObjectsByType<TMP_InputField>(FindObjectsSortMode.None);
-
-        if(inputFields.Length < 1) return false;
-
-        foreach (TMP_InputField inputField in inputFields)
+        if (_cachedInputFields == null ||
+            _cachedInputFields.Length == 0 ||
+            Time.unscaledTime >= _nextInputFieldsRefreshTime ||
+            HasMissingInputFieldReference())
         {
-            if (inputField.isFocused) return true; // Zwraca true, jeśli którykolwiek z input fields ma focus
+            RefreshInputFieldCache();
         }
-        return false; // Zwraca false, jeśli żaden z input fields nie ma focus
+
+        for (int i = 0; i < _cachedInputFields.Length; i++)
+        {
+            TMP_InputField inputField = _cachedInputFields[i];
+            if (inputField != null && inputField.isFocused)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasMissingInputFieldReference()
+    {
+        for (int i = 0; i < _cachedInputFields.Length; i++)
+        {
+            if (_cachedInputFields[i] == null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void RefreshInputFieldCache()
+    {
+        _cachedInputFields = FindObjectsByType<TMP_InputField>(FindObjectsSortMode.None);
+        _nextInputFieldsRefreshTime = Time.unscaledTime + InputFieldsRefreshInterval;
     }
 
     public void QuitGame()
@@ -750,3 +794,7 @@ public class GameManager : MonoBehaviour
         Application.Quit();
     }
 }
+
+
+
+
