@@ -466,6 +466,72 @@ public class UnitsManager : MonoBehaviour
         return newUnitObject;
     }
 
+    public GameObject CreateUnitById(int unitId, Vector2 position, bool isPlayerUnit, string unitName = "")
+    {
+        if (_unitsDropdown == null)
+        {
+            Debug.LogError("Brak referencji do listy jednostek.");
+            return null;
+        }
+
+        if (unitId < 1 || unitId > _unitsDropdown.Buttons.Count)
+        {
+            Debug.LogError($"Nieprawidlowe unitId: {unitId}. Zakres to 1..{_unitsDropdown.Buttons.Count}.");
+            return null;
+        }
+
+        bool previousIsTileSelecting = IsTileSelecting;
+        bool previousIsSavedUnitsManaging = IsSavedUnitsManaging;
+        bool previousTagToggle = _unitTagToggle != null && _unitTagToggle.isOn;
+        bool previousLoadingState = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
+        int previousSelectedIndex = _unitsDropdown.SelectedIndex;
+        UnityEngine.UI.Button previousSelectedButton = _unitsDropdown.SelectedButton;
+        GameObject previousSelectedUnit = Unit.SelectedUnit;
+        GameObject previousLastSelectedUnit = Unit.LastSelectedUnit;
+
+        try
+        {
+            IsSavedUnitsManaging = false;
+            IsTileSelecting = true;
+
+            if (_unitTagToggle != null)
+            {
+                _unitTagToggle.isOn = isPlayerUnit;
+            }
+
+            if (SaveAndLoadManager.Instance != null)
+            {
+                SaveAndLoadManager.Instance.IsLoading = false;
+            }
+
+            _unitsDropdown.SelectedIndex = unitId;
+            _unitsDropdown.SelectedButton = _unitsDropdown.Buttons[unitId - 1];
+
+            return CreateUnit(unitId, unitName, position);
+        }
+        finally
+        {
+            if (SaveAndLoadManager.Instance != null)
+            {
+                SaveAndLoadManager.Instance.IsLoading = previousLoadingState;
+            }
+
+            IsTileSelecting = previousIsTileSelecting;
+            IsSavedUnitsManaging = previousIsSavedUnitsManaging;
+
+            if (_unitTagToggle != null)
+            {
+                _unitTagToggle.isOn = previousTagToggle;
+            }
+
+            _unitsDropdown.SelectedIndex = previousSelectedIndex;
+            _unitsDropdown.SelectedButton = previousSelectedButton;
+
+            Unit.SelectedUnit = previousSelectedUnit;
+            Unit.LastSelectedUnit = previousLastSelectedUnit;
+        }
+    }
+
     public void SetSavedUnitsManaging(bool value)
     {
         IsSavedUnitsManaging = value;
