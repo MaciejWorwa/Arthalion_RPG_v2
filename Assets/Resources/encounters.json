@@ -1,0 +1,830 @@
+﻿{
+    "Encounters":  [
+                       {
+                           "Name":  "Demoniczna wataha",
+                           "Weight":  18,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Demon",
+                                               "Weight":  18,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Pomiot Kainera",
+                                               "Weight":  42,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Krwiożerczy Ogar",
+                                               "Weight":  40,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Nieumarła horda",
+                           "Weight":  16,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Krwiożerczy Ogar",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Zombie",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Pomiot Kainera",
+                                               "Weight":  25,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Bandyci",
+                           "Weight":  14,
+                           "MaxUnits":  4,
+                           "Members":  [
+                                           {
+                                               "Race":  "Oprych",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0.30,
+                                               "Mounts":  [
+                                                              {
+                                                                  "Race":  "Koń",
+                                                                  "Weight":  100
+                                                              }
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Drimharowie",
+                           "Weight":  12,
+                           "MaxUnits":  4,
+                           "Members":  [
+                                           {
+                                               "Race":  "Drimhar",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0.4,
+                                               "Mounts":  [
+                                                              {
+                                                                  "Race":  "Mamut",
+                                                                  "Weight":  65
+                                                              },
+                                                              {
+                                                                  "Race":  "Nosorożec Włochaty",
+                                                                  "Weight":  35
+                                                              }
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Upiorna sfora",
+                           "Weight":  12,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Krwiożerczy Ogar",
+                                               "Weight":  70,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Upiór",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Bagienne plugastwo",
+                           "Weight":  16,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Bagienny Golem",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Torfun",
+                                               "Weight":  35,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Topielica",
+                                               "Weight":  35,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Lodowe bestie",
+                           "Weight":  12,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Lodowy Golem",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Hasai",
+                                               "Weight":  55,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Górskie wynaturzenia",
+                           "Weight":  14,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Morgras",
+                                               "Weight":  40,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0.35,
+                                               "Mounts":  [
+                                                              {
+                                                                  "Race":  "Wargul",
+                                                                  "Weight":  100
+                                                              }
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Wargul",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Troll górski",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Cienie nieumarłych",
+                           "Weight":  12,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Duch",
+                                               "Weight":  40,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Nienazwany",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Upiór",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Murahini",
+                           "Weight":  16,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Murahiński Barbarzyńca",
+                                               "Weight":  43,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0.4,
+                                               "Mounts":  [
+                                                              {
+                                                                  "Race":  "Olbrzymi Pająk",
+                                                                  "Weight":  66
+                                                              },
+                                                              {
+                                                                  "Race":  "Olbrzymi Skorpion",
+                                                                  "Weight":  34
+                                                              }
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Murahiński Szaman",
+                                               "Weight":  22,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Olbrzymi Pająk",
+                                               "Weight":  20,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Olbrzymi Skorpion",
+                                               "Weight":  15,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Druidyczne ciernie",
+                           "Weight":  11,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Druid",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Pokutnik",
+                                               "Weight":  30,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Żmijorośl",
+                                               "Weight":  25,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Leśne ostępy",
+                           "Weight":  11,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Druid",
+                                               "Weight":  35,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Skamielec",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Żmijorośl",
+                                               "Weight":  20,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Żywiołaki wody",
+                           "Weight":  10,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Żywiołak Wody",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Topielica",
+                                               "Weight":  55,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Żywiołaki ziemi",
+                           "Weight":  10,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Żywiołak Ziemi",
+                                               "Weight":  45,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Bagienny Golem",
+                                               "Weight":  55,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Żywiołaki ognia",
+                           "Weight":  10,
+                           "MaxUnits":  5,
+                           "Members":  [
+                                           {
+                                               "Race":  "Żywiołak Ognia",
+                                               "Weight":  50,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           },
+                                           {
+                                               "Race":  "Magmowy Golem",
+                                               "Weight":  50,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Wilki",
+                           "Weight":  9,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Wilk",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Duchy",
+                           "Weight":  9,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Duch",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Nienazwani",
+                           "Weight":  9,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Nienazwany",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Ludzie",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Człowiek",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Elfy",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Elf",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Gnomy",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Gnom",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Krasnoludy",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Krasnolud",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Dziki",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Dzik",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Gobliny",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Goblin",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Kamienne Golemy",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Kamienny Golem",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Koszmary",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Koszmar",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Krwiopije",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Krwiopij",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Kurhańce",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Kurhaniec",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Licze",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Licz",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Niedźwiedzie",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Niedźwiedź",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Pożeracze Dusz",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Pożeracz Dusz",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Smoki",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Smok",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Szczury",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Szczur",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Szkielety",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Szkielet",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Trolle leśne",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Troll leśny",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Xit'lanie",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Xit'lan",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Żywiołaki Lodu",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Żywiołak Lodu",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       },
+                       {
+                           "Name":  "Żywiołaki Powietrza",
+                           "Weight":  8,
+                           "MaxUnits":  6,
+                           "Members":  [
+                                           {
+                                               "Race":  "Żywiołak Powietrza",
+                                               "Weight":  100,
+                                               "CanAppearOnFoot":  true,
+                                               "MountedChance":  0,
+                                               "Mounts":  [
+
+                                                          ]
+                                           }
+                                       ]
+                       }
+                   ]
+}

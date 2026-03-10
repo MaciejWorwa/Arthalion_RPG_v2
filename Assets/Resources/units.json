@@ -190,7 +190,7 @@
         }
       ],
       "Resistance": [ "Ice" ],
-      "Unaffected":  [ "Poison" ],
+      "Unaffected": [ "Poison" ],
       "S": 1,
       "K": 3,
       "Zw": 4,
@@ -495,6 +495,44 @@
       "Endurance": 3,
       "Dodge": 2,
       "MeleeCombat": 2
+    },
+    {
+      "Race": "Murahiński Barbarzyńca",
+      "Type": "Humanoid",
+      "Size": 2,
+      "PrimaryWeaponNames": [ "Włócznia", "Topór", "Topór dwuręczny", "Glewia", "Kiścień", "Sieć", "Oszczep", "Łuk", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
+      "S": 3,
+      "K": 3,
+      "Zw": 1,
+      "Zr": 0,
+      "Int": -2,
+      "P": 0,
+      "Ch": -3,
+      "SW": 1,
+      "Sz": 4,
+      "MeleeCombat": 4,
+      "RangedCombat": 2,
+      "Pitiless": 1,
+      "Endurance": 2,
+      "Dodge": 2,
+      "Cool": 2
+    },
+    {
+      "Race": "Murahiński Szaman",
+      "Type": "Humanoid",
+      "Size": 2,
+      "PrimaryWeaponNames": [ "Kostur", "Sztylet" ],
+      "S": 0,
+      "K": 2,
+      "Zw": -2,
+      "Zr": 0,
+      "Int": 3,
+      "P": 0,
+      "Ch": -1,
+      "SW": 4,
+      "Sz": 4,
+      "Spellcasting": 3,
+      "Endurance": 2
     },
     {
       "Race": "Niedźwiedź",
@@ -1009,7 +1047,7 @@
       "MeleeCombat": 3,
       "Reflex": 2,
       "Dodge": 2,
-      "Flight":  6
+      "Flight": 6
     },
     {
       "Race": "Złodziej Myśli",

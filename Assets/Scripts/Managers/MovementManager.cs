@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -387,7 +387,7 @@ public class MovementManager : MonoBehaviour
 
     public IEnumerator UpdateMovementRange(int modifier, Unit unit = null, bool isCharging = false, bool isFlying = false)
     {
-        if (Unit.SelectedUnit != null)
+        if (unit == null && Unit.SelectedUnit != null)
         {
             unit = Unit.SelectedUnit.GetComponent<Unit>();
         }
@@ -549,4 +549,6 @@ public class Node
     public int F; // Całkowity koszt (G + H)
     public Node Parent; // Węzeł nadrzędny w ścieżce
 }
+
+
 

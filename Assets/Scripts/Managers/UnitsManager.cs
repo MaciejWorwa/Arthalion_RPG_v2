@@ -1,4 +1,4 @@
-using NUnit.Framework.Internal;
+﻿using NUnit.Framework.Internal;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -589,49 +589,80 @@ public class UnitsManager : MonoBehaviour
         }
         else if (unitObject == Unit.SelectedUnit)
         {
-            unitObject.GetComponent<Unit>().SelectUnit();
+            unitObject.GetComponent<Unit>()?.SelectUnit();
+        }
+
+        if (unitObject == null)
+        {
+            return;
         }
 
         Unit unit = unitObject.GetComponent<Unit>();
-        Stats stats = unit.Stats;
+        if (unit == null)
+        {
+            Destroy(unitObject);
+            return;
+        }
 
-        //Usunięcie jednostki z kolejki inicjatywy
+        Stats stats = unit.Stats != null ? unit.Stats : unitObject.GetComponent<Stats>();
+        if (stats != null)
+        {
+            unit.Stats = stats;
+        }
+
+        //Usuniecie jednostki z kolejki inicjatywy
         InitiativeQueueManager.Instance.RemoveUnitFromInitiativeQueue(unit);
 
-        //Uwolnienie jednostki uwięzionej przez jednostkę, która umiera
+        //Uwolnienie jednostki uwiezionej przez jednostke, ktora umiera
         if (unit.EntangledUnitId != 0)
         {
             foreach (var u in AllUnits)
             {
-                if (u.UnitId == unit.GetComponent<Unit>().EntangledUnitId && u.Entangled)
+                if (u != null && u.UnitId == unit.EntangledUnitId && u.Entangled)
                 {
                     u.Entangled = false;
                 }
             }
         }
 
-        // Jeśli umiera jednostka Straszna to należy zaktualizować stan Strachu u przeciwników
-        if (stats.Scary > 0) StartCoroutine(ScaryUnitDeath(unit));
-
-        if (unit.IsMounted && unit.Mount != null && !SaveAndLoadManager.Instance.IsLoading && (AreaSelector.Instance.SelectedUnits == null || !AreaSelector.Instance.SelectedUnits.Contains(unit)))
+        // Jesli umiera jednostka Straszna to nalezy zaktualizowac stan Strachu u przeciwnikow
+        if (stats != null && stats.Scary > 0)
         {
-            unit.Mount.transform.SetParent(GameObject.Find("----------Units-------------------").transform);
+            StartCoroutine(ScaryUnitDeath(unit));
+        }
+
+        bool isLoading = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
+        bool unitSelectedInArea = AreaSelector.Instance != null &&
+                                  AreaSelector.Instance.SelectedUnits != null &&
+                                  AreaSelector.Instance.SelectedUnits.Contains(unit);
+
+        if (unit.IsMounted && unit.Mount != null && !isLoading && !unitSelectedInArea)
+        {
+            Transform unitsRoot = GameObject.Find("----------Units-------------------")?.transform;
+            if (unitsRoot != null)
+            {
+                unit.Mount.transform.SetParent(unitsRoot);
+            }
+
             InitiativeQueueManager.Instance.AddUnitToInitiativeQueue(unit.Mount);
             unit.Mount.gameObject.SetActive(true);
             unit.Mount.HasRider = false;
         }
 
-        //Aktualizuje kolejkę inicjatywy
+        //Aktualizuje kolejke inicjatywy
         InitiativeQueueManager.Instance.UpdateInitiativeQueue();
 
-        //Usuwa jednostkę z listy wszystkich jednostek
+        //Usuwa jednostke z listy wszystkich jednostek
         AllUnits.Remove(unit);
 
-        //Resetuje Tile, żeby nie było uznawane jako zajęte
-        GridManager.Instance.ResetTileOccupancy(unit.transform.position);
+        //Resetuje Tile, zeby nie bylo uznawane jako zajete
+        if (GridManager.Instance != null)
+        {
+            GridManager.Instance.ResetTileOccupancy(unit.transform.position);
+        }
 
-        // Aktualizuje osiągnięcia
-        if (unit.LastAttackerStats != null)
+        // Aktualizuje osiagniecia
+        if (unit.LastAttackerStats != null && stats != null)
         {
             unit.LastAttackerStats.OpponentsKilled++;
             if (unit.LastAttackerStats.StrongestDefeatedOpponentOverall < stats.Overall)
@@ -640,7 +671,7 @@ public class UnitsManager : MonoBehaviour
                 unit.LastAttackerStats.StrongestDefeatedOpponent = stats.Name;
             }
 
-            // Uwzględnia cechę Żarłoczny
+            // Uwzglednia ceche Zarloczny
             if (unit.LastAttackerStats.Hungry)
             {
                 StartCoroutine(HungryTrait(unit.LastAttackerStats, stats));
@@ -650,7 +681,10 @@ public class UnitsManager : MonoBehaviour
         Destroy(unitObject);
 
         //Resetuje kolor przycisku usuwania jednostek
-        _removeUnitButton.GetComponent<UnityEngine.UI.Image>().color = Color.white;
+        if (_removeUnitButton != null)
+        {
+            _removeUnitButton.GetComponent<UnityEngine.UI.Image>().color = Color.white;
+        }
     }
 
     private IEnumerator ScaryUnitDeath(Unit deadUnit)
@@ -1643,4 +1677,7 @@ public class UnitsManager : MonoBehaviour
         return true;
     }
 }
+
+
+
 

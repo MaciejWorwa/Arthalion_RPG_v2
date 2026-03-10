@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -264,35 +264,52 @@ public class MountsManager : MonoBehaviour
 
     public void UpdateMountButtonColor()
     {
-        if (Unit.SelectedUnit == null) return;
-        Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
-
-        if (unit.IsMounted && unit.Mount != null)
-        {
-            _mountButton.GetComponent<UnityEngine.UI.Image>().color = UnityEngine.Color.green;
-
-            //Wyświetla ikonkę wierzchowca przy tokenie jednostki
-            Unit.SelectedUnit.transform.Find("Canvas/Mount_image").gameObject.SetActive(true);
-            Unit.SelectedUnit.transform.Find("Canvas/Mount_image").GetComponent<UIButtonTooltip>().ChangeTooltipText(unit.Mount.GetComponent<Stats>().Name);
-        }
-        else
+        if (_mountButton != null)
         {
             _mountButton.GetComponent<UnityEngine.UI.Image>().color = UnityEngine.Color.white;
+        }
 
-            //Ukrywa ikonkę wierzchowca przy tokenie jednostki
-            Unit.SelectedUnit.transform.Find("Canvas/Mount_image").gameObject.SetActive(false);
+        if (Unit.SelectedUnit == null) return;
+
+        Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
+        if (unit == null) return;
+
+        if (_mountButton != null)
+        {
+            _mountButton.GetComponent<UnityEngine.UI.Image>().color =
+                unit.IsMounted && unit.Mount != null ? UnityEngine.Color.green : UnityEngine.Color.white;
+        }
+
+        UpdateMountIcon(unit);
+    }
+
+    public void UpdateMountIcon(Unit unit)
+    {
+        if (unit == null) return;
+
+        Transform iconTransform = unit.transform.Find("Canvas/Mount_image");
+        if (iconTransform == null) return;
+
+        bool showIcon = unit.IsMounted && unit.Mount != null;
+        iconTransform.gameObject.SetActive(showIcon);
+
+        if (!showIcon) return;
+
+        UIButtonTooltip tooltip = iconTransform.GetComponent<UIButtonTooltip>();
+        Stats mountStats = unit.Mount.GetComponent<Stats>();
+        if (tooltip != null && mountStats != null)
+        {
+            tooltip.ChangeTooltipText(mountStats.Name);
         }
     }
 
     public void DisplayAllMountIcons()
     {
+        if (InitiativeQueueManager.Instance == null) return;
+
         foreach (var pair in InitiativeQueueManager.Instance.InitiativeQueue)
         {
-            if (pair.Key.IsMounted && pair.Key.Mount != null)
-            {
-                pair.Key.transform.Find("Canvas/Mount_image").gameObject.SetActive(true);
-                pair.Key.transform.Find("Canvas/Mount_image").GetComponent<UIButtonTooltip>().ChangeTooltipText(pair.Key.Mount.GetComponent<Stats>().Name);
-            }
+            UpdateMountIcon(pair.Key);
         }
     }
 
@@ -313,3 +330,5 @@ public class MountsManager : MonoBehaviour
         _mountButton.gameObject.SetActive(value);
     }
 }
+
+

@@ -23,8 +23,9 @@ public class DungeonGenerator : MonoBehaviour
     private class EnemyTemplate
     {
         public int UnitId;
-        public string Race;
+        public string Race = string.Empty;
         public int EstimatedOverall;
+        public int Size;
     }
 
     private class EnemySpawnCandidate
@@ -35,6 +36,77 @@ public class DungeonGenerator : MonoBehaviour
         public int Diff;
         public int Score;
         public bool InTolerance;
+    }
+
+    [Serializable]
+    private class EncounterCatalog
+    {
+        public EncounterGroupData[] Encounters = Array.Empty<EncounterGroupData>();
+    }
+
+    [Serializable]
+    private class EncounterGroupData
+    {
+        public string Name = string.Empty;
+        public int Weight = 1;
+        public int MinUnits = 1;
+        public int MaxUnits = 6;
+        public EncounterMemberData[] Members = Array.Empty<EncounterMemberData>();
+    }
+
+    [Serializable]
+    private class EncounterMemberData
+    {
+        public string Race = string.Empty;
+        public int Weight = 1;
+        public bool CanAppearOnFoot = true;
+        public float MountedChance = 0f;
+        public EncounterMountData[] Mounts = Array.Empty<EncounterMountData>();
+    }
+
+    [Serializable]
+    private class EncounterMountData
+    {
+        public string Race = string.Empty;
+        public int Weight = 1;
+    }
+
+    private class EncounterGroupRuntime
+    {
+        public string Name = string.Empty;
+        public int Weight;
+        public int MinUnits;
+        public int MaxUnits;
+        public List<EncounterMemberRuntime> Members = new List<EncounterMemberRuntime>();
+    }
+
+    private class EncounterMemberRuntime
+    {
+        public EnemyTemplate Template;
+        public int Weight;
+        public bool CanAppearOnFoot;
+        public float MountedChance;
+        public List<EnemyTemplate> MountTemplates = new List<EnemyTemplate>();
+        public List<int> MountWeights = new List<int>();
+    }
+
+    private class PlannedEnemySpawn
+    {
+        public EnemyTemplate RiderTemplate;
+        public EnemyTemplate MountTemplate;
+        public bool IsMounted;
+        public int PredictedOverall;
+    }
+
+    private class EncounterSpawnCandidate
+    {
+        public EncounterGroupRuntime Group;
+        public List<PlannedEnemySpawn> Spawns = new List<PlannedEnemySpawn>();
+        public int PredictedOverall;
+        public int Diff;
+        public int Score;
+        public bool InTolerance;
+        public int TileUsage;
     }
 
     [Header("Rooms")]
@@ -72,7 +144,13 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField, Min(1)] private int _maxGeneratedEnemies = 6;
     [SerializeField] private bool _includePlayableRacesAsEnemies = false;
     [SerializeField, Range(1, 8)] private int _enemySelectionTopCandidates = 4;
+    [SerializeField] private bool _useEncounterGroups = true;
+    [SerializeField] private string _encountersResourceName = "encounters";
+    [SerializeField, Range(0f, 1f)] private float _mountedOverallContribution = 0.35f;
+    [SerializeField, Min(1)] private int _encounterBuildAttemptsPerGroup = 24;
+    [SerializeField] private List<string> _disallowedStandaloneEnemyRaces = new List<string> { "Koń", "Kuc" };
     private int _lastGeneratedEnemyUnitId = -1;
+    private string _lastGeneratedEncounterName = string.Empty;
     public void GenerateDungeonFromButton()
     {
         if (_seedInputField != null && int.TryParse(_seedInputField.text, out int parsedSeed))
@@ -131,7 +209,7 @@ public class DungeonGenerator : MonoBehaviour
         RemoveUnitsOutsideDungeonIfNeeded();
         GenerateEnemiesByPlayerStrength(rng);
 
-        Debug.Log($"<color=green>Wygenerowano dungeon. Seed: {seedToUse}, liczba pokoi: {rooms.Count}.</color>");
+        Debug.Log($"<color=green>Wygenerowano losową mapę. Seed: {seedToUse}, liczba pomieszczeń: {rooms.Count}.</color>");
     }
 
     public void RestoreFullGrid()
@@ -141,7 +219,7 @@ public class DungeonGenerator : MonoBehaviour
         GridManager.Instance.SetAllTilesState(true);
         GridManager.Instance.CheckTileOccupancy();
 
-        Debug.Log("Przywrócono pełną prostokątną siatkę.");
+        Debug.Log("Przywrócono pełną siatkę.");
     }
 
     private void NormalizeSettings(int width, int height)
@@ -497,15 +575,66 @@ public class DungeonGenerator : MonoBehaviour
         int toleranceAbs = Mathf.RoundToInt(targetOverall * Mathf.Clamp01(_overallTolerance));
         int minTargetOverall = Mathf.Max(1, targetOverall - toleranceAbs);
         int maxTargetOverall = targetOverall + toleranceAbs;
+
+        bool generated = false;
+
+        if (_useEncounterGroups)
+        {
+            generated = TryGenerateEnemiesFromEncounterGroups(
+                rng,
+                templates,
+                availablePositions,
+                minEnemies,
+                maxSpawnBySpace,
+                targetOverall,
+                toleranceAbs,
+                minTargetOverall,
+                maxTargetOverall
+            );
+        }
+
+        if (!generated)
+        {
+            GenerateEnemiesSingleTypeFallback(
+                rng,
+                templates,
+                availablePositions,
+                minEnemies,
+                maxSpawnBySpace,
+                targetOverall,
+                toleranceAbs,
+                minTargetOverall,
+                maxTargetOverall
+            );
+        }
+    }
+
+    private void GenerateEnemiesSingleTypeFallback(
+        System.Random rng,
+        List<EnemyTemplate> templates,
+        List<Vector2> availablePositions,
+        int minEnemies,
+        int maxSpawnBySpace,
+        int targetOverall,
+        int toleranceAbs,
+        int minTargetOverall,
+        int maxTargetOverall)
+    {
+        if (templates == null || templates.Count == 0 || availablePositions == null || availablePositions.Count == 0) return;
+
         EnemyTemplate selectedTemplate = null;
         int selectedCount = 1;
+        HashSet<string> blockedStandaloneRaces = BuildDisallowedStandaloneRaceSet();
 
         List<EnemySpawnCandidate> allCandidates = new List<EnemySpawnCandidate>();
 
-        // Wybieramy JEDEN typ przeciwnika i liczbę jego kopii (1..N).
+        // Fallback: jeden typ przeciwnika i liczba jego kopii (1..N).
         for (int i = 0; i < templates.Count; i++)
         {
             EnemyTemplate template = templates[i];
+            if (template == null) continue;
+            if (IsStandaloneRaceBlocked(template.Race, blockedStandaloneRaces)) continue;
+
             int estimated = Mathf.Max(1, template.EstimatedOverall);
 
             for (int count = 1; count <= maxSpawnBySpace; count++)
@@ -518,24 +647,20 @@ public class DungeonGenerator : MonoBehaviour
 
                 int score = diff;
 
-                // Mocno karzemy przeszacowanie ponad tolerancję.
                 if (predictedOverall > maxTargetOverall)
                 {
                     score += (predictedOverall - maxTargetOverall) * 3;
                 }
-                // Lekką karą traktujemy zbyt niski poziom.
                 else if (predictedOverall < minTargetOverall)
                 {
                     score += (minTargetOverall - predictedOverall);
                 }
 
-                // Delikatna preferencja dla kilku takich samych jednostek.
                 if (count == 1)
                 {
                     score += Mathf.Max(1, targetOverall / 20);
                 }
 
-                // Delikatnie unikamy ciągle tego samego typu, gdy są podobne alternatywy.
                 if (template.UnitId == _lastGeneratedEnemyUnitId)
                 {
                     score += Mathf.Max(5, targetOverall / 8);
@@ -553,109 +678,96 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
-        if (allCandidates.Count > 0)
+        if (allCandidates.Count == 0)
         {
-            // Zostawiamy najlepszy wariant dla każdego typu jednostki.
-            Dictionary<int, EnemySpawnCandidate> bestPerType = new Dictionary<int, EnemySpawnCandidate>();
-            for (int i = 0; i < allCandidates.Count; i++)
-            {
-                EnemySpawnCandidate candidate = allCandidates[i];
-                int unitId = candidate.Template.UnitId;
-
-                if (!bestPerType.TryGetValue(unitId, out EnemySpawnCandidate existing))
-                {
-                    bestPerType[unitId] = candidate;
-                    continue;
-                }
-
-                bool better = false;
-                if (candidate.Score < existing.Score) better = true;
-                else if (candidate.Score == existing.Score)
-                {
-                    if (candidate.InTolerance && !existing.InTolerance) better = true;
-                    else if (candidate.InTolerance == existing.InTolerance)
-                    {
-                        if (candidate.Diff < existing.Diff) better = true;
-                        else if (candidate.Diff == existing.Diff && candidate.Count > existing.Count) better = true;
-                    }
-                }
-
-                if (better)
-                {
-                    bestPerType[unitId] = candidate;
-                }
-            }
-
-            List<EnemySpawnCandidate> candidates = new List<EnemySpawnCandidate>(bestPerType.Values);
-            candidates.Sort((a, b) =>
-            {
-                int scoreCmp = a.Score.CompareTo(b.Score);
-                if (scoreCmp != 0) return scoreCmp;
-
-                if (a.InTolerance != b.InTolerance)
-                {
-                    return a.InTolerance ? -1 : 1;
-                }
-
-                int diffCmp = a.Diff.CompareTo(b.Diff);
-                if (diffCmp != 0) return diffCmp;
-
-                return b.Count.CompareTo(a.Count);
-            });
-
-            int top = Mathf.Clamp(_enemySelectionTopCandidates, 1, candidates.Count);
-            int totalWeight = 0;
-            for (int i = 0; i < top; i++)
-            {
-                totalWeight += (top - i);
-            }
-
-            int roll = rng.Next(0, totalWeight);
-            int acc = 0;
-            int selectedIndex = 0;
-            for (int i = 0; i < top; i++)
-            {
-                acc += (top - i);
-                if (roll < acc)
-                {
-                    selectedIndex = i;
-                    break;
-                }
-            }
-
-            EnemySpawnCandidate chosen = candidates[selectedIndex];
-            selectedTemplate = chosen.Template;
-            selectedCount = chosen.Count;
-            _lastGeneratedEnemyUnitId = selectedTemplate.UnitId;
-        }
-
-        if (selectedTemplate == null)
-        {
-            Debug.LogWarning("Nie udało się dobrać żadnego wariantu przeciwników.");
+            Debug.LogWarning("Fallback single-type: brak poprawnych kandydatów przeciwników.");
             return;
         }
+
+        Dictionary<int, EnemySpawnCandidate> bestPerType = new Dictionary<int, EnemySpawnCandidate>();
+        for (int i = 0; i < allCandidates.Count; i++)
+        {
+            EnemySpawnCandidate candidate = allCandidates[i];
+            int unitId = candidate.Template.UnitId;
+
+            if (!bestPerType.TryGetValue(unitId, out EnemySpawnCandidate existing))
+            {
+                bestPerType[unitId] = candidate;
+                continue;
+            }
+
+            bool better = false;
+            if (candidate.Score < existing.Score) better = true;
+            else if (candidate.Score == existing.Score)
+            {
+                if (candidate.InTolerance && !existing.InTolerance) better = true;
+                else if (candidate.InTolerance == existing.InTolerance)
+                {
+                    if (candidate.Diff < existing.Diff) better = true;
+                    else if (candidate.Diff == existing.Diff && candidate.Count > existing.Count) better = true;
+                }
+            }
+
+            if (better)
+            {
+                bestPerType[unitId] = candidate;
+            }
+        }
+
+        List<EnemySpawnCandidate> candidates = new List<EnemySpawnCandidate>(bestPerType.Values);
+        candidates.Sort((a, b) =>
+        {
+            int scoreCmp = a.Score.CompareTo(b.Score);
+            if (scoreCmp != 0) return scoreCmp;
+
+            if (a.InTolerance != b.InTolerance)
+            {
+                return a.InTolerance ? -1 : 1;
+            }
+
+            int diffCmp = a.Diff.CompareTo(b.Diff);
+            if (diffCmp != 0) return diffCmp;
+
+            return b.Count.CompareTo(a.Count);
+        });
+
+        int top = Mathf.Clamp(_enemySelectionTopCandidates, 1, candidates.Count);
+        int totalWeight = 0;
+        for (int i = 0; i < top; i++)
+        {
+            totalWeight += (top - i);
+        }
+
+        int roll = rng.Next(0, totalWeight);
+        int acc = 0;
+        int selectedIndex = 0;
+        for (int i = 0; i < top; i++)
+        {
+            acc += (top - i);
+            if (roll < acc)
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        EnemySpawnCandidate chosen = candidates[selectedIndex];
+        selectedTemplate = chosen.Template;
+        selectedCount = chosen.Count;
+        _lastGeneratedEnemyUnitId = selectedTemplate.UnitId;
+        _lastGeneratedEncounterName = string.Empty;
 
         int generatedOverall = 0;
         int generatedEnemies = 0;
 
         for (int i = 0; i < selectedCount && availablePositions.Count > 0; i++)
         {
-            int positionIndex = rng.Next(0, availablePositions.Count);
-            Vector2 spawnPosition = availablePositions[positionIndex];
-            availablePositions.RemoveAt(positionIndex);
+            Vector2 spawnPosition = TakeRandomPosition(availablePositions, rng);
 
             GameObject enemyObject = UnitsManager.Instance.CreateUnitById(selectedTemplate.UnitId, spawnPosition, false);
             if (enemyObject == null) continue;
 
-            Stats enemyStats = enemyObject.GetComponent<Stats>();
-            int realOverall = selectedTemplate.EstimatedOverall;
-            if (enemyStats != null)
-            {
-                realOverall = enemyStats.CalculateOverall();
-                enemyStats.Overall = realOverall;
-            }
-
-            generatedOverall += Mathf.Max(1, realOverall);
+            generatedOverall += CalculateSpawnedUnitOverall(enemyObject, selectedTemplate.EstimatedOverall);
             generatedEnemies++;
         }
 
@@ -663,8 +775,628 @@ public class DungeonGenerator : MonoBehaviour
         InitiativeQueueManager.Instance.UpdateInitiativeQueue();
         InitiativeQueueManager.Instance.CalculateDominance();
 
-        Debug.Log($"<color=green>Wygenerowano przeciwników: {generatedEnemies}, typ: {selectedTemplate.Race}, łączny Overall: {generatedOverall}, cel: {targetOverall} (+/- {toleranceAbs}).</color>");
+        Debug.Log($"<color=green>Wygenerowano przeciwników (fallback): {generatedEnemies}, typ: {selectedTemplate.Race}, łączny Overall: {generatedOverall}, cel: {targetOverall} (+/- {toleranceAbs}).</color>");
     }
+
+    private bool TryGenerateEnemiesFromEncounterGroups(
+        System.Random rng,
+        List<EnemyTemplate> templates,
+        List<Vector2> availablePositions,
+        int minEnemies,
+        int maxSpawnBySpace,
+        int targetOverall,
+        int toleranceAbs,
+        int minTargetOverall,
+        int maxTargetOverall)
+    {
+        EncounterCatalog catalog = TryLoadEncounterCatalog();
+        if (catalog == null || catalog.Encounters == null || catalog.Encounters.Length == 0)
+        {
+            Debug.LogWarning($"Nie znaleziono poprawnych danych encounterów w Resources/{_encountersResourceName}.json. Używam fallback single-type.");
+            return false;
+        }
+
+        List<EncounterGroupRuntime> groups = BuildEncounterGroupsRuntime(catalog, templates);
+        if (groups.Count == 0)
+        {
+            Debug.LogWarning("Brak poprawnych grup encounterów po walidacji. Używam fallback single-type.");
+            return false;
+        }
+
+        int availableTiles = availablePositions.Count;
+        List<EncounterSpawnCandidate> allCandidates = new List<EncounterSpawnCandidate>();
+        int attemptsPerGroup = Mathf.Max(1, _encounterBuildAttemptsPerGroup);
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            EncounterGroupRuntime group = groups[i];
+            for (int attempt = 0; attempt < attemptsPerGroup; attempt++)
+            {
+                EncounterSpawnCandidate candidate = BuildEncounterCandidate(
+                    group,
+                    minEnemies,
+                    maxSpawnBySpace,
+                    availableTiles,
+                    targetOverall,
+                    minTargetOverall,
+                    maxTargetOverall,
+                    rng
+                );
+
+                if (candidate != null)
+                {
+                    allCandidates.Add(candidate);
+                }
+            }
+        }
+
+        if (allCandidates.Count == 0)
+        {
+            Debug.LogWarning("Nie udało się zbudować żadnego poprawnego encounteru. Używam fallback single-type.");
+            return false;
+        }
+
+        allCandidates.Sort((a, b) =>
+        {
+            int scoreCmp = a.Score.CompareTo(b.Score);
+            if (scoreCmp != 0) return scoreCmp;
+
+            if (a.InTolerance != b.InTolerance)
+            {
+                return a.InTolerance ? -1 : 1;
+            }
+
+            int diffCmp = a.Diff.CompareTo(b.Diff);
+            if (diffCmp != 0) return diffCmp;
+
+            int groupWeightCmp = b.Group.Weight.CompareTo(a.Group.Weight);
+            if (groupWeightCmp != 0) return groupWeightCmp;
+
+            return b.Spawns.Count.CompareTo(a.Spawns.Count);
+        });
+
+        int top = Mathf.Clamp(_enemySelectionTopCandidates, 1, allCandidates.Count);
+        int totalWeight = 0;
+        for (int i = 0; i < top; i++)
+        {
+            totalWeight += (top - i);
+        }
+
+        int roll = rng.Next(0, totalWeight);
+        int acc = 0;
+        int selectedIndex = 0;
+        for (int i = 0; i < top; i++)
+        {
+            acc += (top - i);
+            if (roll < acc)
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        EncounterSpawnCandidate chosen = allCandidates[selectedIndex];
+        bool spawned = SpawnEncounterCandidate(chosen, availablePositions, rng, targetOverall, toleranceAbs);
+        if (!spawned) return false;
+
+        _lastGeneratedEncounterName = chosen.Group != null ? chosen.Group.Name : string.Empty;
+        if (chosen.Spawns.Count > 0 && chosen.Spawns[0].RiderTemplate != null)
+        {
+            _lastGeneratedEnemyUnitId = chosen.Spawns[0].RiderTemplate.UnitId;
+        }
+
+        return true;
+    }
+
+    private EncounterCatalog TryLoadEncounterCatalog()
+    {
+        if (string.IsNullOrWhiteSpace(_encountersResourceName))
+        {
+            return null;
+        }
+
+        TextAsset encountersJson = Resources.Load<TextAsset>(_encountersResourceName.Trim());
+        if (encountersJson == null)
+        {
+            return null;
+        }
+
+        return JsonUtility.FromJson<EncounterCatalog>(encountersJson.text);
+    }
+
+    private List<EncounterGroupRuntime> BuildEncounterGroupsRuntime(EncounterCatalog catalog, List<EnemyTemplate> templates)
+    {
+        List<EncounterGroupRuntime> groups = new List<EncounterGroupRuntime>();
+        if (catalog == null || catalog.Encounters == null || templates == null || templates.Count == 0)
+        {
+            return groups;
+        }
+
+        Dictionary<string, EnemyTemplate> templatesByRace = new Dictionary<string, EnemyTemplate>();
+        for (int i = 0; i < templates.Count; i++)
+        {
+            EnemyTemplate template = templates[i];
+            if (template == null) continue;
+
+            string key = NormalizeRaceKey(template.Race);
+            if (string.IsNullOrEmpty(key)) continue;
+
+            templatesByRace[key] = template;
+        }
+
+        HashSet<string> blockedStandaloneRaces = BuildDisallowedStandaloneRaceSet();
+
+        for (int i = 0; i < catalog.Encounters.Length; i++)
+        {
+            EncounterGroupData groupData = catalog.Encounters[i];
+            if (groupData == null || groupData.Members == null || groupData.Members.Length == 0) continue;
+
+            EncounterGroupRuntime group = new EncounterGroupRuntime
+            {
+                Name = string.IsNullOrWhiteSpace(groupData.Name) ? $"Encounter {i + 1}" : groupData.Name.Trim(),
+                Weight = Mathf.Max(1, groupData.Weight),
+                MinUnits = Mathf.Max(1, groupData.MinUnits),
+                MaxUnits = Mathf.Max(Mathf.Max(1, groupData.MinUnits), groupData.MaxUnits)
+            };
+
+            for (int memberIndex = 0; memberIndex < groupData.Members.Length; memberIndex++)
+            {
+                EncounterMemberData memberData = groupData.Members[memberIndex];
+                if (memberData == null || string.IsNullOrWhiteSpace(memberData.Race)) continue;
+
+                string riderRaceKey = NormalizeRaceKey(memberData.Race);
+                if (string.IsNullOrEmpty(riderRaceKey)) continue;
+
+                if (!templatesByRace.TryGetValue(riderRaceKey, out EnemyTemplate riderTemplate))
+                {
+                    continue;
+                }
+
+                EncounterMemberRuntime member = new EncounterMemberRuntime
+                {
+                    Template = riderTemplate,
+                    Weight = Mathf.Max(1, memberData.Weight),
+                    CanAppearOnFoot = memberData.CanAppearOnFoot && !IsStandaloneRaceBlocked(riderTemplate.Race, blockedStandaloneRaces),
+                    MountedChance = Mathf.Clamp01(memberData.MountedChance)
+                };
+
+                if (memberData.Mounts != null)
+                {
+                    for (int mountIndex = 0; mountIndex < memberData.Mounts.Length; mountIndex++)
+                    {
+                        EncounterMountData mountData = memberData.Mounts[mountIndex];
+                        if (mountData == null || string.IsNullOrWhiteSpace(mountData.Race)) continue;
+
+                        string mountRaceKey = NormalizeRaceKey(mountData.Race);
+                        if (string.IsNullOrEmpty(mountRaceKey)) continue;
+
+                        if (!templatesByRace.TryGetValue(mountRaceKey, out EnemyTemplate mountTemplate))
+                        {
+                            continue;
+                        }
+
+                        if (mountTemplate.UnitId == riderTemplate.UnitId) continue;
+                        if (mountTemplate.Size <= riderTemplate.Size) continue;
+
+                        member.MountTemplates.Add(mountTemplate);
+                        member.MountWeights.Add(Mathf.Max(1, mountData.Weight));
+                    }
+                }
+
+                if (!member.CanAppearOnFoot && member.MountTemplates.Count == 0)
+                {
+                    continue;
+                }
+
+                group.Members.Add(member);
+            }
+
+            if (group.Members.Count > 0)
+            {
+                groups.Add(group);
+            }
+        }
+
+        return groups;
+    }
+
+    private EncounterSpawnCandidate BuildEncounterCandidate(
+        EncounterGroupRuntime group,
+        int minEnemies,
+        int maxSpawnBySpace,
+        int availableTiles,
+        int targetOverall,
+        int minTargetOverall,
+        int maxTargetOverall,
+        System.Random rng)
+    {
+        if (group == null || group.Members == null || group.Members.Count == 0) return null;
+
+        int maxBound = Mathf.Max(minEnemies, maxSpawnBySpace);
+        int groupMin = Mathf.Clamp(group.MinUnits, minEnemies, maxBound);
+        int groupMax = Mathf.Clamp(group.MaxUnits, groupMin, maxBound);
+        if (groupMin > groupMax) return null;
+
+        int desiredUnits = rng.Next(groupMin, groupMax + 1);
+        int remainingTiles = availableTiles;
+
+        EncounterSpawnCandidate candidate = new EncounterSpawnCandidate
+        {
+            Group = group
+        };
+
+        HashSet<string> uniqueRaces = new HashSet<string>();
+        int buildAttempts = desiredUnits * 6;
+
+        while (candidate.Spawns.Count < desiredUnits && buildAttempts-- > 0)
+        {
+            PlannedEnemySpawn spawn = CreatePlannedSpawn(group, remainingTiles, rng);
+            if (spawn == null)
+            {
+                break;
+            }
+
+            int tileCost = spawn.IsMounted ? 2 : 1;
+            if (tileCost > remainingTiles)
+            {
+                continue;
+            }
+
+            candidate.Spawns.Add(spawn);
+            candidate.PredictedOverall += Mathf.Max(1, spawn.PredictedOverall);
+            candidate.TileUsage += tileCost;
+            remainingTiles -= tileCost;
+
+            if (spawn.RiderTemplate != null && !string.IsNullOrWhiteSpace(spawn.RiderTemplate.Race))
+            {
+                uniqueRaces.Add(NormalizeRaceKey(spawn.RiderTemplate.Race));
+            }
+        }
+
+        if (candidate.Spawns.Count < minEnemies) return null;
+        if (candidate.TileUsage > availableTiles) return null;
+
+        candidate.Diff = Mathf.Abs(targetOverall - candidate.PredictedOverall);
+        candidate.InTolerance = candidate.PredictedOverall >= minTargetOverall && candidate.PredictedOverall <= maxTargetOverall;
+
+        int score = candidate.Diff;
+
+        if (candidate.PredictedOverall > maxTargetOverall)
+        {
+            score += (candidate.PredictedOverall - maxTargetOverall) * 3;
+        }
+        else if (candidate.PredictedOverall < minTargetOverall)
+        {
+            score += (minTargetOverall - candidate.PredictedOverall);
+        }
+
+        if (uniqueRaces.Count <= 1 && candidate.Spawns.Count > 1)
+        {
+            score += Mathf.Max(4, targetOverall / 18);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_lastGeneratedEncounterName) &&
+            string.Equals(_lastGeneratedEncounterName, group.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            score += Mathf.Max(6, targetOverall / 10);
+        }
+
+        score -= Mathf.Min(group.Weight, 10);
+        candidate.Score = Mathf.Max(0, score);
+
+        return candidate;
+    }
+
+    private PlannedEnemySpawn CreatePlannedSpawn(EncounterGroupRuntime group, int remainingTiles, System.Random rng)
+    {
+        if (group == null || group.Members == null || group.Members.Count == 0) return null;
+        if (remainingTiles <= 0) return null;
+
+        List<EncounterMemberRuntime> validMembers = new List<EncounterMemberRuntime>();
+        int totalWeight = 0;
+
+        for (int i = 0; i < group.Members.Count; i++)
+        {
+            EncounterMemberRuntime member = group.Members[i];
+            if (member == null || member.Template == null) continue;
+
+            bool canMounted = member.MountTemplates != null && member.MountTemplates.Count > 0 && remainingTiles >= 2;
+            bool canFoot = member.CanAppearOnFoot && remainingTiles >= 1;
+            if (!canMounted && !canFoot) continue;
+
+            validMembers.Add(member);
+            totalWeight += Mathf.Max(1, member.Weight);
+        }
+
+        if (validMembers.Count == 0 || totalWeight <= 0)
+        {
+            return null;
+        }
+
+        int roll = rng.Next(0, totalWeight);
+        int acc = 0;
+        EncounterMemberRuntime selected = validMembers[0];
+        for (int i = 0; i < validMembers.Count; i++)
+        {
+            EncounterMemberRuntime member = validMembers[i];
+            acc += Mathf.Max(1, member.Weight);
+            if (roll < acc)
+            {
+                selected = member;
+                break;
+            }
+        }
+
+        bool canUseMount = selected.MountTemplates != null && selected.MountTemplates.Count > 0 && remainingTiles >= 2;
+        bool shouldMount = false;
+
+        if (canUseMount)
+        {
+            if (!selected.CanAppearOnFoot)
+            {
+                shouldMount = true;
+            }
+            else
+            {
+                shouldMount = rng.NextDouble() < selected.MountedChance;
+            }
+        }
+
+        EnemyTemplate mountTemplate = null;
+        if (shouldMount)
+        {
+            mountTemplate = TryPickMountTemplate(selected, rng);
+            if (mountTemplate == null && !selected.CanAppearOnFoot)
+            {
+                return null;
+            }
+        }
+
+        if (mountTemplate != null)
+        {
+            int riderOverall = Mathf.Max(1, selected.Template.EstimatedOverall);
+            int mountContribution = Mathf.RoundToInt(Mathf.Max(1, mountTemplate.EstimatedOverall) * Mathf.Clamp01(_mountedOverallContribution));
+
+            return new PlannedEnemySpawn
+            {
+                RiderTemplate = selected.Template,
+                MountTemplate = mountTemplate,
+                IsMounted = true,
+                PredictedOverall = Mathf.Max(1, riderOverall + mountContribution)
+            };
+        }
+
+        return new PlannedEnemySpawn
+        {
+            RiderTemplate = selected.Template,
+            MountTemplate = null,
+            IsMounted = false,
+            PredictedOverall = Mathf.Max(1, selected.Template.EstimatedOverall)
+        };
+    }
+
+    private EnemyTemplate TryPickMountTemplate(EncounterMemberRuntime member, System.Random rng)
+    {
+        if (member == null || member.MountTemplates == null || member.MountTemplates.Count == 0) return null;
+
+        int totalWeight = 0;
+        for (int i = 0; i < member.MountTemplates.Count; i++)
+        {
+            EnemyTemplate template = member.MountTemplates[i];
+            if (template == null) continue;
+
+            int weight = 1;
+            if (member.MountWeights != null && i < member.MountWeights.Count)
+            {
+                weight = Mathf.Max(1, member.MountWeights[i]);
+            }
+
+            totalWeight += weight;
+        }
+
+        if (totalWeight <= 0) return null;
+
+        int roll = rng.Next(0, totalWeight);
+        int acc = 0;
+
+        for (int i = 0; i < member.MountTemplates.Count; i++)
+        {
+            EnemyTemplate template = member.MountTemplates[i];
+            if (template == null) continue;
+
+            int weight = 1;
+            if (member.MountWeights != null && i < member.MountWeights.Count)
+            {
+                weight = Mathf.Max(1, member.MountWeights[i]);
+            }
+
+            acc += weight;
+            if (roll < acc)
+            {
+                return template;
+            }
+        }
+
+        return null;
+    }
+
+    private bool SpawnEncounterCandidate(EncounterSpawnCandidate chosen, List<Vector2> availablePositions, System.Random rng, int targetOverall, int toleranceAbs)
+    {
+        if (chosen == null || chosen.Spawns == null || chosen.Spawns.Count == 0) return false;
+        if (availablePositions == null || availablePositions.Count == 0) return false;
+
+        int generatedOverall = 0;
+        int generatedEnemies = 0;
+        List<string> composition = new List<string>();
+
+        for (int i = 0; i < chosen.Spawns.Count && availablePositions.Count > 0; i++)
+        {
+            PlannedEnemySpawn planned = chosen.Spawns[i];
+            if (planned == null || planned.RiderTemplate == null) continue;
+
+            Vector2 riderPosition = TakeRandomPosition(availablePositions, rng);
+            GameObject riderObject = UnitsManager.Instance.CreateUnitById(planned.RiderTemplate.UnitId, riderPosition, false);
+            if (riderObject == null) continue;
+
+            generatedOverall += CalculateSpawnedUnitOverall(riderObject, planned.RiderTemplate.EstimatedOverall);
+            generatedEnemies++;
+
+            string riderRace = string.IsNullOrWhiteSpace(planned.RiderTemplate.Race) ? "Nieznany" : planned.RiderTemplate.Race;
+            bool mountedApplied = false;
+            string mountRace = string.Empty;
+
+            if (planned.IsMounted && planned.MountTemplate != null && availablePositions.Count > 0)
+            {
+                Vector2 mountPosition = TakeRandomPosition(availablePositions, rng);
+                GameObject mountObject = UnitsManager.Instance.CreateUnitById(planned.MountTemplate.UnitId, mountPosition, false);
+                if (mountObject != null)
+                {
+                    int mountOverall = CalculateSpawnedUnitOverall(mountObject, planned.MountTemplate.EstimatedOverall);
+                    mountRace = string.IsNullOrWhiteSpace(planned.MountTemplate.Race) ? "Wierzchowiec" : planned.MountTemplate.Race;
+
+                    Unit riderUnit = riderObject.GetComponent<Unit>();
+                    Unit mountUnit = mountObject.GetComponent<Unit>();
+                    mountedApplied = TryApplyMount(riderUnit, mountUnit);
+
+                    if (mountedApplied)
+                    {
+                        generatedOverall += Mathf.RoundToInt(Mathf.Max(1, mountOverall) * Mathf.Clamp01(_mountedOverallContribution));
+                    }
+                    else
+                    {
+                        generatedEnemies++;
+                        generatedOverall += Mathf.Max(1, mountOverall);
+                    }
+                }
+            }
+
+            if (mountedApplied)
+            {
+                composition.Add($"{riderRace} na {mountRace}");
+            }
+            else
+            {
+                composition.Add(riderRace);
+                if (!string.IsNullOrWhiteSpace(mountRace))
+                {
+                    composition.Add(mountRace);
+                }
+            }
+        }
+
+        if (generatedEnemies <= 0)
+        {
+            return false;
+        }
+
+        GridManager.Instance.CheckTileOccupancy();
+        InitiativeQueueManager.Instance.UpdateInitiativeQueue();
+        InitiativeQueueManager.Instance.CalculateDominance();
+
+        string groupName = chosen.Group != null && !string.IsNullOrWhiteSpace(chosen.Group.Name)
+            ? chosen.Group.Name
+            : "Nieznana grupa";
+        string compositionText = composition.Count > 0 ? string.Join(", ", composition) : "brak";
+
+        Debug.Log($"<color=green>Wygenerowano przeciwników (encounter: {groupName}): {generatedEnemies}, skład: {compositionText}, łączny Overall: {generatedOverall}, cel: {targetOverall} (+/- {toleranceAbs}).</color>");
+        return true;
+    }
+
+    private bool TryApplyMount(Unit rider, Unit mount)
+    {
+        if (rider == null || mount == null) return false;
+
+        Stats riderStats = rider.Stats != null ? rider.Stats : rider.GetComponent<Stats>();
+        Stats mountStats = mount.Stats != null ? mount.Stats : mount.GetComponent<Stats>();
+        if (riderStats == null || mountStats == null) return false;
+
+        if (mountStats.Size <= riderStats.Size) return false;
+        if (mount.HasRider) return false;
+
+        rider.Stats = riderStats;
+        mount.Stats = mountStats;
+        rider.Mount = mount;
+        rider.MountId = mount.UnitId;
+
+        rider.IsMounted = true;
+        mount.HasRider = true;
+        mount.transform.position = rider.transform.position;
+        mount.transform.SetParent(rider.transform);
+
+        if (InitiativeQueueManager.Instance != null)
+        {
+            InitiativeQueueManager.Instance.RemoveUnitFromInitiativeQueue(mount);
+        }
+
+        mount.gameObject.SetActive(false);
+
+        if (MountsManager.Instance != null)
+        {
+            MountsManager.Instance.UpdateMountIcon(rider);
+        }
+
+        int mountedSpeed = mountStats.Flight != 0 ? mountStats.Flight : mountStats.Sz;
+        mountStats.TempSz = mountedSpeed;
+        riderStats.TempSz = mountedSpeed;
+
+        return true;
+    }
+
+    private static int CalculateSpawnedUnitOverall(GameObject unitObject, int fallbackOverall)
+    {
+        if (unitObject == null) return Mathf.Max(1, fallbackOverall);
+
+        Stats stats = unitObject.GetComponent<Stats>();
+        if (stats == null) return Mathf.Max(1, fallbackOverall);
+
+        int overall = stats.CalculateOverall();
+        stats.Overall = overall;
+        return Mathf.Max(1, overall);
+    }
+
+    private static Vector2 TakeRandomPosition(List<Vector2> availablePositions, System.Random rng)
+    {
+        if (availablePositions == null || availablePositions.Count == 0) return Vector2.zero;
+
+        int positionIndex = rng.Next(0, availablePositions.Count);
+        Vector2 spawnPosition = availablePositions[positionIndex];
+        availablePositions.RemoveAt(positionIndex);
+        return spawnPosition;
+    }
+
+    private HashSet<string> BuildDisallowedStandaloneRaceSet()
+    {
+        HashSet<string> blocked = new HashSet<string>();
+        if (_disallowedStandaloneEnemyRaces == null) return blocked;
+
+        for (int i = 0; i < _disallowedStandaloneEnemyRaces.Count; i++)
+        {
+            string key = NormalizeRaceKey(_disallowedStandaloneEnemyRaces[i]);
+            if (!string.IsNullOrEmpty(key))
+            {
+                blocked.Add(key);
+            }
+        }
+
+        return blocked;
+    }
+
+    private static bool IsStandaloneRaceBlocked(string race, HashSet<string> blocked)
+    {
+        if (blocked == null || blocked.Count == 0) return false;
+
+        string key = NormalizeRaceKey(race);
+        if (string.IsNullOrEmpty(key)) return false;
+
+        return blocked.Contains(key);
+    }
+
+    private static string NormalizeRaceKey(string race)
+    {
+        if (string.IsNullOrWhiteSpace(race)) return string.Empty;
+        return race.Trim().ToLowerInvariant();
+    }
+
     private int CalculateLivingPlayerOverall()
     {
         if (UnitsManager.Instance == null) return 0;
@@ -755,7 +1487,8 @@ public class DungeonGenerator : MonoBehaviour
             {
                 UnitId = statsData.Id,
                 Race = statsData.Race,
-                EstimatedOverall = estimatedOverall
+                EstimatedOverall = estimatedOverall,
+                Size = (int)statsData.Size
             });
         }
 
@@ -1179,6 +1912,15 @@ public class DungeonGenerator : MonoBehaviour
         return true;
     }
 }
+
+
+
+
+
+
+
+
+
 
 
 
