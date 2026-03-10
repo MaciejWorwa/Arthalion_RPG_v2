@@ -272,6 +272,7 @@ public class GameManager : MonoBehaviour
 
     public void ChangeScene(int index)
     {
+        GridManager.CacheRuntimeTopologyForSceneChange();
         SceneManager.LoadScene(index, LoadSceneMode.Single);
     }
 

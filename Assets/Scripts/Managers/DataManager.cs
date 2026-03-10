@@ -1013,17 +1013,36 @@ public class InventoryData
 }
 
 [System.Serializable]
+public class GridTileData
+{
+    public int X;
+    public int Y;
+
+    public GridTileData(int x, int y)
+    {
+        X = x;
+        Y = y;
+    }
+}
+
+[System.Serializable]
 public class GridManagerData
 {
     public int Width;
     public int Height;
     public string GridColor;
+    public List<GridTileData> DisabledTiles = new List<GridTileData>();
 
     public GridManagerData()
     {
         Width = GridManager.Width;
         Height = GridManager.Height;
         GridColor = GridManager.GridColor;
+
+        if (GridManager.Instance != null)
+        {
+            DisabledTiles = GridManager.Instance.GetDisabledTilesData();
+        }
     }
 }
 
@@ -1116,4 +1135,3 @@ public class GameSettings
 }
 
 #endregion
-

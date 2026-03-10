@@ -7,10 +7,10 @@ using static UnityEngine.GraphicsBuffer;
 
 public class RoundsManager : MonoBehaviour
 {
-    // Prywatne statyczne pole przechowujące instancję
+    // Prywatne statyczne pole przechowuj?ce instancj?
     private static RoundsManager instance;
 
-    // Publiczny dostęp do instancji
+    // Publiczny dost?p do instancji
     public static RoundsManager Instance
     {
         get { return instance; }
@@ -25,7 +25,7 @@ public class RoundsManager : MonoBehaviour
         }
         else if (instance != this)
         {
-            // Jeśli instancja już istnieje, a próbujemy utworzyć kolejną, niszczymy nadmiarową
+            // Je?li instancja ju? istnieje, a pr?bujemy utworzy? kolejn?, niszczymy nadmiarow?
             Destroy(gameObject);
         }
     }
@@ -35,7 +35,7 @@ public class RoundsManager : MonoBehaviour
     public UnityEngine.UI.Button NextRoundButton;
     [SerializeField] private UnityEngine.UI.Toggle _canDoActionToggle;
     [SerializeField] private GameObject _useFortunePointsButton;
-    private bool _isFortunePointSpent; //informacja o tym, że punkt szczęścia został zużyty, aby nie można było ponownie go użyć do wczytania tego samego autozapisu
+    private bool _isFortunePointSpent; //informacja o tym, ?e punkt szcz?cia zosta? zu?yty, aby nie mo?na by?o ponownie go u?y? do wczytania tego samego autozapisu
 
     private void Start()
     {
@@ -56,7 +56,7 @@ public class RoundsManager : MonoBehaviour
 
         if (RoundNumber > 0)
         {
-            NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Następna runda";
+            NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Nastepna runda";
         }
 
         Debug.Log($"<color=#4dd2ff>------------------------------------------------------------------------------------ RUNDA {RoundNumber} ------------------------------------------------------------------------------------</color>");
@@ -68,7 +68,7 @@ public class RoundsManager : MonoBehaviour
             return s != null && s.Stink;
         });
 
-        //Resetuje ilość dostępnych akcji dla wszystkich jednostek
+        //Resetuje ilo?? dost?pnych akcji dla wszystkich jednostek
         foreach (Unit unit in UnitsManager.Instance.AllUnits)
         {
             if (unit == null) continue;
@@ -141,11 +141,11 @@ public class RoundsManager : MonoBehaviour
                 }
             }
 
-            //Aktualizuje osiągnięcia
+            //Aktualizuje osi?gni?cia
             stats.RoundsPlayed++;
         }
 
-        // Wykonuje testy grozy i strachu, jeśli na polu bitwy są jednostki straszne
+        // Wykonuje testy grozy i strachu, je?li na polu bitwy s? jednostki straszne
         if (GameManager.IsFearIncluded)
         {
             var queue = InitiativeQueueManager.Instance.InitiativeQueue;
@@ -161,7 +161,7 @@ public class RoundsManager : MonoBehaviour
                 .Select(p => p.Key.GetComponent<Stats>()?.Scary ?? 0)
                 .DefaultIfEmpty(0).Max();
 
-            // jeśli nikt nie jest straszny – pomija dalszy kod
+            // je?li nikt nie jest straszny ? pomija dalszy kod
             if (maxScaryEnemies > 0 || maxScaryPlayers > 0)
             {
                 foreach (var pair in queue)
@@ -171,7 +171,7 @@ public class RoundsManager : MonoBehaviour
 
                     // wybierz odpowiedni max poziom Strachu przeciwnika
                     int requiredLevel = unit.CompareTag("PlayerUnit") ? maxScaryEnemies : maxScaryPlayers;
-                    if (requiredLevel <= unit.FearTestedLevel) continue;           // test już się odbył na tym lub wyższym poziomie Starchu
+                    if (requiredLevel <= unit.FearTestedLevel) continue;           // test ju? si? odby? na tym lub wy?szym poziomie Starchu
 
                     unit.FearTestedLevel = requiredLevel;
                     StartCoroutine(StatesManager.Instance.FearTest(unit));         // korutyna sama zrobi test na aktualne warunki
@@ -181,19 +181,19 @@ public class RoundsManager : MonoBehaviour
 
         InitiativeQueueManager.Instance.UpdateInitiativeQueue();
 
-        //Odświeża panel jednostki, aby zaktualizowac ewentualną informację o długości trwania stanu (np. ogłuszenia) wybranej jednostki
+        //Od?wie?a panel jednostki, aby zaktualizowac ewentualn? informacj? o d?ugo?ci trwania stanu (np. og?uszenia) wybranej jednostki
         if (Unit.SelectedUnit != null)
         {
             UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
         }
 
-        //Wybiera jednostkę zgodnie z kolejką inicjatywy, jeśli ten tryb jest włączony
+        //Wybiera jednostk? zgodnie z kolejk? inicjatywy, je?li ten tryb jest w??czony
         if (GameManager.IsAutoSelectUnitMode && InitiativeQueueManager.Instance.ActiveUnit != null)
         {
             InitiativeQueueManager.Instance.SelectUnitByQueue();
         }
 
-        //Wykonuje automatyczną akcję za każdą jednostkę
+        //Wykonuje automatyczn? akcj? za ka?d? jednostk?
         if (GameManager.IsAutoCombatMode)
         {
             StartCoroutine(AutoCombat());
@@ -205,48 +205,71 @@ public class RoundsManager : MonoBehaviour
         NextRoundButton.gameObject.SetActive(false);
         _useFortunePointsButton.SetActive(false);
 
-        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        while (true)
         {
-            if (UnitsManager.Instance.AllUnits[i] == null || !InitiativeQueueManager.Instance.InitiativeQueue.ContainsKey(UnitsManager.Instance.AllUnits[i])) continue;
+            Unit unit = GetNextUnitForAutoCombat();
+            if (unit == null) break;
 
-            InitiativeQueueManager.Instance.SelectUnitByQueue();
-            yield return new WaitForSeconds(0.1f);
-
-            Unit unit = null;
-            if (Unit.SelectedUnit != null)
+            // Wyb?r jednostki bez asynchronicznego wy?cigu z SelectUnitByQueue.
+            if (Unit.SelectedUnit != unit.gameObject)
             {
-                unit = Unit.SelectedUnit.GetComponent<Unit>();
+                unit.SelectUnit();
             }
-            else continue;
 
-            // Jeśli jednostka to PlayerUnit i gramy w trybie ukrywania statystyk wrogów
+            if (!ReinforcementLearningManager.Instance.IsLearning)
+            {
+                yield return new WaitForSeconds(0.05f);
+            }
+
+            // Je?eli jednostka to PlayerUnit i gramy w trybie ukrywania statystyk wrog?w
             if (unit.CompareTag("PlayerUnit") && GameManager.IsStatsHidingMode)
             {
-                // Czeka aż jednostka zakończy swoją turę
+                // Czeka a? jednostka zako?czy swoj? tur?
                 yield return new WaitUntil(() => (unit.CanDoAction == false && unit.CanMove == false) || unit.IsTurnFinished);
-                yield return new WaitForSeconds(0.6f);
+                if (!ReinforcementLearningManager.Instance.IsLearning)
+                {
+                    yield return new WaitForSeconds(0.6f);
+                }
             }
-            else // Jednostki wrogów lub wszystkie jednostki, jeśli nie ukrywamy ich statystyk
+            else // Jednostki wrog?w lub wszystkie jednostki, je?li nie ukrywamy ich statystyk
             {
-                //TYMCZASOWE - test algorytmów gentycznych
                 if (ReinforcementLearningManager.Instance.IsLearning)
                 {
                     if (unit.CompareTag("PlayerUnit"))
                     {
                         AutoCombatManager.Instance.Act(unit);
+                        yield return StartCoroutine(WaitForLearningStepResolution(unit));
+
+                        if (ReinforcementLearningManager.Instance.ConsumeStepTimeoutFlag() && !unit.IsTurnFinished)
+                        {
+                            FinishTurn(unit, false);
+                        }
                     }
                     else
                     {
                         int iterationCount = 0;
+                        int maxIterations = ReinforcementLearningManager.Instance.GetMaxLearningIterationsPerUnitTurn();
 
-                        while ((unit.CanDoAction || unit.CanMove) && !unit.IsTurnFinished && iterationCount < 5)
+                        while ((unit.CanDoAction || unit.CanMove) && !unit.IsTurnFinished && iterationCount < maxIterations)
                         {
                             ReinforcementLearningManager.Instance.SimulateUnit(unit);
+                            yield return StartCoroutine(WaitForLearningStepResolution(unit));
+
+                            if (ReinforcementLearningManager.Instance.ConsumeStepTimeoutFlag())
+                            {
+                                if (!unit.IsTurnFinished)
+                                {
+                                    FinishTurn(unit, false);
+                                }
+                                break;
+                            }
+
                             iterationCount++;
                         }
-                        if (iterationCount >= 5 && !unit.IsTurnFinished)
+
+                        if (iterationCount >= maxIterations && !unit.IsTurnFinished)
                         {
-                            FinishTurn();
+                            FinishTurn(unit, false);
                         }
                     }
                 }
@@ -254,28 +277,18 @@ public class RoundsManager : MonoBehaviour
                 {
                     // NORMALNA ROZGRYWKA
                     AutoCombatManager.Instance.Act(unit);
-
-                    // ROZGRYWKA VS AI
-                    //int iterationCount = 0;
-
-                    //while ((unit.CanDoAction || unit.CanMove) && !unit.IsTurnFinished && iterationCount < 5)
-                    //{
-                    //    ReinforcementLearningManager.Instance.SimulateUnit(unit);
-                    //    iterationCount++;
-                    //}
-                    //if (iterationCount >= 5 && !unit.IsTurnFinished)
-                    //{
-                    //    FinishTurn();
-                    //}
                 }
 
-                // Czeka, aż jednostka zakończy ruch
+                // Czeka, a? jednostka zako?czy ruch
                 yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false);
-                yield return new WaitForSeconds(0.6f);
+                if (!ReinforcementLearningManager.Instance.IsLearning)
+                {
+                    yield return new WaitForSeconds(0.6f);
+                }
 
                 if (!unit.IsTurnFinished && (unit.CanDoAction || unit.CanMove))
                 {
-                    FinishTurn();
+                    FinishTurn(unit, false);
                 }
             }
         }
@@ -286,11 +299,11 @@ public class RoundsManager : MonoBehaviour
         //DO SZKOLENIA AI
         if (ReinforcementLearningManager.Instance.IsLearning)
         {
-            // Sprawdź, czy któraś z drużyn już nie istnieje lub przekroczono limit tur
+            // Sprawd?, czy kt?ra? z dru?yn ju? nie istnieje lub przekroczono limit tur
             bool battleEnded = !ReinforcementLearningManager.Instance.BothTeamsExist() || RoundNumber > 50;
             if (battleEnded)
             {
-                // Wylicz zwycięzcę: true jeśli gracz wciąż ma jednostki, a enemy nie
+                // Wylicz zwyci?zc?: true je?li gracz wci?? ma jednostki, a enemy nie
                 bool playerUnitsExist = UnitsManager.Instance.AllUnits.Any(u =>
                     u != null && u.CompareTag("PlayerUnit") && u.GetComponent<Stats>().TempHealth > 0);
                 bool enemyUnitsExist = UnitsManager.Instance.AllUnits.Any(u =>
@@ -300,10 +313,11 @@ public class RoundsManager : MonoBehaviour
                 // Terminalna nagroda dla wszystkich zapisanych akcji
                 ReinforcementLearningManager.Instance.GiveTerminalRewardToAll(didAIWin);
 
-                // Zaktualizuj licznik zwycięstw w UI
+                // Zaktualizuj licznik zwyci?stw w UI i metryki epizod?w
                 ReinforcementLearningManager.Instance.UpdateTeamWins();
+                ReinforcementLearningManager.Instance.NotifyEpisodeEnd(didAIWin);
 
-                // Wczytaj ponownie scenę/stan rozpoczynający kolejne epizody
+                // Wczytaj ponownie scen?/stan rozpoczynaj?cy kolejne epizody
                 SaveAndLoadManager.Instance.SetLoadingType("units");
                 SaveAndLoadManager.Instance.LoadGame("AIlearning");
 
@@ -311,10 +325,10 @@ public class RoundsManager : MonoBehaviour
                 {
                     if (UnitsManager.Instance.AllUnits[i] == null || !InitiativeQueueManager.Instance.InitiativeQueue.ContainsKey(UnitsManager.Instance.AllUnits[i])) continue;
                     UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().Overall = UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().CalculateOverall();
-                }    
+                }
             }
 
-            // Czekaj na zakończenie ładowania, potem leci dalej
+            // Czekaj na zako?czenie ?adowania, potem leci dalej
             yield return new WaitUntil(() => SaveAndLoadManager.Instance.IsLoading == false);
 
             GridManager.Instance.CheckTileOccupancy();
@@ -322,15 +336,46 @@ public class RoundsManager : MonoBehaviour
         }
     }
 
+    private IEnumerator WaitForLearningStepResolution(Unit unit)
+    {
+        int timeoutFrames = ReinforcementLearningManager.Instance.GetLearningStepTimeoutFrames();
+        int settleFrames = ReinforcementLearningManager.Instance.GetLearningSettleFrames();
+        int waited = 0;
+
+        while (MovementManager.Instance.IsMoving)
+        {
+            if (waited >= timeoutFrames)
+            {
+                ReinforcementLearningManager.Instance.ReportLearningStepTimeout(unit);
+                yield break;
+            }
+
+            waited++;
+            yield return null;
+        }
+
+        for (int i = 0; i < settleFrames; i++)
+        {
+            if (waited >= timeoutFrames)
+            {
+                ReinforcementLearningManager.Instance.ReportLearningStepTimeout(unit);
+                yield break;
+            }
+
+            waited++;
+            yield return null;
+        }
+    }    
+    
     #region Units actions
     public void DoAction(Unit unit)
     {
-        //Zapobiega zużywaniu akcji przed rozpoczęciem bitwy
+        //Zapobiega zu?ywaniu akcji przed rozpocz?ciem bitwy
         if (RoundNumber == 0) return;
 
         if (unit.CanDoAction)
         {
-            // Automatyczny zapis, aby możliwe było użycie punktów szczęścia lub zepsucia
+            // Automatyczny zapis, aby mo?liwe by?o u?ycie punkt?w szcz?cia lub zepsucia
             if (!GameManager.IsAutoCombatMode)
             {
                 SaveAndLoadManager.Instance.SaveUnits(UnitsManager.Instance.AllUnits, "autosave");
@@ -340,12 +385,12 @@ public class RoundsManager : MonoBehaviour
             unit.CanDoAction = false;
             DisplayActionsLeft();
 
-            Debug.Log($"<color=green>{unit.GetComponent<Stats>().Name} wykonał/a akcję. </color>");
+            Debug.Log($"<color=green>{unit.GetComponent<Stats>().Name} wykonal/a akcje. </color>");
 
-            //Zresetowanie szarży lub biegu, jeśli były aktywne (po zużyciu jednej akcji szarża i bieg nie mogą być możliwe)
+            //Zresetowanie szar?y lub biegu, je?li by?y aktywne (po zu?yciu jednej akcji szar?a i bieg nie mog? by? mo?liwe)
             //MovementManager.Instance.UpdateMovementRange(1);
 
-            //W przypadku ręcznego zadawania obrażeń, czekamy na wpisanie wartości obrażeń przed zmianą jednostki (jednostka jest wtedy zmieniana w funkcji ExecuteAttack w CombatManager)
+            //W przypadku r?cznego zadawania obra?e?, czekamy na wpisanie warto?ci obra?e? przed zmian? jednostki (jednostka jest wtedy zmieniana w funkcji ExecuteAttack w CombatManager)
             if (!CombatManager.Instance.IsManualPlayerAttack && !unit.CanMove && !unit.CanDoAction)
             {
                 FinishTurn();
@@ -355,7 +400,7 @@ public class RoundsManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("Ta jednostka nie może w tej rundzie wykonać więcej akcji.");
+            Debug.Log("Ta jednostka nie mo?e w tej rundzie wykona? wi?cej akcji.");
             return;
         }
     }
@@ -393,7 +438,7 @@ public class RoundsManager : MonoBehaviour
             stats = Unit.LastSelectedUnit.GetComponent<Stats>();
         }
 
-        Debug.Log($"{stats.Name} zużywa Punkt Losu. Wykonaj akcję ponownie.");
+        Debug.Log($"{stats.Name} zuzywa Punkt Losu. Wykonaj akcje ponownie.");
         stats.TempPL--;
 
         _isFortunePointSpent = true;
@@ -404,23 +449,31 @@ public class RoundsManager : MonoBehaviour
         _useFortunePointsButton.SetActive(false);
     }
 
-    //Zakończenie tury danej jednostki mimo tego, że ma jeszcze dostępne akcje
+        //Zako?czenie tury danej jednostki mimo tego, ?e ma jeszcze dost?pne akcje
     public void FinishTurn()
     {
         if (Unit.SelectedUnit == null) return;
+        FinishTurn(Unit.SelectedUnit.GetComponent<Unit>());
+    }
 
-        Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
+    public void FinishTurn(Unit unit, bool selectNextUnit = true)
+    {
+        if (unit == null) return;
+
         unit.IsTurnFinished = true;
 
-        // Bierze pod uwagę efekty ewentualnych stanów postaci
+        // Bierze pod uwag? efekty ewentualnych stan?w postaci
         StatesManager.Instance.UpdateUnitStates(unit);
 
         if (unit.CanMove || unit.CanDoAction)
         {
-            Debug.Log($"<color=green>{unit.Stats.Name} kończy swoją turę.</color>");
+            Debug.Log($"<color=green>{unit.Stats.Name} konczy swoja ture.</color>");
         }
 
-        InitiativeQueueManager.Instance.SelectUnitByQueue();
+        if (selectNextUnit)
+        {
+            InitiativeQueueManager.Instance.SelectUnitByQueue();
+        }
     }
     #endregion
 
@@ -430,7 +483,7 @@ public class RoundsManager : MonoBehaviour
         if (RoundNumber > 0)
         {
             _roundNumberDisplay.text = "Runda: " + RoundNumber;
-            NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Następna runda";
+            NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Nastepna runda";
         }
         else
         {
@@ -447,5 +500,20 @@ public class RoundsManager : MonoBehaviour
     {
         if (Unit.SelectedUnit == null) return;
         Unit.SelectedUnit.GetComponent<Unit>().CanDoAction = _canDoActionToggle.isOn;
+    }
+
+    private Unit GetNextUnitForAutoCombat()
+    {
+        foreach (var pair in InitiativeQueueManager.Instance.InitiativeQueue)
+        {
+            Unit candidate = pair.Key;
+            if (candidate == null) continue;
+            if (candidate.IsTurnFinished) continue;
+            if (!candidate.CanDoAction && !candidate.CanMove) continue;
+
+            return candidate;
+        }
+
+        return null;
     }
 }
