@@ -14,6 +14,9 @@ public class Weapon : MonoBehaviour
     public bool TwoHanded;
     public bool NaturalWeapon;
 
+    [Header("Wartość")]
+    public int Value;
+
     [Header("Jakość")]
     public string Quality;
 

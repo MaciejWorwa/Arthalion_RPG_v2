@@ -1453,26 +1453,26 @@ public class InventoryManager : MonoBehaviour
             inv.CopperCoins = 0;
 
             // Próbujemy pobrać z SilverCoins
-            int silverNeeded = Mathf.CeilToInt(deficit / 12f); // 1 Silver = 12 Copper
+            int silverNeeded = Mathf.CeilToInt(deficit / 10f); // 1 Silver = 10 Copper
             if (silverNeeded <= inv.SilverCoins)
             {
                 inv.SilverCoins -= silverNeeded;
                 // Po “przelaniu” Silver → Copper, musimy jeszcze odjąć pozostały deficyt z Copper
-                inv.CopperCoins = silverNeeded * 12 - deficit;
+                inv.CopperCoins = silverNeeded * 10 - deficit;
             }
             else
             {
                 // Za mało Silver, więc zgarniamy wszystko z Silver i idziemy dalej
-                deficit -= inv.SilverCoins * 12;
+                deficit -= inv.SilverCoins * 10;
                 inv.SilverCoins = 0;
 
                 // Próbujemy pobrać z GoldCoins
-                int goldNeeded = Mathf.CeilToInt(deficit / 240f); // 1 Gold = 240 Copper
+                int goldNeeded = Mathf.CeilToInt(deficit / 100f); // 1 Gold = 100 Copper
                 if (goldNeeded <= inv.GoldCoins)
                 {
                     inv.GoldCoins -= goldNeeded;
                     // Po “przelaniu” Gold → Copper, odejmujemy pozostały deficyt z Copper
-                    inv.CopperCoins = goldNeeded * 240 - deficit;
+                    inv.CopperCoins = goldNeeded * 100 - deficit;
                 }
                 else
                 {
@@ -1500,12 +1500,12 @@ public class InventoryManager : MonoBehaviour
             inv.SilverCoins = 0;
 
             // Próbujemy pobrać z GoldCoins
-            if (deficit <= inv.GoldCoins * 20) // 1 Gold = 20 Silver
+            if (deficit <= inv.GoldCoins * 10) // 1 Gold = 10 Silver
             {
-                int goldNeeded = Mathf.CeilToInt(deficit / 20f);
+                int goldNeeded = Mathf.CeilToInt(deficit / 10f);
                 inv.GoldCoins -= goldNeeded;
                 // “Przelewamy” z Gold do Silver i odejmujemy pozostały deficyt
-                inv.SilverCoins = goldNeeded * 20 - deficit;
+                inv.SilverCoins = goldNeeded * 10 - deficit;
             }
             else
             {
@@ -1536,20 +1536,20 @@ public class InventoryManager : MonoBehaviour
     private void NormalizeCoins(Inventory inv)
     {
         // 1) Nadmiar Copper → Silver
-        if (inv.CopperCoins >= 12)
+        if (inv.CopperCoins >= 10)
         {
-            int silverGained = inv.CopperCoins / 12;
+            int silverGained = inv.CopperCoins / 10;
             inv.SilverCoins += silverGained;
-            inv.CopperCoins %= 12;
+            inv.CopperCoins %= 10;
         }
         else if (inv.CopperCoins < 0)
         {
             // Deficyt w Copper – próbujemy “pożyczyć” z Silver
-            int silverNeeded = Mathf.CeilToInt(Mathf.Abs(inv.CopperCoins) / 12f);
+            int silverNeeded = Mathf.CeilToInt(Mathf.Abs(inv.CopperCoins) / 10f);
             if (silverNeeded <= inv.SilverCoins)
             {
                 inv.SilverCoins -= silverNeeded;
-                inv.CopperCoins += silverNeeded * 12;
+                inv.CopperCoins += silverNeeded * 10;
             }
             else
             {
@@ -1562,20 +1562,20 @@ public class InventoryManager : MonoBehaviour
         }
 
         // 2) Nadmiar Silver → Gold
-        if (inv.SilverCoins >= 20)
+        if (inv.SilverCoins >= 10)
         {
-            int goldGained = inv.SilverCoins / 20;
+            int goldGained = inv.SilverCoins / 10;
             inv.GoldCoins += goldGained;
-            inv.SilverCoins %= 20;
+            inv.SilverCoins %= 10;
         }
         else if (inv.SilverCoins < 0)
         {
             // Deficyt w Silver – próbujemy “pożyczyć” z Gold
-            int goldNeeded = Mathf.CeilToInt(Mathf.Abs(inv.SilverCoins) / 20f);
+            int goldNeeded = Mathf.CeilToInt(Mathf.Abs(inv.SilverCoins) / 10f);
             if (goldNeeded <= inv.GoldCoins)
             {
                 inv.GoldCoins -= goldNeeded;
-                inv.SilverCoins += goldNeeded * 20;
+                inv.SilverCoins += goldNeeded * 10;
             }
             else
             {

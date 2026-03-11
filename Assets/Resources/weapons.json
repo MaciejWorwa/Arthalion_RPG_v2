@@ -5,8 +5,11 @@
       "Type": [
         "melee"
       ],
-      "Damage": [6],
-      "AttackRange": 1.5
+      "Damage": [
+        6
+      ],
+      "AttackRange": 1.5,
+      "Value": 0
     },
     {
       "Name": "Broń naturalna",
@@ -15,8 +18,11 @@
         "natural-weapon"
       ],
       "AttackRange": 1.5,
-      "Damage": [6],
-      "NaturalWeapon": true
+      "Damage": [
+        6
+      ],
+      "NaturalWeapon": true,
+      "Value": 0
     },
     {
       "Name": "Arkebuz",
@@ -25,12 +31,16 @@
       ],
       "TwoHanded": true,
       "Zr": 3,
-      "Damage": [8,8],
+      "Damage": [
+        8,
+        8
+      ],
       "AttackRange": 25.0,
       "ReloadTime": 3,
       "Slow": true,
       "Penetrating": true,
-      "AmmoType": "Pocisk i proch"
+      "AmmoType": "Pocisk i proch",
+      "Value": 1200
     },
     {
       "Name": "Bicz",
@@ -39,17 +49,23 @@
       ],
       "AttackRange": 2.0,
       "Zr": 3,
-      "Damage": [8],
-      "Fast": true
+      "Damage": [
+        8
+      ],
+      "Fast": true,
+      "Value": 250
     },
     {
       "Name": "Buława",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 200
     },
     {
       "Name": "Ciężka kusza",
@@ -58,12 +74,15 @@
       ],
       "TwoHanded": true,
       "S": 3,
-      "Damage": [12],
+      "Damage": [
+        12
+      ],
       "AttackRange": 25.0,
       "ReloadTime": 1,
       "Slow": true,
       "Penetrating": true,
-      "AmmoType": "Bełt"
+      "AmmoType": "Bełt",
+      "Value": 1000
     },
     {
       "Name": "Dmuchawka",
@@ -71,9 +90,12 @@
         "ranged"
       ],
       "Zr": 2,
-      "Damage": [4],
+      "Damage": [
+        4
+      ],
       "AttackRange": 8.0,
-      "AmmoType": "Strzałka"
+      "AmmoType": "Strzałka",
+      "Value": 50
     },
     {
       "Name": "Długi łuk",
@@ -82,9 +104,12 @@
       ],
       "TwoHanded": true,
       "S": 2,
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "AttackRange": 20.0,
-      "AmmoType": "Strzała"
+      "AmmoType": "Strzała",
+      "Value": 800
     },
     {
       "Name": "Glewia",
@@ -94,8 +119,11 @@
       "TwoHanded": true,
       "AttackRange": 2.0,
       "S": 2,
-      "Damage": [12],
-      "Penetrating": true
+      "Damage": [
+        12
+      ],
+      "Penetrating": true,
+      "Value": 400
     },
     {
       "Name": "Halabarda",
@@ -105,8 +133,12 @@
       "TwoHanded": true,
       "AttackRange": 2.0,
       "S": 3,
-      "Damage": [8,8],
-      "Penetrating": true
+      "Damage": [
+        8,
+        8
+      ],
+      "Penetrating": true,
+      "Value": 600
     },
     {
       "Name": "Kij",
@@ -115,8 +147,11 @@
       ],
       "TwoHanded": true,
       "AttackRange": 2.0,
-      "Damage": [4],
-      "Pummel": true
+      "Damage": [
+        4
+      ],
+      "Pummel": true,
+      "Value": 5
     },
     {
       "Name": "Kiścień",
@@ -124,9 +159,12 @@
         "melee"
       ],
       "Zr": 2,
-      "Damage": [12],
+      "Damage": [
+        12
+      ],
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 350
     },
     {
       "Name": "Kostur",
@@ -135,8 +173,11 @@
       ],
       "TwoHanded": true,
       "AttackRange": 2.0,
-      "Damage": [6],
-      "Pummel": true
+      "Damage": [
+        6
+      ],
+      "Pummel": true,
+      "Value": 100
     },
     {
       "Name": "Krótki łuk",
@@ -144,9 +185,12 @@
         "ranged"
       ],
       "TwoHanded": true,
-      "Damage": [6],
+      "Damage": [
+        6
+      ],
       "AttackRange": 10.0,
-      "AmmoType": "Strzała"
+      "AmmoType": "Strzała",
+      "Value": 200
     },
     {
       "Name": "Kusza",
@@ -154,10 +198,13 @@
         "ranged"
       ],
       "TwoHanded": true,
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "AttackRange": 15.0,
       "ReloadTime": 1,
-      "AmmoType": "Bełt"
+      "AmmoType": "Bełt",
+      "Value": 600
     },
     {
       "Name": "Łapacz",
@@ -167,7 +214,8 @@
       ],
       "TwoHanded": true,
       "AttackRange": 2.0,
-      "Entangle": true
+      "Entangle": true,
+      "Value": 100
     },
     {
       "Name": "Łuk",
@@ -175,17 +223,23 @@
         "ranged"
       ],
       "TwoHanded": true,
-      "Damage": [8],
+      "Damage": [
+        8
+      ],
       "AttackRange": 12.0,
-      "AmmoType": "Strzała"
+      "AmmoType": "Strzała",
+      "Value": 400
     },
     {
       "Name": "Miecz",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
-      "AttackRange": 1.5
+      "Damage": [
+        10
+      ],
+      "AttackRange": 1.5,
+      "Value": 100
     },
     {
       "Name": "Miecz dwuręczny",
@@ -194,19 +248,25 @@
       ],
       "TwoHanded": true,
       "S": 2,
-      "Damage": [12],
+      "Damage": [
+        12
+      ],
       "Slow": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 300
     },
     {
       "Name": "Młot bojowy",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Pummel": true,
       "Penetrating": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 400
     },
     {
       "Name": "Młot dwuręczny",
@@ -215,28 +275,38 @@
       ],
       "TwoHanded": true,
       "S": 4,
-      "Damage": [8,8],
+      "Damage": [
+        8,
+        8
+      ],
       "Pummel": true,
       "Slow": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 600
     },
     {
       "Name": "Nadziak",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Penetrating": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 200
     },
     {
       "Name": "Nóż",
       "Type": [
         "melee"
       ],
-      "Damage": [6],
+      "Damage": [
+        6
+      ],
       "Fast": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 40
     },
     {
       "Name": "Nóż do rzucania",
@@ -245,8 +315,11 @@
         "throwing"
       ],
       "Zr": 2,
-      "Damage": [6],
-      "AttackRange": 10.0
+      "Damage": [
+        6
+      ],
+      "AttackRange": 10.0,
+      "Value": 80
     },
     {
       "Name": "Oszczep",
@@ -254,10 +327,13 @@
         "ranged",
         "throwing"
       ],
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Zr": 2,
       "AttackRange": 10.0,
-      "Penetrating": true
+      "Penetrating": true,
+      "Value": 200
     },
     {
       "Name": "Pawęż",
@@ -266,29 +342,38 @@
         "shield"
       ],
       "S": 3,
-      "Damage": [4],
+      "Damage": [
+        4
+      ],
       "Defensive": 4,
       "Pummel": true,
       "Slow": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 500
     },
     {
       "Name": "Pałka",
       "Type": [
         "melee"
       ],
-      "Damage": [8],
+      "Damage": [
+        8
+      ],
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 70
     },
     {
       "Name": "Pałka z kolcami",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Penetrating": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 200
     },
     {
       "Name": "Pistolet",
@@ -296,10 +381,13 @@
         "ranged"
       ],
       "Zr": 3,
-      "Damage": [12],
+      "Damage": [
+        12
+      ],
       "AttackRange": 10.0,
       "ReloadTime": 2,
-      "AmmoType": "Pocisk i proch"
+      "AmmoType": "Pocisk i proch",
+      "Value": 900
     },
     {
       "Name": "Proca",
@@ -307,9 +395,12 @@
         "ranged"
       ],
       "Zr": 2,
-      "Damage": [6],
+      "Damage": [
+        6
+      ],
       "AttackRange": 10.0,
-      "AmmoType": "Pocisk kamienny"
+      "AmmoType": "Pocisk kamienny",
+      "Value": 200
     },
     {
       "Name": "Puklerz",
@@ -317,10 +408,13 @@
         "melee",
         "shield"
       ],
-      "Damage": [4],
+      "Damage": [
+        4
+      ],
       "Defensive": 1,
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 100
     },
     {
       "Name": "Rapier",
@@ -328,10 +422,13 @@
         "melee"
       ],
       "Zr": 2,
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Fast": true,
       "Defensive": 1,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 400
     },
     {
       "Name": "Sieć",
@@ -343,18 +440,22 @@
       "Zr": 2,
       "AttackRange": 4.0,
       "Entangle": true,
-      "Penetrating": true
+      "Penetrating": true,
+      "Value": 50
     },
-        {
+    {
       "Name": "Słoneczna tarcza",
       "Type": [
         "melee",
         "shield"
       ],
-      "Damage": [4],
+      "Damage": [
+        4
+      ],
       "Defensive": 3,
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 800
     },
     {
       "Name": "Szabla",
@@ -362,18 +463,24 @@
         "melee"
       ],
       "Zr": 2,
-      "Damage": [10],
+      "Damage": [
+        10
+      ],
       "Fast": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 200
     },
     {
       "Name": "Sztylet",
       "Type": [
         "melee"
       ],
-      "Damage": [8],
+      "Damage": [
+        8
+      ],
       "Fast": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 80
     },
     {
       "Name": "Tarcza",
@@ -381,18 +488,24 @@
         "melee",
         "shield"
       ],
-      "Damage": [4],
+      "Damage": [
+        4
+      ],
       "Defensive": 2,
       "Pummel": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 150
     },
     {
       "Name": "Topór",
       "Type": [
         "melee"
       ],
-      "Damage": [10],
-      "AttackRange": 1.5
+      "Damage": [
+        10
+      ],
+      "AttackRange": 1.5,
+      "Value": 100
     },
     {
       "Name": "Topór dwuręczny",
@@ -401,10 +514,14 @@
       ],
       "TwoHanded": true,
       "S": 3,
-      "Damage": [8,8],
+      "Damage": [
+        8,
+        8
+      ],
       "Slow": true,
       "Penetrating": true,
-      "AttackRange": 1.5
+      "AttackRange": 1.5,
+      "Value": 600
     },
     {
       "Name": "Włócznia",
@@ -413,8 +530,11 @@
       ],
       "TwoHanded": true,
       "AttackRange": 2.0,
-      "Damage": [10],
-      "Penetrating": true
+      "Damage": [
+        10
+      ],
+      "Penetrating": true,
+      "Value": 300
     },
     {
       "Name": "Skórzany hełm",
@@ -422,7 +542,8 @@
         "head",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 50
     },
     {
       "Name": "Skórzany kaftan",
@@ -430,7 +551,8 @@
         "torso",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 200
     },
     {
       "Name": "Skórzane karwasze",
@@ -438,7 +560,8 @@
         "arms",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 100
     },
     {
       "Name": "Skórzana kurta",
@@ -447,7 +570,8 @@
         "arms",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 300
     },
     {
       "Name": "Skórzane nogawice",
@@ -455,7 +579,8 @@
         "legs",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 150
     },
     {
       "Name": "Czepiec kolczy",
@@ -464,7 +589,8 @@
         "chain"
       ],
       "Armor": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 400
     },
     {
       "Name": "Kaftan kolczy",
@@ -474,7 +600,8 @@
       ],
       "Armor": 2,
       "S": 1,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 800
     },
     {
       "Name": "Kolczuga",
@@ -486,7 +613,8 @@
       ],
       "Armor": 2,
       "S": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 1800
     },
     {
       "Name": "Koszulka kolcza",
@@ -497,7 +625,8 @@
       ],
       "Armor": 2,
       "S": 1,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 1200
     },
     {
       "Name": "Hełm",
@@ -507,7 +636,8 @@
       ],
       "Armor": 2,
       "Zw": -1,
-      "P": -1
+      "P": -1,
+      "Value": 600
     },
     {
       "Name": "Płytowe nagolenniki",
@@ -517,7 +647,8 @@
       ],
       "Armor": 2,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 1600
     },
     {
       "Name": "Płytowy napierśnik",
@@ -527,7 +658,8 @@
       ],
       "Armor": 2,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 2000
     },
     {
       "Name": "Płytowe naramienniki",
@@ -537,7 +669,8 @@
       ],
       "Armor": 2,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 1200
     },
     {
       "Name": "Słoneczny hełm",
@@ -546,7 +679,8 @@
         "plate"
       ],
       "Armor": 2,
-      "P": -1
+      "P": -1,
+      "Value": 1600
     },
     {
       "Name": "Słoneczne nagolenniki",
@@ -555,7 +689,8 @@
         "plate"
       ],
       "Armor": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 4000
     },
     {
       "Name": "Słoneczny napierśnik",
@@ -564,7 +699,8 @@
         "plate"
       ],
       "Armor": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 5600
     },
     {
       "Name": "Słoneczne naramienniki",
@@ -573,7 +709,8 @@
         "plate"
       ],
       "Armor": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 3200
     },
     {
       "Name": "Hełm z Czerwonej Stali",
@@ -583,7 +720,8 @@
       ],
       "Armor": 3,
       "Zw": -2,
-      "P": -1
+      "P": -1,
+      "Value": 2000
     },
     {
       "Name": "Napierśnik z Czerwonej Stali",
@@ -593,7 +731,8 @@
       ],
       "Armor": 3,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 7000
     },
     {
       "Name": "Naramienniki z Czerwonej Stali",
@@ -603,7 +742,8 @@
       ],
       "Armor": 3,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 4000
     },
     {
       "Name": "Nogawice z Czerwonej Stali",
@@ -613,7 +753,8 @@
       ],
       "Armor": 3,
       "S": 2,
-      "Zw": -2
+      "Zw": -2,
+      "Value": 5000
     },
     {
       "Name": "Zbroja skórzana",
@@ -624,7 +765,8 @@
         "legs",
         "leather"
       ],
-      "Armor": 1
+      "Armor": 1,
+      "Value": 500
     },
     {
       "Name": "Zbroja kolcza",
@@ -637,7 +779,8 @@
       ],
       "Armor": 2,
       "S": 2,
-      "Zw": -1
+      "Zw": -1,
+      "Value": 2200
     },
     {
       "Name": "Zbroja płytowa",
@@ -651,7 +794,8 @@
       "Armor": 2,
       "S": 2,
       "Zw": -2,
-      "P": -1
+      "P": -1,
+      "Value": 5400
     },
     {
       "Name": "Słoneczna zbroja",
@@ -664,7 +808,8 @@
       ],
       "Armor": 2,
       "Zw": -1,
-      "P": -1
+      "P": -1,
+      "Value": 14400
     },
     {
       "Name": "Zbroja z Czerwonej Stali",
@@ -678,7 +823,8 @@
       "Armor": 3,
       "S": 2,
       "Zw": -2,
-      "P": -1
+      "P": -1,
+      "Value": 18000
     }
   ]
 }
