@@ -135,6 +135,7 @@ public class DungeonGenerator : MonoBehaviour
 
     [Header("Safety")]
     [SerializeField] private bool _removeUnitsOutsideDungeon = true;
+    [SerializeField] private bool _removeMapElementsOutsideDungeon = true;
 
 
     [Header("Enemy generation")]
@@ -208,6 +209,7 @@ public class DungeonGenerator : MonoBehaviour
         EnsureRoomCentersAreWalkable(rooms, walkableMask, width, height);
 
         GridManager.Instance.ApplyWalkableMask(walkableMask);
+        RemoveMapElementsOutsideDungeonIfNeeded();
         RemoveUnitsOutsideDungeonIfNeeded();
         GenerateEnemiesByPlayerStrength(rng);
 
@@ -1927,6 +1929,112 @@ public class DungeonGenerator : MonoBehaviour
         {
             Debug.LogWarning($"Nie udało się przenieść {notMovedUnits} jednostek: brak wolnych pól w dungeonie.");
         }
+    }
+
+    private void RemoveMapElementsOutsideDungeonIfNeeded()
+    {
+        if (!_removeMapElementsOutsideDungeon) return;
+
+        GameObject[] mapElements = GameObject.FindGameObjectsWithTag("MapElement");
+        if (mapElements == null || mapElements.Length == 0) return;
+
+        int removedElements = 0;
+        List<GameObject> mapEditorElements = MapEditor.Instance != null ? MapEditor.Instance.AllElements : null;
+
+        for (int i = 0; i < mapElements.Length; i++)
+        {
+            GameObject mapElement = mapElements[i];
+            if (mapElement == null || !mapElement.activeInHierarchy) continue;
+
+            if (IsMapElementWithinDungeonArea(mapElement))
+            {
+                continue;
+            }
+
+            if (mapEditorElements != null)
+            {
+                mapEditorElements.Remove(mapElement);
+            }
+
+            Destroy(mapElement);
+            removedElements++;
+        }
+
+        if (removedElements <= 0) return;
+
+        GridManager.Instance?.CheckTileOccupancy();
+        Debug.Log($"Usunięto {removedElements} elementów mapy spoza obszaru dungeonu.");
+    }
+
+    private static bool IsMapElementWithinDungeonArea(GameObject mapElement)
+    {
+        if (mapElement == null) return false;
+
+        if (!TryGetMapElementBounds(mapElement, out Bounds bounds))
+        {
+            return HasActiveTileNearPoint(mapElement.transform.position);
+        }
+
+        float safeSizeX = Mathf.Max(bounds.size.x, 0.1f);
+        float safeSizeY = Mathf.Max(bounds.size.y, 0.1f);
+
+        int sampleCountX = Mathf.Clamp(Mathf.CeilToInt(safeSizeX) + 1, 2, 6);
+        int sampleCountY = Mathf.Clamp(Mathf.CeilToInt(safeSizeY) + 1, 2, 6);
+
+        for (int x = 0; x < sampleCountX; x++)
+        {
+            float tx = sampleCountX == 1 ? 0.5f : x / (sampleCountX - 1f);
+            float sampleX = Mathf.Lerp(bounds.min.x, bounds.max.x, tx);
+
+            for (int y = 0; y < sampleCountY; y++)
+            {
+                float ty = sampleCountY == 1 ? 0.5f : y / (sampleCountY - 1f);
+                float sampleY = Mathf.Lerp(bounds.min.y, bounds.max.y, ty);
+
+                if (HasActiveTileNearPoint(new Vector2(sampleX, sampleY)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetMapElementBounds(GameObject mapElement, out Bounds bounds)
+    {
+        bounds = default;
+        if (mapElement == null) return false;
+
+        Collider2D collider = mapElement.GetComponent<Collider2D>();
+        if (collider != null)
+        {
+            bounds = collider.bounds;
+            return true;
+        }
+
+        SpriteRenderer spriteRenderer = mapElement.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            bounds = spriteRenderer.bounds;
+            return true;
+        }
+
+        bounds = new Bounds(mapElement.transform.position, new Vector3(0.1f, 0.1f, 0.1f));
+        return true;
+    }
+
+    private static bool HasActiveTileNearPoint(Vector2 point, float radius = 0.16f)
+    {
+        Collider2D[] colliders = Physics2D.OverlapCircleAll(point, radius);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider2D collider = colliders[i];
+            if (collider == null || !collider.gameObject.activeInHierarchy) continue;
+            if (collider.CompareTag("Tile")) return true;
+        }
+
+        return false;
     }
 
     private static bool IsRelocationTargetFree(Vector2 targetPosition, Unit unitBeingMoved)

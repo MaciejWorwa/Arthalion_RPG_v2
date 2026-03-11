@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,6 +38,8 @@ public class GameManager : MonoBehaviour
     }
 
     [Header("Tryby gry")]
+    public static bool IsDungeonCrawlerMode = false;
+    [SerializeField] private Button _dungeonCrawlerButton;
     public static bool IsAutoDiceRollingMode = false;
     [SerializeField] private Button _autoDiceRollingButton;
     public static bool IsAutoDefenseMode = false;
@@ -158,9 +160,19 @@ public class GameManager : MonoBehaviour
             IsMousePressed = false;
             DraggableObject.IsDragging = false;
 
-            if(MapEditor.Instance != null && MapEditor.Instance.RemovedPositions.Count > 0)
+            if(MapEditor.Instance != null)
             {
-                MapEditor.Instance.RemovedPositions.Clear();
+                if (MapEditor.Instance.RemovedPositions.Count > 0)
+                {
+                    MapEditor.Instance.RemovedPositions.Clear();
+                }
+
+                if (MapEditor.Instance.PlacedPositions.Count > 0)
+                {
+                    MapEditor.Instance.PlacedPositions.Clear();
+                }
+
+                MapEditor.Instance.StopElementDragging();
             }
         }
 
@@ -375,6 +387,22 @@ public class GameManager : MonoBehaviour
     #endregion
 
     #region Game modes
+    public void SetDungeonCrawlerMode()
+    {
+        IsDungeonCrawlerMode = !IsDungeonCrawlerMode;
+
+        UpdateButtonColor(_dungeonCrawlerButton, IsDungeonCrawlerMode);
+
+        if (IsDungeonCrawlerMode)
+        {
+            Debug.Log("Tryb eksploracji podziemi został włączony. Podziemia wraz z przeciwnikami będą generowane automatycznie. Postać będzie otrzymywała Punkty Doświadczenia i ekwipunek za pokonanych wrogów.");
+        }
+        else
+        {
+            Debug.Log("Tryb eksploracji podziemi został wyłączony.");
+        }
+    }
+
     public void SetAutoCombatMode()
     {
         if(RoundsManager.Instance.NextRoundButton != null && !RoundsManager.Instance.NextRoundButton.gameObject.activeSelf)
@@ -794,6 +822,9 @@ public class GameManager : MonoBehaviour
         Application.Quit();
     }
 }
+
+
+
 
 
 

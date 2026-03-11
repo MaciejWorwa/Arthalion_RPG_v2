@@ -23,6 +23,8 @@ At the moment only Polish language is supported.
 
 - Battlefield editor with hundreds of map assets from https://www.forgotten-adventures.net/. Author retains all copyright rights,
 
+- Dungeon Crawler mode for standalone tactical gameplay,
+
 - Various races and monsters to choose from,
 
 - Various weapons with quality selection,
@@ -54,6 +56,7 @@ At the moment only Polish language is supported.
 When you start the game, you enter the **Map Editor**. Here, you can customize the battlefield using the following features:
 
 - **Grid Size**: Adjust the grid size to fit your gameplay needs.
+- **Random Dungeon Generation:** Generate a random layout of interconnected rooms within the boundaries of your grid. This tool quickly creates a complex playable area for your encounters.
 - **Background Settings**: Load a custom background and modify its size and position to align with your grid.
 - **Map Elements**: Place various elements on the map and adjust their rotation:
   - **Element Rotation**: Right-click before placing an element on the map to rotate it by 90 degrees. You can also set random rotation. When enabled, each placed element will have a random rotation.
@@ -61,6 +64,8 @@ When you start the game, you enter the **Map Editor**. Here, you can customize t
     - **High Obstacle**: Fully covers units behind it.
     - **Low Obstacle**: Partially covers units behind it.
   - **Blocking Tiles**: Set elements to block the tile they occupy. The last item in the element list is specifically designed for blocking; check the box to enable this, making it invisible in Battle Mode.
+  - **Moving Elements:** Move map elements freely across the grid using drag and drop.
+  - **Exiting Modes:** To disable the current element placement or deletion mode, click the middle mouse button (MMB).
 - When your battlefield setup is complete, click **Play** in the top right corner to start the battle.
 
 ## Camera Controls
@@ -83,7 +88,11 @@ In Battle Mode, manage and control units with these actions:
 - **Attacking:** Right-click on an enemy unit to initiate an attack. Hold the mouse button to choose a specific hit location.
 - **Editing Units:** After selecting a unit, you can edit its attributes in the panel located on the left side of the screen.
 - **Deleting Units:** Press `Delete` to remove selected units or use the "Delete" button in the Unit Management Panel.
-- **Drag and Drop Units or Map Elements**: Move elements freely across the map using drag and drop. Press `Delete` to remove the selected element or right-click to rotate it.
+- **Drag and Drop Units or Map Elements**: Move elements freely across the map using drag and drop. Press `Delete` to remove the selected element or right-click to rotate it. To move elements that do not block movement (walkable) in Battle Mode, you must hold the Alt key while dragging.
+- **Dungeon Crawler Mode**: This mode can be activated via a dedicated button within Battle Mode. It is a standalone gameplay mode where you:
+  - **Generate Random Dungeons:** Instantly create a new, procedurally generated layout.
+  - **Scaled Challenges:** The system automatically spawns enemies adjusted to your character's current level.
+  - **Progression:** Defeat enemies to gain experience and level up your character, focusing purely on tactical combat independent of a tabletop story.
 
 ## Covering Areas
 

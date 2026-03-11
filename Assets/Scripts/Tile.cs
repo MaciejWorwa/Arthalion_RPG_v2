@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Tile : MonoBehaviour
 {
@@ -133,6 +133,10 @@ public class Tile : MonoBehaviour
             Vector3 position = new Vector3(transform.position.x, transform.position.y, 1);
             MapEditor.Instance.PlaceElementOnSelectedTile(position);
         }
+        else if (MapEditor.Instance != null)
+        {
+            MapEditor.Instance.TryDragElementAtTile(transform.position);
+        }
     }
 
     public void HighlightTile()
@@ -185,3 +189,5 @@ public class Tile : MonoBehaviour
         _tileFilling.SetActive(false);
     }
 }
+
+

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -39,6 +39,7 @@ public class MapEditor : MonoBehaviour
 
     public static bool IsElementRemoving = false;
     public HashSet<Vector2> RemovedPositions = new HashSet<Vector2>(); // Przechowuje unikalne pozycje usuniętych elementów
+    public HashSet<Vector2> PlacedPositions = new HashSet<Vector2>(); // Przechowuje pozycje, na których już postawiliśmy element podczas jednego przytrzymania LPM
     public static bool IsElementPlacing = false;
 
     [SerializeField] private UnityEngine.UI.Toggle _highObstacleToggle;
@@ -49,6 +50,10 @@ public class MapEditor : MonoBehaviour
     [SerializeField] private TMP_InputField _rotationInputField;
     private Vector3 _mousePosition;
     private GameObject _cursorObject;
+    private GameObject _draggedElement;
+    private Vector3 _draggedElementTileOffset;
+    private bool _isDraggingElement;
+    private const float _mapElementSelectionRadius = 0.9f;
 
     [Header("Ukrywanie mapy")]
     [SerializeField] private GameObject _tileCover; //Czarny sprite zasłaniający pole
@@ -135,6 +140,11 @@ public class MapEditor : MonoBehaviour
             RemoveElementsMode(false);
             ResetAllSelectedElements();
         }
+
+        if (Input.GetMouseButtonUp(0))
+        {
+            StopElementDragging();
+        }
     }
 
     #region Map elements managing
@@ -188,6 +198,13 @@ public class MapEditor : MonoBehaviour
         _cursorObject.transform.position = _mousePosition + offset;
     }
 
+    private static Vector2 GetPlacementKey(Vector3 position)
+    {
+        // Zaokrąglamy pozycję, aby uniknąć problemów z precyzją float.
+        float x = Mathf.Round(position.x * 100f) / 100f;
+        float y = Mathf.Round(position.y * 100f) / 100f;
+        return new Vector2(x, y);
+    }
     public void PlaceElementOnRandomTile()
     {
         List<Vector3> availablePositions = new List<Vector3>();
@@ -327,15 +344,34 @@ public class MapEditor : MonoBehaviour
                 if (circleCollider != null && !circleCollider.gameObject.CompareTag("Tile")) return;  
             }
 
+            if (GameManager.IsMousePressed)
+            {
+                Vector2 placementKey = GetPlacementKey(position);
+                if (PlacedPositions.Contains(placementKey)) return;
+            }
+
             GameObject newElement = Instantiate(MapElementUI.SelectedElement, position, rotation);
+
+            if (GameManager.IsMousePressed)
+            {
+                PlacedPositions.Add(GetPlacementKey(position));
+            }
 
             //Dodanie elementu do listy wszystkich obecnych na mapie elementów
             AllElements.Add(newElement);
 
             newElement.tag = "MapElement";
-            newElement.GetComponent<MapElement>().IsHighObstacle = _highObstacleToggle.isOn;
-            newElement.GetComponent<MapElement>().IsLowObstacle = _lowObstacleToggle.isOn;
-            newElement.GetComponent<MapElement>().IsCollider = _isColliderToggle.isOn;
+
+            MapElement createdElement = newElement.GetComponent<MapElement>();
+            if (createdElement != null)
+            {
+                createdElement.IsHighObstacle = _highObstacleToggle.isOn;
+                createdElement.IsLowObstacle = _lowObstacleToggle.isOn;
+                createdElement.IsCollider = _isColliderToggle.isOn;
+
+                bool isMapEditorScene = SceneManager.GetActiveScene().buildIndex == 0;
+                createdElement.SetColliderState(isMapEditorScene || createdElement.IsCollider);
+            }
         }
     }
 
@@ -440,35 +476,162 @@ public class MapEditor : MonoBehaviour
 
     public void RemoveElement(GameObject gameObject)
     {
+        if (gameObject == null) return;
+
         Vector2 position = gameObject.transform.position;
 
-        // Sprawdzamy, czy już usuwaliśmy element z tej pozycji
+        // Blokuje wielokrotne usuwanie tego samego pola podczas jednego przeciagania LPM.
         if (RemovedPositions.Contains(position)) return;
 
-        Collider2D[] colliders = Physics2D.OverlapPointAll(position);
+        bool removedAny = false;
+        HashSet<int> removedIds = new HashSet<int>();
 
+        Collider2D[] colliders = Physics2D.OverlapPointAll(position);
         for (int i = 0; i < colliders.Length; i++)
         {
-            if (colliders[i].gameObject.CompareTag("Tile"))
+            Collider2D col = colliders[i];
+            if (col == null) continue;
+
+            GameObject hitObject = col.gameObject;
+            if (hitObject == null) continue;
+
+            if (hitObject.CompareTag("Tile"))
             {
-                colliders[i].GetComponent<Tile>().IsOccupied = false;
+                Tile tile = hitObject.GetComponent<Tile>();
+                if (tile != null) tile.IsOccupied = false;
+                continue;
             }
-            else if (colliders[i].gameObject.CompareTag("MapElement"))
+
+            if (!hitObject.CompareTag("MapElement")) continue;
+
+            int id = hitObject.GetInstanceID();
+            if (removedIds.Contains(id)) continue;
+
+            removedIds.Add(id);
+            AllElements.Remove(hitObject);
+            Destroy(hitObject);
+            removedAny = true;
+        }
+
+                // Fallback: usuwanie elementów bez aktywnego collidera (np. dekoracje walkable).
+        if (!removedAny)
+        {
+            Vector2 mouseWorldPosition = GetMouseWorldPosition(position);
+            GameObject elementToRemove = FindClosestMapElement(position, mouseWorldPosition, _mapElementSelectionRadius);
+
+            if (elementToRemove != null)
             {
-                if (!colliders[i].GetComponent<MapElement>().IsCollider && RemovedPositions.Count > 0) return;
+                AllElements.Remove(elementToRemove);
+                Destroy(elementToRemove);
+                removedAny = true;
+            }
+        }
 
-                AllElements.Remove(gameObject);
-                Destroy(colliders[i].gameObject);
+        if (removedAny)
+        {
+            RemovedPositions.Add(position);
 
-                if (colliders[i].GetComponent<MapElement>().IsCollider)
-                {
-                    // Dodajemy pozycję do listy usuniętych elementów
-                    RemovedPositions.Add(position);
-                }
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.CheckTileOccupancy();
             }
         }
     }
 
+    public bool TryDragElementAtTile(Vector3 tilePosition)
+    {
+        if (AllElements == null || AllElements.Count == 0) return false;
+        if (!Input.GetKey(KeyCode.LeftAlt) && !Input.GetKey(KeyCode.RightAlt)) return false;
+        if (MapElementUI.SelectedElement != null || IsElementRemoving) return false;
+        if (GameManager.Instance == null || GameManager.Instance.IsPointerOverUI()) return false;
+
+        Vector2 anchorPosition = new Vector2(tilePosition.x, tilePosition.y);
+        Vector2 mouseWorldPosition = GetMouseWorldPosition(anchorPosition);
+
+        if (!_isDraggingElement || _draggedElement == null)
+        {
+            _draggedElement = FindClosestMapElement(anchorPosition, mouseWorldPosition, _mapElementSelectionRadius);
+            if (_draggedElement == null) return false;
+
+            _isDraggingElement = true;
+            Vector3 draggedPosition = _draggedElement.transform.position;
+            _draggedElementTileOffset = new Vector3(
+                draggedPosition.x - anchorPosition.x,
+                draggedPosition.y - anchorPosition.y,
+                0f
+            );
+        }
+
+        Vector3 newPosition = _draggedElement.transform.position;
+        newPosition.x = anchorPosition.x + _draggedElementTileOffset.x;
+        newPosition.y = anchorPosition.y + _draggedElementTileOffset.y;
+        _draggedElement.transform.position = newPosition;
+
+        if (GridManager.Instance != null)
+        {
+            GridManager.Instance.CheckTileOccupancy();
+        }
+
+        return true;
+    }
+
+    public void StopElementDragging()
+    {
+        _isDraggingElement = false;
+        _draggedElement = null;
+        _draggedElementTileOffset = Vector3.zero;
+    }
+
+    private Vector2 GetMouseWorldPosition(Vector2 fallback)
+    {
+        if (Camera.main == null) return fallback;
+
+        Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        return new Vector2(worldPosition.x, worldPosition.y);
+    }
+
+    private GameObject FindClosestMapElement(Vector2 anchorPosition, Vector2 mouseWorldPosition, float radius)
+    {
+        if (AllElements == null || AllElements.Count == 0) return null;
+
+        GameObject bestElement = null;
+        float bestDistance = float.MaxValue;
+        float bestZ = float.MaxValue;
+
+        for (int i = 0; i < AllElements.Count; i++)
+        {
+            GameObject element = AllElements[i];
+            if (element == null) continue;
+
+            Vector2 elementPosition = new Vector2(element.transform.position.x, element.transform.position.y);
+            float distanceToAnchor = Vector2.Distance(elementPosition, anchorPosition);
+            float distanceToMouse = Vector2.Distance(elementPosition, mouseWorldPosition);
+
+            bool inRange = distanceToAnchor <= radius || distanceToMouse <= radius;
+
+            SpriteRenderer spriteRenderer = element.GetComponent<SpriteRenderer>();
+            if (!inRange && spriteRenderer != null)
+            {
+                Vector3 mousePoint3D = new Vector3(mouseWorldPosition.x, mouseWorldPosition.y, spriteRenderer.bounds.center.z);
+                inRange = spriteRenderer.bounds.Contains(mousePoint3D);
+            }
+
+            if (!inRange) continue;
+
+            float elementZ = element.transform.position.z;
+            bool betterDepth = elementZ < bestZ;
+            bool sameDepth = Mathf.Abs(elementZ - bestZ) <= 0.0001f;
+
+            if (bestElement == null || betterDepth || (sameDepth && distanceToMouse < bestDistance))
+            {
+                bestElement = element;
+                bestDistance = distanceToMouse;
+                bestZ = elementZ;
+            }
+        }
+
+        return bestElement;
+    }
     public void RemoveElementsOutsideTheGrid()
     {
         // Usuwa wszystkie przeszkody poza siatką bitewną
@@ -830,3 +993,11 @@ public class MapEditor : MonoBehaviour
     }
     #endregion
 }
+
+
+
+
+
+
+
+
