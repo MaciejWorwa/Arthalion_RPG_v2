@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -8,10 +8,11 @@ public class CustomDropdown : MonoBehaviour
     public List<Button> Buttons = new List<Button>();
     public int SelectedIndex = 0;
     public Button SelectedButton;
-    private Color _defaultColor = new Color(0.55f, 0.66f, 0.66f, 0.05f); // Domyślny kolor przycisku
-    private Color _selectedColor = new Color(1f, 1f, 1f, 0.2f); // Kolor wybranego przycisku
-    private Color _activeColor = new Color(0.15f, 1f, 0.45f, 0.2f); // Kolor aktywnego przycisku
-    private Color _selectedActiveColor = new Color(0.15f, 1f, 0.45f, 0.4f); // Kolor aktywnego przycisku, jeśli jednocześnie jest zaznaczony
+
+    private readonly Color _defaultColor = new Color(0.55f, 0.66f, 0.66f, 0.05f);
+    private readonly Color _selectedColor = new Color(1f, 1f, 1f, 0.2f);
+    private readonly Color _activeColor = new Color(0.15f, 1f, 0.45f, 0.2f);
+    private readonly Color _selectedActiveColor = new Color(0.15f, 1f, 0.45f, 0.4f);
 
     private void Awake()
     {
@@ -22,8 +23,12 @@ public class CustomDropdown : MonoBehaviour
     {
         foreach (var button in Buttons)
         {
-            Destroy(button.gameObject);
+            if (button != null)
+            {
+                Destroy(button.gameObject);
+            }
         }
+
         Buttons.Clear();
         SelectedIndex = 0;
         SelectedButton = null;
@@ -31,13 +36,11 @@ public class CustomDropdown : MonoBehaviour
 
     public void ResetSelectedOption()
     {
-        // Jeśli istnieje wybrany przycisk, przywróć jego domyślny kolor
         if (SelectedIndex >= 1 && SelectedIndex <= Buttons.Count)
         {
             ResetColor(SelectedIndex);
         }
 
-        // Zresetuj SelectedIndex i SelectedButton
         SelectedIndex = 0;
         SelectedButton = null;
     }
@@ -48,58 +51,82 @@ public class CustomDropdown : MonoBehaviour
         {
             int capturedIndex = i;
             Buttons[capturedIndex].onClick.RemoveAllListeners();
-            Buttons[capturedIndex].onClick.AddListener(() => SelectOption(capturedIndex + 1)); // Zakładamy, że indeksy zaczynają się od 1
+            Buttons[capturedIndex].onClick.AddListener(() => SelectOption(capturedIndex + 1));
         }
     }
 
-    void SelectOption(int index)
+    private void SelectOption(int index)
     {
         if (index < 1 || index > Buttons.Count)
         {
-            Debug.LogError($"Nieprawidłowy indeks: {index}");
+            Debug.LogError($"Nieprawidlowy indeks: {index}");
             return;
         }
 
         if (SelectedIndex >= 1 && SelectedIndex <= Buttons.Count)
         {
-            if(Buttons[SelectedIndex - 1].GetComponent<Image>().color != _activeColor && Buttons[SelectedIndex - 1].GetComponent<Image>().color != _selectedActiveColor)
+            Image oldImage = Buttons[SelectedIndex - 1].GetComponent<Image>();
+            if (oldImage != null)
             {
-                ResetColor(SelectedIndex);
-            }
-            else if (Buttons[SelectedIndex - 1].GetComponent<Image>().color == _selectedActiveColor)
-            {
-                Buttons[SelectedIndex - 1].GetComponent<Image>().color = _activeColor;
+                if (oldImage.color != _activeColor && oldImage.color != _selectedActiveColor)
+                {
+                    ResetColor(SelectedIndex);
+                }
+                else if (oldImage.color == _selectedActiveColor)
+                {
+                    oldImage.color = _activeColor;
+                }
             }
         }
-        
-        SelectedButton = null;
+
         SelectedIndex = index;
         SelectedButton = Buttons[SelectedIndex - 1];
 
-        if(Buttons[SelectedIndex - 1].GetComponent<Image>().color != _activeColor)
+        Image selectedImage = Buttons[SelectedIndex - 1].GetComponent<Image>();
+        if (selectedImage != null)
         {
-            Buttons[SelectedIndex - 1].GetComponent<Image>().color = _selectedColor;
-        }
-        else
-        {
-            Buttons[SelectedIndex - 1].GetComponent<Image>().color = _selectedActiveColor;
+            if (selectedImage.color != _activeColor)
+            {
+                selectedImage.color = _selectedColor;
+            }
+            else
+            {
+                selectedImage.color = _selectedActiveColor;
+            }
         }
     }
 
     public void MakeOptionActive(int index)
     {
-        Buttons[index - 1].GetComponent<Image>().color = _activeColor;
+        if (index < 1 || index > Buttons.Count) return;
 
-        //W przypadku aktywnych (trzymanych) broni z ekwipunku pokazuje informację o ręce, w której dana broń jest trzymana
-        InventoryManager.Instance.DisplayHandInfo(Buttons[index - 1]);
+        Image image = Buttons[index - 1].GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = _activeColor;
+        }
+
+        if (InventoryManager.Instance != null)
+        {
+            InventoryManager.Instance.DisplayHandInfo(Buttons[index - 1]);
+        }
     }
 
     public void ResetColor(int index)
     {
-        Buttons[index - 1].GetComponent<Image>().color = _defaultColor;
+        if (index < 1 || index > Buttons.Count) return;
 
-        //Ukrywa widok informacji dodatkowej
-        Buttons[index - 1].transform.Find("hand_text").gameObject.SetActive(false);
+        Image image = Buttons[index - 1].GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = _defaultColor;
+        }
+
+        Transform handInfo = Buttons[index - 1].transform.Find("hand_text");
+        if (handInfo != null)
+        {
+            handInfo.gameObject.SetActive(false);
+        }
     }
 
     public int GetSelectedIndex()
@@ -107,16 +134,21 @@ public class CustomDropdown : MonoBehaviour
         return SelectedIndex;
     }
 
-    // Opcjonalnie: metoda do zaznaczenia przycisku programowo
     public void SetSelectedIndex(int index)
     {
-        if (index >= 0 && index <= Buttons.Count)
+        if (index == 0)
+        {
+            ResetSelectedOption();
+            return;
+        }
+
+        if (index >= 1 && index <= Buttons.Count)
         {
             SelectOption(index);
         }
         else
         {
-            Debug.LogError($"Nieprawidłowy indeks: {index}. Lista Buttons ma {Buttons.Count} elementów.");
+            Debug.LogError($"Nieprawidlowy indeks: {index}. Lista Buttons ma {Buttons.Count} elementow.");
         }
     }
 }

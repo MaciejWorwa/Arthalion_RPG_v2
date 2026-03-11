@@ -4918,6 +4918,7 @@ GameObject:
   - component: {fileID: 115621309}
   - component: {fileID: 115621311}
   - component: {fileID: 115621310}
+  - component: {fileID: 115621312}
   m_Layer: 5
   m_Name: Text (TMP)
   m_TagString: Untagged
@@ -4964,7 +4965,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Losowa siatka
+  m_text: "Losowy uk\u0142ad"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b89603a1818861141bae167160054d29, type: 2}
   m_sharedMaterial: {fileID: -1351651729723031045, guid: b89603a1818861141bae167160054d29, type: 2}
@@ -5043,6 +5044,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 115621308}
   m_CullTransparentMesh: 1
+--- !u!114 &115621312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 115621308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Kliknij, aby wygenerowa\u0107 losowy uk\u0142ad podziemi na podstawie
+    obecnej siatki."
 --- !u!1 &115803822
 GameObject:
   m_ObjectHideFlags: 0
@@ -37705,6 +37720,7 @@ GameObject:
   - component: {fileID: 769678065}
   - component: {fileID: 769678064}
   - component: {fileID: 769678063}
+  - component: {fileID: 769678066}
   m_Layer: 5
   m_Name: restore_grid_button
   m_TagString: Untagged
@@ -37826,6 +37842,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 769678061}
   m_CullTransparentMesh: 1
+--- !u!114 &769678066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 769678061}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonTooltip
+  _tooltipText: "Kliknij, aby przywr\xF3ci\u0107 standardow\u0105 siatk\u0119."
 --- !u!1 &770467557
 GameObject:
   m_ObjectHideFlags: 0
@@ -92715,6 +92744,15 @@ MonoBehaviour:
   activePanels: []
   _mainMenuPanel: {fileID: 466833132}
   _tileCoveringPanel: {fileID: 0}
+  _dungeonCrawlerRewardPanel: {fileID: 0}
+  _dungeonCrawlerRewardSummaryText: {fileID: 0}
+  _dungeonCrawlerLootScrollContent: {fileID: 0}
+  _dungeonCrawlerLootButtonPrefab: {fileID: 0}
+  _dungeonCrawlerTakeButton: {fileID: 0}
+  _dungeonCrawlerTakeAllButton: {fileID: 0}
+  _dungeonCrawlerSellButton: {fileID: 0}
+  _dungeonCrawlerSellAllButton: {fileID: 0}
+  _dungeonCrawlerCloseButton: {fileID: 0}
 --- !u!1 &2028419360
 GameObject:
   m_ObjectHideFlags: 0

@@ -610,6 +610,12 @@ public class UnitsManager : MonoBehaviour
             unit.Stats = stats;
         }
 
+        bool isLoading = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
+        if (!isLoading && unit.CompareTag("EnemyUnit") && GameManager.Instance != null)
+        {
+            GameManager.Instance.RegisterDungeonCrawlerEnemyDefeat(unit);
+        }
+
         //Usuniecie jednostki z kolejki inicjatywy
         InitiativeQueueManager.Instance.RemoveUnitFromInitiativeQueue(unit);
 
@@ -631,7 +637,6 @@ public class UnitsManager : MonoBehaviour
             StartCoroutine(ScaryUnitDeath(unit));
         }
 
-        bool isLoading = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
         bool unitSelectedInArea = AreaSelector.Instance != null &&
                                   AreaSelector.Instance.SelectedUnits != null &&
                                   AreaSelector.Instance.SelectedUnits.Contains(unit);
@@ -684,6 +689,11 @@ public class UnitsManager : MonoBehaviour
         if (_removeUnitButton != null)
         {
             _removeUnitButton.GetComponent<UnityEngine.UI.Image>().color = Color.white;
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.EvaluateDungeonCrawlerBattleEnd();
         }
     }
 
@@ -1677,6 +1687,12 @@ public class UnitsManager : MonoBehaviour
         return true;
     }
 }
+
+
+
+
+
+
 
 
 

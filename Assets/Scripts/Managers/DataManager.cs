@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -828,6 +828,7 @@ public class WeaponData
     public int Id;
     public string Name;
     public string[] Type;
+    public int Value;
     public string Quality;
     public List<int> Damage = new List<int> { 0 }; // Obrażenia
     public bool Broken; // Uszkodzenie broni
@@ -1136,3 +1137,4 @@ public class GameSettings
 }
 
 #endregion
+

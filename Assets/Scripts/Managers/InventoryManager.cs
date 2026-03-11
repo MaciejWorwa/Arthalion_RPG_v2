@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -119,8 +119,10 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    public void AddWeaponToInventory(WeaponData weaponData, GameObject unit)
+    public bool AddWeaponToInventory(WeaponData weaponData, GameObject unit, bool allowDuplicates = false, bool refreshUi = true)
     {
+        if (weaponData == null || unit == null) return false;
+
         //Pobiera komponent weapon z puli
         GameObject weaponObj = WeaponsPool.Instance.GetWeapon();
         Weapon newWeapon = weaponObj.GetComponent<Weapon>();
@@ -151,17 +153,20 @@ public class InventoryManager : MonoBehaviour
             }
         }
 
+        bool isLoading = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
+
         // Sprawdzenie, czy przedmiot o takiej samej nazwie już istnieje w ekwipunku
-        if (unit.GetComponent<Inventory>().AllWeapons.Any(w => w.Name == newWeapon.Name) && !SaveAndLoadManager.Instance.IsLoading)
+        if (!allowDuplicates && unit.GetComponent<Inventory>().AllWeapons.Any(w => w.Name == newWeapon.Name) && !isLoading)
         {
             Debug.Log($"Przedmiot {newWeapon.Name} już znajduje się w ekwipunku {unit.GetComponent<Stats>().Name}.");
-            return;
+            WeaponsPool.Instance.ReturnWeaponToPool(newWeapon.gameObject);
+            return false;
         }
 
         //Dodaje przedmiot do ekwipunku
         unit.GetComponent<Inventory>().AllWeapons.Add(newWeapon);
 
-        if (!SaveAndLoadManager.Instance.IsLoading) //Zapobiega wypisywaniu wszystkich broni podczas wczytywania stanu gry
+        if (!isLoading) //Zapobiega wypisywaniu wszystkich broni podczas wczytywania stanu gry
         {
             //Sortuje listę alfabetycznie
             unit.GetComponent<Inventory>().AllWeapons.Sort((x, y) => x.Name.CompareTo(y.Name));
@@ -177,7 +182,12 @@ public class InventoryManager : MonoBehaviour
             newWeapon.SetBaseWeaponStats();
         }
 
-        UpdateInventoryDropdown(unit.GetComponent<Inventory>().AllWeapons, true);
+        if (refreshUi && Unit.SelectedUnit != null && Unit.SelectedUnit == unit)
+        {
+            UpdateInventoryDropdown(unit.GetComponent<Inventory>().AllWeapons, true);
+        }
+
+        return true;
     }
     #endregion
 
@@ -1383,7 +1393,24 @@ public class InventoryManager : MonoBehaviour
         UpdateMoneyInputFields(inventory);
     }
 
-    // Dodaje określoną liczbę monet do właściwego typu (Gold, Silver lub Copper).
+    public int AddCopperCoinsToUnit(GameObject unit, int copperAmount)
+    {
+        if (unit == null || copperAmount <= 0) return 0;
+
+        Inventory inventory = unit.GetComponent<Inventory>();
+        if (inventory == null) return 0;
+
+        inventory.CopperCoins += copperAmount;
+        NormalizeCoins(inventory);
+
+        if (Unit.SelectedUnit == unit)
+        {
+            UpdateMoneyInputFields(inventory);
+        }
+
+        return copperAmount;
+    }
+// Dodaje określoną liczbę monet do właściwego typu (Gold, Silver lub Copper).
     private void AddCoins(Inventory inventory, TMP_InputField inputField, int amount)
     {
         if (inputField == _goldCoinsInput)
@@ -1596,3 +1623,7 @@ public class InventoryManager : MonoBehaviour
     }
     #endregion
 }
+
+
+
+

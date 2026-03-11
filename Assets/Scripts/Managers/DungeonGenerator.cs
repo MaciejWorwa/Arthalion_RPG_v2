@@ -167,53 +167,71 @@ public class DungeonGenerator : MonoBehaviour
 
     public void GenerateDungeon()
     {
-        if (GridManager.Instance == null || GridManager.Instance.Tiles == null)
+        bool suppressDungeonCrawlerRewards = GameManager.Instance != null && GameManager.IsDungeonCrawlerMode;
+        if (suppressDungeonCrawlerRewards)
         {
-            Debug.LogError("Brak GridManagera lub siatka nie jest jeszcze gotowa.");
-            return;
+            GameManager.Instance.SetDungeonCrawlerRewardSuppression(true);
+            GameManager.Instance.ResetDungeonCrawlerRewardProgress();
         }
 
-        int width = GridManager.Width;
-        int height = GridManager.Height;
-
-        if (width < 8 || height < 8)
+        try
         {
-            Debug.LogWarning("Siatka jest zbyt mała do sensownego generowania dungeonu. Minimalnie zalecane: 8x8.");
-            return;
+            if (GridManager.Instance == null || GridManager.Instance.Tiles == null)
+            {
+                Debug.LogError("Brak GridManagera lub siatka nie jest jeszcze gotowa.");
+                return;
+            }
+
+            int width = GridManager.Width;
+            int height = GridManager.Height;
+
+            if (width < 8 || height < 8)
+            {
+                Debug.LogWarning("Siatka jest zbyt mała do sensownego generowania dungeonu. Minimalnie zalecane: 8x8.");
+                return;
+            }
+
+            NormalizeSettings(width, height);
+
+            int seedToUse = _useRandomSeed ? UnityEngine.Random.Range(int.MinValue, int.MaxValue) : _seed;
+            _seed = seedToUse;
+
+            if (_seedInputField != null)
+            {
+                _seedInputField.text = seedToUse.ToString();
+            }
+
+            System.Random rng = new System.Random(seedToUse);
+            bool[,] walkableMask = new bool[width, height];
+
+            List<RoomData> rooms = CreateRooms(rng, walkableMask, width, height);
+
+            if (rooms.Count == 0)
+            {
+                Debug.LogWarning("Generator nie utworzył żadnego pokoju. Przywracam pełną siatkę.");
+                RestoreFullGrid();
+                return;
+            }
+
+            ConnectRoomsWithMst(rng, rooms, walkableMask, width, height);
+            AddExtraConnections(rng, rooms, walkableMask, width, height);
+            EnsureRoomCentersAreWalkable(rooms, walkableMask, width, height);
+
+            GridManager.Instance.ApplyWalkableMask(walkableMask);
+            RemoveMapElementsOutsideDungeonIfNeeded();
+            RemoveUnitsOutsideDungeonIfNeeded();
+            GenerateEnemiesByPlayerStrength(rng);
+            UnitsManager.Instance.UpdateUnitPanel(null);
+
+            Debug.Log($"<color=green>Wygenerowano losową mapę. Seed: {seedToUse}, liczba pomieszczeń: {rooms.Count}.</color>");
         }
-
-        NormalizeSettings(width, height);
-
-        int seedToUse = _useRandomSeed ? UnityEngine.Random.Range(int.MinValue, int.MaxValue) : _seed;
-        _seed = seedToUse;
-
-        if (_seedInputField != null)
+        finally
         {
-            _seedInputField.text = seedToUse.ToString();
+            if (suppressDungeonCrawlerRewards && GameManager.Instance != null)
+            {
+                GameManager.Instance.SetDungeonCrawlerRewardSuppression(false);
+            }
         }
-
-        System.Random rng = new System.Random(seedToUse);
-        bool[,] walkableMask = new bool[width, height];
-
-        List<RoomData> rooms = CreateRooms(rng, walkableMask, width, height);
-
-        if (rooms.Count == 0)
-        {
-            Debug.LogWarning("Generator nie utworzył żadnego pokoju. Przywracam pełną siatkę.");
-            RestoreFullGrid();
-            return;
-        }
-
-        ConnectRoomsWithMst(rng, rooms, walkableMask, width, height);
-        AddExtraConnections(rng, rooms, walkableMask, width, height);
-        EnsureRoomCentersAreWalkable(rooms, walkableMask, width, height);
-
-        GridManager.Instance.ApplyWalkableMask(walkableMask);
-        RemoveMapElementsOutsideDungeonIfNeeded();
-        RemoveUnitsOutsideDungeonIfNeeded();
-        GenerateEnemiesByPlayerStrength(rng);
-
-        Debug.Log($"<color=green>Wygenerowano losową mapę. Seed: {seedToUse}, liczba pomieszczeń: {rooms.Count}.</color>");
     }
 
     public void RestoreFullGrid()
@@ -1262,6 +1280,10 @@ public class DungeonGenerator : MonoBehaviour
         if (chosen == null || chosen.Spawns == null || chosen.Spawns.Count == 0) return false;
         if (availablePositions == null || availablePositions.Count == 0) return false;
 
+        // Zmienia listę jednostek na ogólną, a nie na zapiane jednostki (zapobiega to błędom z Id tworzonych losowo jednostek)
+        UnitsManager.Instance.SetSavedUnitsManaging(false);
+        DataManager.Instance.ChangeUnitListByToggle();
+
         int generatedOverall = 0;
         int generatedEnemies = 0;
         List<string> composition = new List<string>();
@@ -2055,6 +2077,7 @@ public class DungeonGenerator : MonoBehaviour
         return true;
     }
 }
+
 
 
 

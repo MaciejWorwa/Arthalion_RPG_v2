@@ -89,6 +89,25 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject _mainMenuPanel;
     [SerializeField] private GameObject _tileCoveringPanel; //Panel z informacją o trybie ukrywania mapy
 
+    [Header("Nagrody Dungeon Crawler")]
+    [SerializeField] private GameObject _dungeonCrawlerRewardPanel;
+    [SerializeField] private TMP_Text _dungeonCrawlerRewardSummaryText;
+    [SerializeField] private Transform _dungeonCrawlerLootScrollContent;
+    [SerializeField] private GameObject _dungeonCrawlerLootButtonPrefab;
+    private CustomDropdown _dungeonCrawlerLootCustomDropdown;
+    [SerializeField] private Button _dungeonCrawlerTakeButton;
+    [SerializeField] private Button _dungeonCrawlerTakeAllButton;
+    [SerializeField] private Button _dungeonCrawlerSellButton;
+    [SerializeField] private Button _dungeonCrawlerSellAllButton;
+    [SerializeField] private Button _dungeonCrawlerCloseButton;
+
+    private readonly List<WeaponData> _dungeonCrawlerPendingLoot = new List<WeaponData>();
+    private int _dungeonCrawlerPendingExp;
+    private bool _dungeonCrawlerExpGrantedForCurrentReward;
+    private bool _isDungeonCrawlerRewardPanelVisible;
+    private bool _isDungeonCrawlerRewardResolutionInProgress;
+    private bool _suppressDungeonCrawlerRewards;
+
     private void Start()
     {    
         // if (Display.displays.Length > 1)
@@ -129,12 +148,28 @@ public class GameManager : MonoBehaviour
         {
             UpdateButtonColor(pair.Key, pair.Value);
         }
+
+        ConfigureDungeonCrawlerRewardUi();
     }
 
     private void Update()
     {
         //Pauzuje grę, gdy jest otwarteokno wczytywania plików
-        IsGamePaused = FileBrowser.IsOpen? true : false;
+        IsGamePaused = FileBrowser.IsOpen ? true : false;
+
+        if (_isDungeonCrawlerRewardPanelVisible)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                CloseDungeonCrawlerRewardAndProceed();
+            }
+            else if (_dungeonCrawlerRewardPanel != null && !_dungeonCrawlerRewardPanel.activeSelf && !_isDungeonCrawlerRewardResolutionInProgress)
+            {
+                CloseDungeonCrawlerRewardAndProceed();
+            }
+
+            return;
+        }
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -395,10 +430,13 @@ public class GameManager : MonoBehaviour
 
         if (IsDungeonCrawlerMode)
         {
+            ConfigureDungeonCrawlerRewardUi();
             Debug.Log("Tryb eksploracji podziemi został włączony. Podziemia wraz z przeciwnikami będą generowane automatycznie. Postać będzie otrzymywała Punkty Doświadczenia i ekwipunek za pokonanych wrogów.");
         }
         else
         {
+            HideDungeonCrawlerRewardPanel();
+            ResetDungeonCrawlerRewardProgress();
             Debug.Log("Tryb eksploracji podziemi został wyłączony.");
         }
     }
@@ -754,6 +792,560 @@ public class GameManager : MonoBehaviour
     }
     #endregion
 
+    public void SetDungeonCrawlerRewardSuppression(bool suppressRewards)
+    {
+        _suppressDungeonCrawlerRewards = suppressRewards;
+    }
+
+    public void ResetDungeonCrawlerRewardProgress()
+    {
+        _dungeonCrawlerPendingLoot.Clear();
+        _dungeonCrawlerPendingExp = 0;
+        _dungeonCrawlerExpGrantedForCurrentReward = false;
+    }
+
+    public void RegisterDungeonCrawlerEnemyDefeat(Unit enemyUnit)
+    {
+        if (!IsDungeonCrawlerMode || _suppressDungeonCrawlerRewards) return;
+        if (enemyUnit == null || !enemyUnit.CompareTag("EnemyUnit")) return;
+
+        Stats enemyStats = enemyUnit.GetComponent<Stats>();
+        if (enemyStats != null)
+        {
+            int overall = enemyStats.Overall > 0 ? enemyStats.Overall : enemyStats.CalculateOverall();
+            _dungeonCrawlerPendingExp += Mathf.Max(1, overall);
+        }
+
+        Inventory enemyInventory = enemyUnit.GetComponent<Inventory>();
+        if (enemyInventory == null || enemyInventory.AllWeapons == null) return;
+
+        for (int i = 0; i < enemyInventory.AllWeapons.Count; i++)
+        {
+            Weapon weapon = enemyInventory.AllWeapons[i];
+            if (weapon == null) continue;
+            if (weapon.Id == 0 || weapon.NaturalWeapon) continue;
+            if (string.IsNullOrWhiteSpace(weapon.Name)) continue;
+
+            _dungeonCrawlerPendingLoot.Add(new WeaponData(weapon));
+        }
+    }
+
+    public void EvaluateDungeonCrawlerBattleEnd()
+    {
+        if (!IsDungeonCrawlerMode || _suppressDungeonCrawlerRewards) return;
+        if (_isDungeonCrawlerRewardPanelVisible || _isDungeonCrawlerRewardResolutionInProgress) return;
+        if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
+        if (UnitsManager.Instance == null) return;
+
+        bool hasLivingPlayers = false;
+        bool hasLivingEnemies = false;
+
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy) continue;
+
+            Stats stats = unit.GetComponent<Stats>();
+            if (stats == null || stats.TempHealth <= 0) continue;
+
+            if (unit.CompareTag("PlayerUnit")) hasLivingPlayers = true;
+            else if (unit.CompareTag("EnemyUnit")) hasLivingEnemies = true;
+        }
+
+        if (!hasLivingPlayers)
+        {
+            ResetDungeonCrawlerRewardProgress();
+            return;
+        }
+
+        if (hasLivingEnemies) return;
+
+        if (!_dungeonCrawlerExpGrantedForCurrentReward)
+        {
+            AwardDungeonCrawlerExpToPlayers();
+            _dungeonCrawlerExpGrantedForCurrentReward = true;
+        }
+
+        ShowDungeonCrawlerRewardPanel();
+    }
+
+    public void TakeSelectedDungeonCrawlerLoot()
+    {
+        if (!_isDungeonCrawlerRewardPanelVisible || _dungeonCrawlerPendingLoot.Count == 0) return;
+
+        int selectedIndex = _dungeonCrawlerLootCustomDropdown != null ? _dungeonCrawlerLootCustomDropdown.GetSelectedIndex() : 0;
+        if (selectedIndex <= 0) return;
+        selectedIndex = Mathf.Clamp(selectedIndex - 1, 0, _dungeonCrawlerPendingLoot.Count - 1);
+
+        if (TryTakeLootByIndex(selectedIndex))
+        {
+            if (_dungeonCrawlerPendingLoot.Count == 0)
+            {
+                ResolveDungeonCrawlerRewardAndGenerateNextDungeon();
+            }
+            else
+            {
+                RefreshDungeonCrawlerRewardUi();
+            }
+        }
+    }
+
+    public void TakeAllDungeonCrawlerLoot()
+    {
+        if (!_isDungeonCrawlerRewardPanelVisible) return;
+
+        while (_dungeonCrawlerPendingLoot.Count > 0)
+        {
+            if (!TryTakeLootByIndex(0))
+            {
+                break;
+            }
+        }
+
+        ResolveDungeonCrawlerRewardAndGenerateNextDungeon();
+    }
+
+    public void SellSelectedDungeonCrawlerLoot()
+    {
+        if (!_isDungeonCrawlerRewardPanelVisible || _dungeonCrawlerPendingLoot.Count == 0) return;
+
+        int selectedIndex = _dungeonCrawlerLootCustomDropdown != null ? _dungeonCrawlerLootCustomDropdown.GetSelectedIndex() : 0;
+        if (selectedIndex <= 0) return;
+        selectedIndex = Mathf.Clamp(selectedIndex - 1, 0, _dungeonCrawlerPendingLoot.Count - 1);
+
+        if (TrySellLootByIndex(selectedIndex))
+        {
+            if (_dungeonCrawlerPendingLoot.Count == 0)
+            {
+                ResolveDungeonCrawlerRewardAndGenerateNextDungeon();
+            }
+            else
+            {
+                RefreshDungeonCrawlerRewardUi();
+            }
+        }
+    }
+
+    public void SellAllDungeonCrawlerLoot()
+    {
+        if (!_isDungeonCrawlerRewardPanelVisible) return;
+
+        while (_dungeonCrawlerPendingLoot.Count > 0)
+        {
+            if (!TrySellLootByIndex(0))
+            {
+                break;
+            }
+        }
+
+        ResolveDungeonCrawlerRewardAndGenerateNextDungeon();
+    }
+
+    public void CloseDungeonCrawlerRewardAndProceed()
+    {
+        if (!_isDungeonCrawlerRewardPanelVisible && (_dungeonCrawlerRewardPanel == null || !_dungeonCrawlerRewardPanel.activeSelf))
+        {
+            return;
+        }
+
+        _dungeonCrawlerPendingLoot.Clear();
+        ResolveDungeonCrawlerRewardAndGenerateNextDungeon();
+    }
+
+    private void ResolveDungeonCrawlerRewardAndGenerateNextDungeon()
+    {
+        if (_isDungeonCrawlerRewardResolutionInProgress) return;
+
+        _isDungeonCrawlerRewardResolutionInProgress = true;
+
+        HideDungeonCrawlerRewardPanel();
+        RestorePlayerUnitsForNextDungeonCrawlerEncounter();
+        ResetDungeonCrawlerRewardProgress();
+
+        DungeonGenerator dungeonGenerator = FindFirstObjectByType<DungeonGenerator>();
+        if (dungeonGenerator != null)
+        {
+            dungeonGenerator.GenerateDungeon();
+        }
+        else
+        {
+            Debug.LogWarning("Nie znaleziono DungeonGeneratora. Nie można wygenerować kolejnego dungeonu.");
+        }
+
+        _isDungeonCrawlerRewardResolutionInProgress = false;
+    }
+
+    private void RestorePlayerUnitsForNextDungeonCrawlerEncounter()
+    {
+        if (UnitsManager.Instance == null) return;
+
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit == null || !unit.CompareTag("PlayerUnit")) continue;
+
+            Stats stats = unit.GetComponent<Stats>();
+            if (stats == null) continue;
+
+            stats.TempHealth = Mathf.Max(1, stats.MaxHealth);
+            stats.CriticalWounds = 0;
+
+            unit.DisplayUnitHealthPoints();
+        }
+
+        if (Unit.SelectedUnit != null)
+        {
+            UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
+        }
+    }
+
+    private bool TryTakeLootByIndex(int index)
+    {
+        if (index < 0 || index >= _dungeonCrawlerPendingLoot.Count) return false;
+
+        GameObject recipient = GetDungeonCrawlerRewardRecipient();
+        if (recipient == null)
+        {
+            Debug.LogWarning("Brak aktywnej jednostki gracza do odebrania łupu.");
+            return false;
+        }
+
+        WeaponData lootItem = _dungeonCrawlerPendingLoot[index];
+        bool added = InventoryManager.Instance != null && InventoryManager.Instance.AddWeaponToInventory(lootItem, recipient, allowDuplicates: true, refreshUi: Unit.SelectedUnit == recipient);
+
+        if (!added) return false;
+
+        _dungeonCrawlerPendingLoot.RemoveAt(index);
+        return true;
+    }
+
+    private bool TrySellLootByIndex(int index)
+    {
+        if (index < 0 || index >= _dungeonCrawlerPendingLoot.Count) return false;
+
+        GameObject recipient = GetDungeonCrawlerRewardRecipient();
+        if (recipient == null)
+        {
+            Debug.LogWarning("Brak aktywnej jednostki gracza do sprzedaży łupu.");
+            return false;
+        }
+
+        WeaponData lootItem = _dungeonCrawlerPendingLoot[index];
+        int sellValue = CalculateDungeonCrawlerSellValue(lootItem);
+
+        if (sellValue > 0 && InventoryManager.Instance != null)
+        {
+            InventoryManager.Instance.AddCopperCoinsToUnit(recipient, sellValue);
+        }
+
+        string recipientName = recipient.GetComponent<Stats>() != null ? recipient.GetComponent<Stats>().Name : recipient.name;
+        Debug.Log($"Sprzedano: {lootItem.Name} za {sellValue} (miedziaki). Otrzymuje: {recipientName}.");
+
+        _dungeonCrawlerPendingLoot.RemoveAt(index);
+        return true;
+    }
+
+    private static int CalculateDungeonCrawlerSellValue(WeaponData lootItem)
+    {
+        if (lootItem == null) return 0;
+
+        int baseValue = Mathf.Max(0, lootItem.Value);
+        int sellValue = Mathf.FloorToInt(baseValue / 2f);
+
+        string quality = string.IsNullOrWhiteSpace(lootItem.Quality) ? "Zwykła" : lootItem.Quality;
+        if (quality == "Słaba")
+        {
+            sellValue = Mathf.FloorToInt(sellValue / 2f);
+        }
+        else if (quality == "Dobra")
+        {
+            sellValue *= 3;
+        }
+
+        return Mathf.Max(0, sellValue);
+    }
+
+    private GameObject GetDungeonCrawlerRewardRecipient()
+    {
+        if (Unit.SelectedUnit != null && Unit.SelectedUnit.CompareTag("PlayerUnit"))
+        {
+            return Unit.SelectedUnit;
+        }
+
+        if (UnitsManager.Instance == null) return null;
+
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit != null && unit.CompareTag("PlayerUnit") && unit.gameObject.activeInHierarchy)
+            {
+                return unit.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    private void AwardDungeonCrawlerExpToPlayers()
+    {
+        if (_dungeonCrawlerPendingExp <= 0 || UnitsManager.Instance == null) return;
+
+        int awardedUnits = 0;
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit == null || !unit.CompareTag("PlayerUnit") || !unit.gameObject.activeInHierarchy) continue;
+
+            Stats stats = unit.GetComponent<Stats>();
+            if (stats == null) continue;
+
+            stats.Exp += _dungeonCrawlerPendingExp;
+            awardedUnits++;
+        }
+
+        if (awardedUnits > 0)
+        {
+            Debug.Log($"<color=green>Drużyna otrzymała {_dungeonCrawlerPendingExp} punktów doświadczenia za pokonanie przeciwników.</color>");
+        }
+    }
+
+    private void ShowDungeonCrawlerRewardPanel()
+    {
+        ConfigureDungeonCrawlerRewardUi();
+        if (_dungeonCrawlerRewardPanel == null)
+        {
+            Debug.LogWarning("Brak panelu nagród Dungeon Crawler.");
+            return;
+        }
+
+        RefreshDungeonCrawlerRewardUi();
+
+        _dungeonCrawlerRewardPanel.SetActive(true);
+        _isDungeonCrawlerRewardPanelVisible = true;
+
+        if (RoundsManager.Instance != null && RoundsManager.Instance.NextRoundButton != null)
+        {
+            RoundsManager.Instance.NextRoundButton.interactable = false;
+        }
+    }
+
+    private void HideDungeonCrawlerRewardPanel()
+    {
+        if (_dungeonCrawlerRewardPanel != null)
+        {
+            _dungeonCrawlerRewardPanel.SetActive(false);
+        }
+
+        _isDungeonCrawlerRewardPanelVisible = false;
+
+        if (RoundsManager.Instance != null && RoundsManager.Instance.NextRoundButton != null)
+        {
+            RoundsManager.Instance.NextRoundButton.interactable = true;
+        }
+    }
+
+    private void RefreshDungeonCrawlerRewardUi()
+    {
+        if (_dungeonCrawlerRewardSummaryText != null)
+        {
+            _dungeonCrawlerRewardSummaryText.text = $"Ukończyłeś ten etap podziemi.\nNagroda:{_dungeonCrawlerPendingExp} Punktów Doświadczenia";
+        }
+
+        RefreshDungeonCrawlerLootList();
+
+        bool hasLoot = _dungeonCrawlerPendingLoot.Count > 0;
+        if (_dungeonCrawlerTakeButton != null) _dungeonCrawlerTakeButton.interactable = hasLoot;
+        if (_dungeonCrawlerSellButton != null) _dungeonCrawlerSellButton.interactable = hasLoot;
+    }
+
+    private void RefreshDungeonCrawlerLootList()
+    {
+        ResolveDungeonCrawlerLootListRefs();
+        if (_dungeonCrawlerLootScrollContent == null || _dungeonCrawlerLootCustomDropdown == null) return;
+
+        for (int i = _dungeonCrawlerLootScrollContent.childCount - 1; i >= 0; i--)
+        {
+            Destroy(_dungeonCrawlerLootScrollContent.GetChild(i).gameObject);
+        }
+
+        _dungeonCrawlerLootCustomDropdown.Buttons.Clear();
+        _dungeonCrawlerLootCustomDropdown.SelectedButton = null;
+        _dungeonCrawlerLootCustomDropdown.SelectedIndex = 0;
+
+        if (_dungeonCrawlerPendingLoot.Count == 0)
+        {
+            GameObject emptyInfo = new GameObject("EmptyLootLabel", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+            emptyInfo.transform.SetParent(_dungeonCrawlerLootScrollContent, false);
+
+            LayoutElement emptyLayout = emptyInfo.GetComponent<LayoutElement>();
+            emptyLayout.preferredHeight = 36f;
+
+            TMP_Text emptyText = emptyInfo.GetComponent<TMP_Text>();
+            emptyText.text = "Brak przedmiotów";
+            emptyText.alignment = TextAlignmentOptions.Center;
+            emptyText.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+            emptyText.fontSize = 24f;
+            return;
+        }
+
+        for (int i = 0; i < _dungeonCrawlerPendingLoot.Count; i++)
+        {
+            WeaponData item = _dungeonCrawlerPendingLoot[i];
+            string quality = string.IsNullOrWhiteSpace(item.Quality) ? "Zwykła" : item.Quality;
+            string label = $"{item.Name} [{quality}] (wartość {Mathf.Max(0, item.Value)})";
+
+            Button button = CreateDungeonCrawlerLootButton(_dungeonCrawlerLootScrollContent, label);
+            if (button == null) continue;
+
+            _dungeonCrawlerLootCustomDropdown.Buttons.Add(button);
+        }
+
+        _dungeonCrawlerLootCustomDropdown.InitializeButtons();
+
+        if (_dungeonCrawlerLootCustomDropdown.Buttons.Count > 0)
+        {
+            _dungeonCrawlerLootCustomDropdown.SetSelectedIndex(1);
+        }
+    }
+
+    private void ResolveDungeonCrawlerLootListRefs()
+    {
+        if (_dungeonCrawlerLootCustomDropdown == null)
+        {
+            if (_dungeonCrawlerLootScrollContent != null)
+            {
+                _dungeonCrawlerLootCustomDropdown = _dungeonCrawlerLootScrollContent.GetComponent<CustomDropdown>();
+            }
+
+            if (_dungeonCrawlerLootCustomDropdown == null && _dungeonCrawlerRewardPanel != null)
+            {
+                _dungeonCrawlerLootCustomDropdown = _dungeonCrawlerRewardPanel.GetComponentInChildren<CustomDropdown>(true);
+            }
+        }
+
+        if (_dungeonCrawlerLootScrollContent == null && _dungeonCrawlerLootCustomDropdown != null)
+        {
+            _dungeonCrawlerLootScrollContent = _dungeonCrawlerLootCustomDropdown.transform;
+        }
+    }
+
+    private void ConfigureDungeonCrawlerRewardUi()
+    {
+        if (_dungeonCrawlerRewardPanel == null)
+        {
+            Debug.LogWarning("Brak przypiętego panelu nagród Dungeon Crawler w Inspectorze (GameManager)._dungeonCrawlerRewardPanel");
+            return;
+        }
+
+        if (_dungeonCrawlerRewardSummaryText == null)
+        {
+            _dungeonCrawlerRewardSummaryText = _dungeonCrawlerRewardPanel.transform.Find("SummaryText")?.GetComponent<TMP_Text>();
+
+            if (_dungeonCrawlerRewardSummaryText == null)
+            {
+                _dungeonCrawlerRewardSummaryText = _dungeonCrawlerRewardPanel.GetComponentsInChildren<TMP_Text>(true)
+                    .FirstOrDefault(text => text != null && text.name == "SummaryText");
+            }
+        }
+
+        ResolveDungeonCrawlerLootListRefs();
+
+        if (_dungeonCrawlerTakeButton == null) _dungeonCrawlerTakeButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "TakeButton");
+        if (_dungeonCrawlerTakeAllButton == null) _dungeonCrawlerTakeAllButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "TakeAllButton");
+        if (_dungeonCrawlerSellButton == null) _dungeonCrawlerSellButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "SellButton");
+        if (_dungeonCrawlerSellAllButton == null) _dungeonCrawlerSellAllButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "SellAllButton");
+        if (_dungeonCrawlerCloseButton == null) _dungeonCrawlerCloseButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "CloseButton");
+    }
+
+    private Button FindButtonByName(Transform root, string buttonName)
+    {
+        if (root == null) return null;
+
+        Transform buttonTransform = root.Find(buttonName);
+        if (buttonTransform != null)
+        {
+            return buttonTransform.GetComponent<Button>();
+        }
+
+        Button[] allButtons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < allButtons.Length; i++)
+        {
+            if (allButtons[i] != null && allButtons[i].name == buttonName)
+            {
+                return allButtons[i];
+            }
+        }
+
+        return null;
+    }
+
+    private Button CreateDungeonCrawlerLootButton(Transform parent, string label)
+    {
+        if (_dungeonCrawlerLootButtonPrefab != null)
+        {
+            GameObject prefabButtonObj = Instantiate(_dungeonCrawlerLootButtonPrefab, parent);
+            prefabButtonObj.name = "LootItemButton";
+
+            Button prefabButton = prefabButtonObj.GetComponent<Button>();
+            if (prefabButton == null)
+            {
+                prefabButton = prefabButtonObj.GetComponentInChildren<Button>(true);
+            }
+
+            TMP_Text prefabText = prefabButtonObj.GetComponentInChildren<TMP_Text>(true);
+            if (prefabText != null)
+            {
+                prefabText.text = label;
+            }
+
+            return prefabButton;
+        }
+
+        GameObject buttonObj = new GameObject("LootItemButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+        buttonObj.transform.SetParent(parent, false);
+
+        LayoutElement layout = buttonObj.GetComponent<LayoutElement>();
+        layout.preferredHeight = 40f;
+
+        Image image = buttonObj.GetComponent<Image>();
+        image.color = new Color(0.55f, 0.66f, 0.66f, 0.05f);
+
+        Button button = buttonObj.GetComponent<Button>();
+
+        GameObject textObj = new GameObject("Text (TMP)", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObj.transform.SetParent(buttonObj.transform, false);
+
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(12f, 0f);
+        textRect.offsetMax = new Vector2(-12f, 0f);
+
+        TMP_Text text = textObj.GetComponent<TMP_Text>();
+        text.text = label;
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+        text.fontSize = 20f;
+        text.color = Color.white;
+
+        GameObject handTextObj = new GameObject("hand_text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        handTextObj.transform.SetParent(buttonObj.transform, false);
+        handTextObj.SetActive(false);
+
+        RectTransform handRect = handTextObj.GetComponent<RectTransform>();
+        handRect.anchorMin = new Vector2(1f, 0.5f);
+        handRect.anchorMax = new Vector2(1f, 0.5f);
+        handRect.pivot = new Vector2(1f, 0.5f);
+        handRect.anchoredPosition = new Vector2(-10f, 0f);
+        handRect.sizeDelta = new Vector2(30f, 30f);
+
+        TMP_Text handText = handTextObj.GetComponent<TMP_Text>();
+        handText.text = string.Empty;
+        handText.alignment = TextAlignmentOptions.Center;
+        handText.fontSize = 18f;
+
+        return button;
+    }
+
     private void UpdateButtonColor(Button button, bool condition)
     {
         if (condition)
@@ -822,6 +1414,29 @@ public class GameManager : MonoBehaviour
         Application.Quit();
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
