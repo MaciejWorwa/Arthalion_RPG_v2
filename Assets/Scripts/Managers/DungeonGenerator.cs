@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class DungeonGenerator : MonoBehaviour
 {
@@ -221,7 +222,15 @@ public class DungeonGenerator : MonoBehaviour
             RemoveMapElementsOutsideDungeonIfNeeded();
             RemoveUnitsOutsideDungeonIfNeeded();
             GenerateEnemiesByPlayerStrength(rng);
-            UnitsManager.Instance.UpdateUnitPanel(null);
+
+            if (SceneManager.GetActiveScene().buildIndex == 1)
+            {
+                if (Unit.SelectedUnit != null)
+                {
+                    Unit.SelectedUnit.GetComponent<Unit>().SelectUnit();
+                }
+                UnitsManager.Instance.UpdateUnitPanel(null);
+            }
 
             Debug.Log($"<color=green>Wygenerowano losową mapę. Seed: {seedToUse}, liczba pomieszczeń: {rooms.Count}.</color>");
         }

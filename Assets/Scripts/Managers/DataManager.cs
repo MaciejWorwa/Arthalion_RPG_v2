@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,6 +32,37 @@ public class DataManager : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        if (_weaponQualityDropdown != null)
+        {
+            _weaponQualityDropdown.onValueChanged.AddListener(OnWeaponQualityChanged);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_weaponQualityDropdown != null)
+        {
+            _weaponQualityDropdown.onValueChanged.RemoveListener(OnWeaponQualityChanged);
+        }
+    }
+
+    private void Update()
+    {
+        if (_weaponScrollViewContent == null) return;
+
+        CustomDropdown dropdown = _weaponScrollViewContent.GetComponent<CustomDropdown>();
+        if (dropdown == null) return;
+
+        int selectedIndex = dropdown.GetSelectedIndex();
+        if (selectedIndex == _lastWeaponListSelectedIndex) return;
+
+        _lastWeaponListSelectedIndex = selectedIndex;
+        RefreshSelectedWeaponPriceText();
+    }
+
+
     [SerializeField] private GameObject _buttonPrefab; // Przycisk odpowiadający każdej z broni
     [SerializeField] private Transform _weaponScrollViewContent; // Lista wszystkich dostępnych broni
     [SerializeField] private Transform _spellbookScrollViewContent; // Lista wszystkich dostępnych zaklęć
@@ -40,6 +71,7 @@ public class DataManager : MonoBehaviour
     [SerializeField] private Transform _unitScrollViewContent; // Lista wszystkich dostępnych ras (jednostek)
     [SerializeField] private TMP_InputField _searchInputFieldForUnits;
     [SerializeField] private TMP_InputField _searchInputFieldForWeapons;
+    [SerializeField] private TMP_Text _selectedWeaponPriceText;
 
     [SerializeField] private UnityEngine.UI.Toggle _weaponToggle;
     [SerializeField] private UnityEngine.UI.Toggle _armorToggle;
@@ -47,6 +79,7 @@ public class DataManager : MonoBehaviour
 
 
     public List<string> TokensPaths = new List<string>();
+    private int _lastWeaponListSelectedIndex = -2;
 
     #region Loading units stats
     public void ChangeUnitListByToggle()
@@ -103,6 +136,89 @@ public class DataManager : MonoBehaviour
 
             child.gameObject.SetActive(matchesSearch && passesFilter);
         }
+    }
+
+    private void ClearSelectedWeaponPriceText()
+    {
+        if (_selectedWeaponPriceText == null) return;
+        _selectedWeaponPriceText.text = "Cena: -";
+        _lastWeaponListSelectedIndex = -1;
+    }
+
+    private void OnWeaponQualityChanged(int _)
+    {
+        RefreshSelectedWeaponPriceText();
+    }
+
+    private string GetDisplayedWeaponQuality(WeaponData selectedWeapon)
+    {
+        string quality = selectedWeapon != null && !string.IsNullOrWhiteSpace(selectedWeapon.Quality)
+            ? selectedWeapon.Quality
+            : "Zwykła";
+
+        if (_weaponQualityDropdown == null
+            || _weaponQualityDropdown.options == null
+            || _weaponQualityDropdown.options.Count == 0
+            || _weaponQualityDropdown.transform == null
+            || _weaponQualityDropdown.transform.parent == null
+            || !_weaponQualityDropdown.transform.parent.gameObject.activeSelf)
+        {
+            return quality;
+        }
+
+        int selectedQualityIndex = Mathf.Clamp(_weaponQualityDropdown.value, 0, _weaponQualityDropdown.options.Count - 1);
+        return _weaponQualityDropdown.options[selectedQualityIndex].text;
+    }
+
+    private void UpdateSelectedWeaponPriceText(string weaponName)
+    {
+        if (_selectedWeaponPriceText == null) return;
+
+        if (string.IsNullOrWhiteSpace(weaponName))
+        {
+            ClearSelectedWeaponPriceText();
+            return;
+        }
+
+        WeaponData selectedWeapon = InventoryManager.Instance != null
+            ? InventoryManager.Instance.AllWeaponData.FirstOrDefault(w => w != null && w.Name == weaponName)
+            : null;
+
+        if (selectedWeapon == null)
+        {
+            ClearSelectedWeaponPriceText();
+            return;
+        }
+
+        int baseValue = selectedWeapon.BaseValue > 0 ? selectedWeapon.BaseValue : selectedWeapon.Value;
+        string quality = GetDisplayedWeaponQuality(selectedWeapon);
+        int valueInCopper = InventoryManager.CalculateWeaponAdjustedValue(baseValue, quality, selectedWeapon.Broken);
+        if (valueInCopper <= 0)
+        {
+            _selectedWeaponPriceText.text = "Cena: -";
+            return;
+        }
+
+        _selectedWeaponPriceText.text = $"Cena: {InventoryManager.FormatCopperValue(valueInCopper)}";
+    }
+
+    public void RefreshSelectedWeaponPriceText()
+    {
+        if (_weaponScrollViewContent == null)
+        {
+            ClearSelectedWeaponPriceText();
+            return;
+        }
+
+        CustomDropdown dropdown = _weaponScrollViewContent.GetComponent<CustomDropdown>();
+        if (dropdown == null || dropdown.GetSelectedIndex() <= 0 || dropdown.GetSelectedIndex() > dropdown.Buttons.Count)
+        {
+            ClearSelectedWeaponPriceText();
+            return;
+        }
+
+        TextMeshProUGUI selectedButtonText = dropdown.Buttons[dropdown.GetSelectedIndex() - 1].GetComponentInChildren<TextMeshProUGUI>();
+        UpdateSelectedWeaponPriceText(selectedButtonText != null ? selectedButtonText.text : null);
     }
 
     public void LoadAndUpdateStats(GameObject unitObject = null)
@@ -344,6 +460,8 @@ public class DataManager : MonoBehaviour
         }
 
         _searchInputFieldForWeapons.text = "";
+        if (weaponData == null) ClearSelectedWeaponPriceText();
+        _lastWeaponListSelectedIndex = -1;
 
         //Odniesienie do broni postaci
         Weapon weaponToUpdate = null;
@@ -360,6 +478,8 @@ public class DataManager : MonoBehaviour
                 //Ustala jakość wykonania broni
                 weapon.Quality = _weaponQualityDropdown.options[_weaponQualityDropdown.value].text;
             }
+
+            InventoryManager.RecalculateWeaponDataValue(weapon);
 
             if (weaponToUpdate != null && weapon.Id == weaponToUpdate.Id)
             {
@@ -412,7 +532,8 @@ public class DataManager : MonoBehaviour
                 GameObject buttonObj = Instantiate(_buttonPrefab, _weaponScrollViewContent);
                 TextMeshProUGUI buttonText = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
                 //Ustala text buttona
-                buttonText.text = weapon.Name;
+                string weaponName = weapon.Name;
+                buttonText.text = weaponName;
 
                 UnityEngine.UI.Button button = buttonObj.GetComponent<UnityEngine.UI.Button>();
 
@@ -425,6 +546,7 @@ public class DataManager : MonoBehaviour
                 button.onClick.AddListener(() =>
                 {
                     _weaponScrollViewContent.GetComponent<CustomDropdown>().SetSelectedIndex(currentIndex); // Wybiera element i aktualizuje jego wygląd
+                    UpdateSelectedWeaponPriceText(weaponName);
                 });
             }
         }
@@ -829,6 +951,7 @@ public class WeaponData
     public string Name;
     public string[] Type;
     public int Value;
+    public int BaseValue;
     public string Quality;
     public List<int> Damage = new List<int> { 0 }; // Obrażenia
     public bool Broken; // Uszkodzenie broni

@@ -1,4 +1,4 @@
-﻿using NUnit.Framework.Internal;
+using NUnit.Framework.Internal;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -453,6 +453,11 @@ public class UnitsManager : MonoBehaviour
                     }
                 }
             }
+            if (stats.PrimaryWeaponAttributes != null && stats.PrimaryWeaponAttributes.Count > 0)
+            {
+                InventoryManager.RecalculateWeaponValue(InventoryManager.Instance.ChooseWeaponToAttack(newUnitObject));
+            }
+
             InventoryManager.Instance.CalculateEncumbrance(stats);
 
             //Ustala początkową inicjatywę i dodaje jednostkę do kolejki inicjatywy
@@ -1000,29 +1005,63 @@ public class UnitsManager : MonoBehaviour
         Inventory inventory = unitGO.GetComponent<Inventory>();
         if (unit == null || stats == null) return;
 
-        // Modyfikator za cechę broni (Fast/Slow) – na podstawie EquippedWeapons
-        int weaponMod = 0;
-        bool hasFast = false, hasSlow = false;
+        // Modyfikator za cechę broni (Fast/Slow) - na podstawie EquippedWeapons.
+        int weaponMod = CalculateWeaponInitiativeModifier(inventory);
 
-        if (inventory != null && inventory.EquippedWeapons != null)
-        {
-            hasFast = inventory.EquippedWeapons.Any(w => w != null && w.Fast);
-            hasSlow = inventory.EquippedWeapons.Any(w => w != null && w.Slow);
-
-            // Jeżeli występują obie cechy naraz (np. dwie bronie), traktujemy jako 0 (neutralizują się).
-            if (hasFast && !hasSlow) weaponMod = 3;
-            else if (hasSlow && !hasFast) weaponMod = -3;
-            else weaponMod = 0;
-        }
-
-        // Finalna inicjatywa
+        // Finalna inicjatywa.
         stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", null, "Reflex", weaponMod)[2];
 
-        // Aktualizacja kolejki inicjatywy — wpisujemy RZECZYWISTĄ wartość
+        // Aktualizacja kolejki inicjatywy - wpisujemy rzeczywistą wartość.
         InitiativeQueueManager.Instance.InitiativeQueue[unit] = stats.Initiative;
         InitiativeQueueManager.Instance.UpdateInitiativeQueue();
 
         UpdateUnitPanel(unitGO);
+    }
+
+    private int CalculateWeaponInitiativeModifier(Inventory inventory)
+    {
+        int weaponMod = 0;
+
+        if (inventory != null && inventory.EquippedWeapons != null)
+        {
+            bool hasFast = inventory.EquippedWeapons.Any(w => w != null && w.Fast);
+            bool hasSlow = inventory.EquippedWeapons.Any(w => w != null && w.Slow);
+
+            // Jeżeli występują obie cechy naraz (np. dwie bronie), traktujemy jako 0 (neutralizują się).
+            if (hasFast && !hasSlow) weaponMod = 3;
+            else if (hasSlow && !hasFast) weaponMod = -3;
+        }
+
+        return weaponMod;
+    }
+
+    public void RerollInitiativeForTag(string unitTag)
+    {
+        if (string.IsNullOrEmpty(unitTag) || InitiativeQueueManager.Instance == null || DiceRollManager.Instance == null)
+        {
+            return;
+        }
+
+        Dictionary<Unit, int> initiativeQueue = InitiativeQueueManager.Instance.InitiativeQueue;
+        if (initiativeQueue == null || initiativeQueue.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var pair in initiativeQueue.ToList())
+        {
+            Unit unit = pair.Key;
+            if (unit == null || !unit.CompareTag(unitTag)) continue;
+
+            Stats stats = unit.GetComponent<Stats>();
+            if (stats == null) continue;
+
+            int weaponMod = CalculateWeaponInitiativeModifier(unit.GetComponent<Inventory>());
+            stats.Initiative = DiceRollManager.Instance.TestSkill(stats, "Refleks, aby określić inicjatywę", null, "Reflex", weaponMod)[2];
+            initiativeQueue[unit] = stats.Initiative;
+        }
+
+        InitiativeQueueManager.Instance.UpdateInitiativeQueue();
     }
 
     public void EditAttribute(GameObject textInput)

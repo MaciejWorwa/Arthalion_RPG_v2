@@ -1104,7 +1104,7 @@
         },
         {
           "Key": "AttackRange",
-          "Value": 8
+          "Value": 4
         },
         {
           "Key": "Entangle",

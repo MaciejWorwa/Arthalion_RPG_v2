@@ -62,6 +62,67 @@ public class InventoryManager : MonoBehaviour
         SelectHand(true);
     }
 
+    public static string FormatCopperValue(int copperValue)
+    {
+        int normalized = Mathf.Max(0, copperValue);
+        int silver = normalized / 100;
+        int tin = (normalized % 100) / 10;
+        int copper = normalized % 10;
+
+        List<string> parts = new List<string>();
+        if (silver > 0) parts.Add($"{silver} S");
+        if (tin > 0) parts.Add($"{tin} T");
+        if (copper > 0 || parts.Count == 0) parts.Add($"{copper} Ł");
+
+        return string.Join(" ", parts);
+    }
+
+    public static int CalculateWeaponAdjustedValue(int baseValue, string quality, bool broken)
+    {
+        int adjustedValue = Mathf.Max(0, baseValue);
+        string normalizedQuality = string.IsNullOrWhiteSpace(quality) ? "Zwykła" : quality;
+
+        if (normalizedQuality == "Słaba")
+        {
+            adjustedValue = Mathf.FloorToInt(adjustedValue / 2f);
+        }
+        else if (normalizedQuality == "Dobra")
+        {
+            adjustedValue *= 3;
+        }
+
+        if (broken)
+        {
+            adjustedValue = Mathf.FloorToInt(adjustedValue / 2f);
+        }
+
+        return Mathf.Max(0, adjustedValue);
+    }
+
+    public static void RecalculateWeaponValue(Weapon weapon)
+    {
+        if (weapon == null) return;
+
+        if (weapon.BaseValue <= 0)
+        {
+            weapon.BaseValue = Mathf.Max(0, weapon.Value);
+        }
+
+        weapon.Value = CalculateWeaponAdjustedValue(weapon.BaseValue, weapon.Quality, weapon.Broken);
+    }
+
+    public static void RecalculateWeaponDataValue(WeaponData weaponData)
+    {
+        if (weaponData == null) return;
+
+        if (weaponData.BaseValue <= 0)
+        {
+            weaponData.BaseValue = Mathf.Max(0, weaponData.Value);
+        }
+
+        weaponData.Value = CalculateWeaponAdjustedValue(weaponData.BaseValue, weaponData.Quality, weaponData.Broken);
+    }
+
     #region Inventory panel managing
     private void Update()
     {
@@ -81,6 +142,7 @@ public class InventoryManager : MonoBehaviour
     {
         GameManager.Instance.HideActivePanels();
         GameManager.Instance.ShowPanel(_inventoryPanel);
+
         //Odświeża listę ekwipunku
         InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedIndex = 0;
         UpdateInventoryDropdown(Unit.SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
@@ -152,6 +214,8 @@ public class InventoryManager : MonoBehaviour
                 targetField.SetValue(newWeapon, field.GetValue(weaponData));
             }
         }
+
+        RecalculateWeaponValue(newWeapon);
 
         bool isLoading = SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading;
 
@@ -285,6 +349,110 @@ public class InventoryManager : MonoBehaviour
         UpdateInventoryDropdown(allWeapons, true);
     }
     #endregion
+
+    public void SellSelectedInventoryWeapon()
+    {
+        if (Unit.SelectedUnit == null || InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count == 0) return;
+
+        Inventory inventory = Unit.SelectedUnit.GetComponent<Inventory>();
+        if (inventory == null) return;
+
+        int selectedIndex = InventoryScrollViewContent.GetComponent<CustomDropdown>().GetSelectedIndex();
+        if (selectedIndex <= 0 || selectedIndex > inventory.AllWeapons.Count)
+        {
+            Debug.Log("Musisz wybrać przedmiot, który chcesz sprzedać.");
+            return;
+        }
+
+        Weapon selectedWeapon = inventory.AllWeapons[selectedIndex - 1];
+        if (selectedWeapon == null) return;
+
+        int sellValue = Mathf.FloorToInt(Mathf.Max(0, selectedWeapon.Value) / 2f);
+        string soldWeaponName = selectedWeapon.Name;
+        int weaponsCountBefore = inventory.AllWeapons.Count;
+
+        RemoveWeaponFromInventory();
+
+        if (inventory.AllWeapons.Count >= weaponsCountBefore) return;
+
+        if (sellValue > 0)
+        {
+            AddCopperCoinsToUnit(Unit.SelectedUnit, sellValue);
+        }
+
+        Debug.Log($"Sprzedano {soldWeaponName} za {FormatCopperValue(sellValue)}.");
+    }
+
+    public void BuySelectedWeaponFromAllWeapons()
+    {
+        if (Unit.SelectedUnit == null)
+        {
+            Debug.Log("Aby kupić przedmiot, musisz najpierw wybrać postać.");
+            return;
+        }
+
+        int selectedIndex = WeaponsDropdown != null ? WeaponsDropdown.GetSelectedIndex() : 0;
+        if (selectedIndex <= 0)
+        {
+            Debug.Log("Musisz wybrać przedmiot z listy wszystkich przedmiotów.");
+            return;
+        }
+
+        DataManager.Instance.LoadAndUpdateWeapons();
+
+        WeaponData selectedWeaponData = AllWeaponData.FirstOrDefault(w => w != null && w.Id == selectedIndex);
+        if (selectedWeaponData == null)
+        {
+            Debug.LogWarning("Nie udało się odczytać wybranego przedmiotu z listy wszystkich przedmiotów.");
+            return;
+        }
+
+        int buyValue = Mathf.Max(0, selectedWeaponData.Value);
+        if (!TrySpendCopperCoins(Unit.SelectedUnit, buyValue))
+        {
+            Debug.Log($"Brakuje środków. {selectedWeaponData.Name} kosztuje {FormatCopperValue(buyValue)}.");
+            return;
+        }
+
+        Inventory inventory = Unit.SelectedUnit.GetComponent<Inventory>();
+        int weaponsCountBefore = inventory != null ? inventory.AllWeapons.Count : 0;
+
+        LoadWeapons(false);
+
+        int weaponsCountAfter = inventory != null ? inventory.AllWeapons.Count : 0;
+        if (weaponsCountAfter <= weaponsCountBefore)
+        {
+            AddCopperCoinsToUnit(Unit.SelectedUnit, buyValue);
+            Debug.LogWarning($"Nie udało się kupić przedmiotu {selectedWeaponData.Name}. Pieniądze zostały zwrócone.");
+            return;
+        }
+
+        Debug.Log($"Kupiono {selectedWeaponData.Name} za {FormatCopperValue(buyValue)}.");
+    }
+
+    private bool TrySpendCopperCoins(GameObject unit, int copperAmount)
+    {
+        if (unit == null) return false;
+        if (copperAmount <= 0) return true;
+
+        Inventory inventory = unit.GetComponent<Inventory>();
+        if (inventory == null) return false;
+
+        int totalCopper = inventory.GoldCoins * 100 + inventory.SilverCoins * 10 + inventory.CopperCoins;
+        if (totalCopper < copperAmount) return false;
+
+        totalCopper -= copperAmount;
+        inventory.GoldCoins = totalCopper / 100;
+        inventory.SilverCoins = (totalCopper % 100) / 10;
+        inventory.CopperCoins = totalCopper % 10;
+
+        if (Unit.SelectedUnit == unit)
+        {
+            UpdateMoneyInputFields(inventory);
+        }
+
+        return true;
+    }
 
     #region Grabing weapons
     public void GrabWeapon(int selectedIndex = 0)
@@ -884,6 +1052,16 @@ public class InventoryManager : MonoBehaviour
 
 
         //Odświeża listę ekwipunku
+        if (attributeName == "Value")
+        {
+            selectedWeapon.BaseValue = Mathf.Max(0, selectedWeapon.Value);
+            RecalculateWeaponValue(selectedWeapon);
+        }
+        else if (attributeName == "Quality" || attributeName == "Broken")
+        {
+            RecalculateWeaponValue(selectedWeapon);
+        }
+
         UpdateInventoryDropdown(Unit.SelectedUnit.GetComponent<Inventory>().AllWeapons, false);
 
         DisplayEquippedWeaponsName();
@@ -1056,6 +1234,8 @@ public class InventoryManager : MonoBehaviour
         var customDropdown = InventoryScrollViewContent.GetComponent<CustomDropdown>();
         foreach (var weapon in weapons)
         {
+            RecalculateWeaponValue(weapon);
+
             // Dodaje broń do ScrollViewContent w postaci buttona
             GameObject buttonObj = Instantiate(_buttonPrefab, InventoryScrollViewContent);
             TextMeshProUGUI buttonText = buttonObj.GetComponentInChildren<TextMeshProUGUI>();

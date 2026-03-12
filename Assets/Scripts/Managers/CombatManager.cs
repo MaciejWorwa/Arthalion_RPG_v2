@@ -88,6 +88,8 @@ public class CombatManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _escapeNoButton;
 
     public bool IsManualPlayerAttack;
+    private int _activeAttackCoroutines = 0;
+    public bool IsAttackSequenceRunning => _activeAttackCoroutines > 0;
 
     private Unit[] _groupOfTargets;
     private bool _groupOfTargetsPenalty;
@@ -132,7 +134,27 @@ public class CombatManager : MonoBehaviour
             GrapplingActionButtonClick("");
         }
     }
+    public void ResetAttackSequenceTracking()
+    {
+        StopAllCoroutines();
 
+        _activeAttackCoroutines = 0;
+        IsManualPlayerAttack = false;
+        _parryOrDodge = string.Empty;
+        _criticalHitEffect = string.Empty;
+        _grapplingActionChoice = string.Empty;
+        HitLocation = null;
+        DefenceResults = new int[] { 0, 1, 0, 0 };
+
+        if (_parryAndDodgePanel != null) _parryAndDodgePanel.SetActive(false);
+        if (_criticalHitPanel != null) _criticalHitPanel.SetActive(false);
+        if (_grapplingActionPanel != null) _grapplingActionPanel.SetActive(false);
+        if (_riderOrMountPanel != null) _riderOrMountPanel.SetActive(false);
+        if (_selectHitLocationPanel != null) _selectHitLocationPanel.SetActive(false);
+        if (_survivalInstinctPanel != null) _survivalInstinctPanel.SetActive(false);
+        if (_pitilessPanel != null) _pitilessPanel.SetActive(false);
+        if (_entaglingPanel != null) _entaglingPanel.SetActive(false);
+    }
     #region Attack types
     private void InitializeAttackTypes()
     {
@@ -266,8 +288,16 @@ public class CombatManager : MonoBehaviour
 
         if (opportunityAttack) ChangeAttackType();
 
-        StartCoroutine(AttackCoroutine(attacker, target, opportunityAttack));
+        StartCoroutine(AttackCoroutineTracked(attacker, target, opportunityAttack));
     }
+
+    private IEnumerator AttackCoroutineTracked(Unit attacker, Unit target, bool opportunityAttack)
+    {
+        _activeAttackCoroutines++;
+        yield return StartCoroutine(AttackCoroutine(attacker, target, opportunityAttack));
+        _activeAttackCoroutines = Mathf.Max(0, _activeAttackCoroutines - 1);
+    }
+
     private IEnumerator AttackCoroutine(Unit attacker, Unit target, bool opportunityAttack = false)
     {
         // Czekaj aż użytkownik wybierze lokację trafienia (jeśli panel wyboru lokacji jest otwarty)
@@ -617,11 +647,13 @@ public class CombatManager : MonoBehaviour
                 if (attackerWeapon.Quality == "Zwykła" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
                 {
                     attackerWeapon.Broken = true;
+                    InventoryManager.RecalculateWeaponValue(attackerWeapon);
                     Debug.Log($"{attackerStats.Name} uszkodził/a swoją broń ({attackerWeapon.Name}).");
                 }
                 else if (attackerWeapon.Quality == "Słaba" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
                 {
                     attackerWeapon.Broken = true;
+                    InventoryManager.RecalculateWeaponValue(attackerWeapon);
                     Debug.Log($"{attackerStats.Name} zniszczył/a swoją broń ({attackerWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
                 }
             }
@@ -640,7 +672,7 @@ public class CombatManager : MonoBehaviour
                 if(_parryOrDodge == "parry")
                 {
                     yield return StartCoroutine(DetermineHitLocationCoroutine(parryLowerValue, attackerStats, location => hitLocation = location));
-                    StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
+                    yield return StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
                 }
             }
             else
@@ -683,6 +715,7 @@ public class CombatManager : MonoBehaviour
                             if (quality == "Słaba")
                             {
                                 armorPiece.Broken = true;
+                                InventoryManager.RecalculateWeaponValue(armorPiece);
                                 Debug.Log(
                                     $"{targetStats.Name} zniszczył/a swoją zbroję " +
                                     $"({armorPiece.Name}). " +
@@ -692,6 +725,7 @@ public class CombatManager : MonoBehaviour
                             else if (quality == "Zwykła")
                             {
                                 armorPiece.Broken = true;
+                                InventoryManager.RecalculateWeaponValue(armorPiece);
                                 Debug.Log(
                                     $"{targetStats.Name} uszkodził/a swoją zbroję " +
                                     $"({armorPiece.Name})."
@@ -712,11 +746,13 @@ public class CombatManager : MonoBehaviour
                     if (weaponQuality == "Zwykła" && !targetWeapon.Type.Contains("natural-weapon"))
                     {
                         targetWeapon.Broken = true;
+                        InventoryManager.RecalculateWeaponValue(targetWeapon);
                         Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
                     }
                     else if (weaponQuality == "Słaba" && !targetWeapon.Type.Contains("natural-weapon"))
                     {
                         targetWeapon.Broken = true;
+                        InventoryManager.RecalculateWeaponValue(targetWeapon);
                         Debug.Log(
                             $"{targetStats.Name} zniszczył/a swoją broń ({targetWeapon.Name}). " +
                             "<color=red>Należy usunąć ją z ekwipunku.</color>"
@@ -746,7 +782,7 @@ public class CombatManager : MonoBehaviour
             if (AttackTypes["AllOutAttack"])
             {
                 int attackerArmor = CalculateArmor(attackerStats, hitLocation, targetWeapon);
-                StartCoroutine(CalculateDamage(targetStats, attackerStats, targetWeapon, damage =>
+                yield return StartCoroutine(CalculateDamage(targetStats, attackerStats, targetWeapon, damage =>
                 {
                     ApplyDamageToTarget(damage, attackerArmor, targetStats, attackerStats, attacker, targetWeapon);
                 }));
@@ -766,7 +802,7 @@ public class CombatManager : MonoBehaviour
                     }
                     else
                     {
-                        StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
+                        yield return StartCoroutine(CriticalWoundRoll(targetStats, attackerStats, hitLocation));
                     }
                 }
             }
@@ -814,7 +850,7 @@ public class CombatManager : MonoBehaviour
         HashSet<Unit> affectedUnits = new HashSet<Unit> { target }; // Dodajemy target od razu
 
         int armor = CalculateArmor(targetStats, hitLocation, attackerWeapon);
-        StartCoroutine(CalculateDamage(attackerStats, targetStats, attackerWeapon, damage =>
+        yield return StartCoroutine(CalculateDamage(attackerStats, targetStats, attackerWeapon, damage =>
         {
             ApplyDamageToTarget(damage, armor, attackerStats, targetStats, target, attackerWeapon);
         }));
@@ -832,7 +868,7 @@ public class CombatManager : MonoBehaviour
             }
             else
             {
-                StartCoroutine(CriticalWoundRoll(attackerStats, targetStats, hitLocation));
+                yield return StartCoroutine(CriticalWoundRoll(attackerStats, targetStats, hitLocation));
             }
         }
 

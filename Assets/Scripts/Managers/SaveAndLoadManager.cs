@@ -412,6 +412,11 @@ public class SaveAndLoadManager : MonoBehaviour
 
         IsLoading = true;
 
+        if (RoundsManager.Instance != null)
+        {
+            RoundsManager.Instance.ResetRoundFlowState();
+        }
+
         if(IsOnlyMapLoading != true)
         {
             //Odznaczenie zaznaczonej postaci

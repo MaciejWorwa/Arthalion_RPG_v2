@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class Weapon : MonoBehaviour
@@ -16,6 +16,7 @@ public class Weapon : MonoBehaviour
 
     [Header("Wartość")]
     public int Value;
+    public int BaseValue;
 
     [Header("Jakość")]
     public string Quality;
@@ -81,6 +82,8 @@ public class Weapon : MonoBehaviour
         NaturalWeapon = true;
         TwoHanded = false;
         Quality = "Zwykła";
+        Value = 0;
+        BaseValue = 0;
         Damage = new List<int> { 4 }; ;
         AttackRange = 1.5f;
         AmmoType = "Brak";

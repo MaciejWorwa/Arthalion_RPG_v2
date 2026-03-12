@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -91,7 +91,9 @@ public class GameManager : MonoBehaviour
 
     [Header("Nagrody Dungeon Crawler")]
     [SerializeField] private GameObject _dungeonCrawlerRewardPanel;
+    [SerializeField] private GameObject _dungeonCrawlerRewardWithoutLootPanel;
     [SerializeField] private TMP_Text _dungeonCrawlerRewardSummaryText;
+    [SerializeField] private TMP_Text _dungeonCrawlerRewardSummaryTextWithoutLoot;
     [SerializeField] private Transform _dungeonCrawlerLootScrollContent;
     [SerializeField] private GameObject _dungeonCrawlerLootButtonPrefab;
     private CustomDropdown _dungeonCrawlerLootCustomDropdown;
@@ -100,6 +102,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Button _dungeonCrawlerSellButton;
     [SerializeField] private Button _dungeonCrawlerSellAllButton;
     [SerializeField] private Button _dungeonCrawlerCloseButton;
+    private GameObject _activeDungeonCrawlerRewardPanel;
+    private TMP_Text _activeDungeonCrawlerRewardSummaryText;
 
     private readonly List<WeaponData> _dungeonCrawlerPendingLoot = new List<WeaponData>();
     private int _dungeonCrawlerPendingExp;
@@ -163,7 +167,7 @@ public class GameManager : MonoBehaviour
             {
                 CloseDungeonCrawlerRewardAndProceed();
             }
-            else if (_dungeonCrawlerRewardPanel != null && !_dungeonCrawlerRewardPanel.activeSelf && !_isDungeonCrawlerRewardResolutionInProgress)
+            else if (!IsAnyDungeonCrawlerRewardPanelActive() && !_isDungeonCrawlerRewardResolutionInProgress)
             {
                 CloseDungeonCrawlerRewardAndProceed();
             }
@@ -826,7 +830,9 @@ public class GameManager : MonoBehaviour
             if (weapon.Id == 0 || weapon.NaturalWeapon) continue;
             if (string.IsNullOrWhiteSpace(weapon.Name)) continue;
 
-            _dungeonCrawlerPendingLoot.Add(new WeaponData(weapon));
+            WeaponData lootData = new WeaponData(weapon);
+            InventoryManager.RecalculateWeaponDataValue(lootData);
+            _dungeonCrawlerPendingLoot.Add(lootData);
         }
     }
 
@@ -943,7 +949,7 @@ public class GameManager : MonoBehaviour
 
     public void CloseDungeonCrawlerRewardAndProceed()
     {
-        if (!_isDungeonCrawlerRewardPanelVisible && (_dungeonCrawlerRewardPanel == null || !_dungeonCrawlerRewardPanel.activeSelf))
+        if (!_isDungeonCrawlerRewardPanelVisible && !IsAnyDungeonCrawlerRewardPanelActive())
         {
             return;
         }
@@ -962,6 +968,11 @@ public class GameManager : MonoBehaviour
         RestorePlayerUnitsForNextDungeonCrawlerEncounter();
         ResetDungeonCrawlerRewardProgress();
 
+        if (RoundsManager.Instance != null)
+        {
+            RoundsManager.Instance.ResetForNewDungeonCrawlerFloor();
+        }
+
         DungeonGenerator dungeonGenerator = FindFirstObjectByType<DungeonGenerator>();
         if (dungeonGenerator != null)
         {
@@ -970,6 +981,11 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.LogWarning("Nie znaleziono DungeonGeneratora. Nie można wygenerować kolejnego dungeonu.");
+        }
+
+        if (UnitsManager.Instance != null)
+        {
+            UnitsManager.Instance.RerollInitiativeForTag("PlayerUnit");
         }
 
         _isDungeonCrawlerRewardResolutionInProgress = false;
@@ -1039,7 +1055,7 @@ public class GameManager : MonoBehaviour
         }
 
         string recipientName = recipient.GetComponent<Stats>() != null ? recipient.GetComponent<Stats>().Name : recipient.name;
-        Debug.Log($"Sprzedano: {lootItem.Name} za {sellValue} (miedziaki). Otrzymuje: {recipientName}.");
+        Debug.Log($"Sprzedano: {lootItem.Name} za {InventoryManager.FormatCopperValue(sellValue)}. Otrzymuje: {recipientName}.");
 
         _dungeonCrawlerPendingLoot.RemoveAt(index);
         return true;
@@ -1051,16 +1067,6 @@ public class GameManager : MonoBehaviour
 
         int baseValue = Mathf.Max(0, lootItem.Value);
         int sellValue = Mathf.FloorToInt(baseValue / 2f);
-
-        string quality = string.IsNullOrWhiteSpace(lootItem.Quality) ? "Zwykła" : lootItem.Quality;
-        if (quality == "Słaba")
-        {
-            sellValue = Mathf.FloorToInt(sellValue / 2f);
-        }
-        else if (quality == "Dobra")
-        {
-            sellValue *= 3;
-        }
 
         return Mathf.Max(0, sellValue);
     }
@@ -1109,18 +1115,47 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private GameObject GetSelectedDungeonCrawlerRewardPanel()
+    {
+        bool hasLoot = _dungeonCrawlerPendingLoot.Count > 0;
+        if (!hasLoot && _dungeonCrawlerRewardWithoutLootPanel != null)
+        {
+            return _dungeonCrawlerRewardWithoutLootPanel;
+        }
+
+        return _dungeonCrawlerRewardPanel;
+    }
+
+    private bool IsAnyDungeonCrawlerRewardPanelActive()
+    {
+        return (_dungeonCrawlerRewardPanel != null && _dungeonCrawlerRewardPanel.activeSelf)
+               || (_dungeonCrawlerRewardWithoutLootPanel != null && _dungeonCrawlerRewardWithoutLootPanel.activeSelf);
+    }
     private void ShowDungeonCrawlerRewardPanel()
     {
-        ConfigureDungeonCrawlerRewardUi();
-        if (_dungeonCrawlerRewardPanel == null)
+        GameObject panelToShow = GetSelectedDungeonCrawlerRewardPanel();
+        ConfigureDungeonCrawlerRewardUi(panelToShow);
+        if (panelToShow == null)
         {
             Debug.LogWarning("Brak panelu nagród Dungeon Crawler.");
             return;
         }
 
+        if (_dungeonCrawlerRewardPanel != null && _dungeonCrawlerRewardPanel != panelToShow)
+        {
+            _dungeonCrawlerRewardPanel.SetActive(false);
+        }
+
+        if (_dungeonCrawlerRewardWithoutLootPanel != null && _dungeonCrawlerRewardWithoutLootPanel != panelToShow)
+        {
+            _dungeonCrawlerRewardWithoutLootPanel.SetActive(false);
+        }
+
+        _activeDungeonCrawlerRewardPanel = panelToShow;
+
         RefreshDungeonCrawlerRewardUi();
 
-        _dungeonCrawlerRewardPanel.SetActive(true);
+        panelToShow.SetActive(true);
         _isDungeonCrawlerRewardPanelVisible = true;
 
         if (RoundsManager.Instance != null && RoundsManager.Instance.NextRoundButton != null)
@@ -1136,6 +1171,13 @@ public class GameManager : MonoBehaviour
             _dungeonCrawlerRewardPanel.SetActive(false);
         }
 
+        if (_dungeonCrawlerRewardWithoutLootPanel != null)
+        {
+            _dungeonCrawlerRewardWithoutLootPanel.SetActive(false);
+        }
+
+        _activeDungeonCrawlerRewardPanel = null;
+        _activeDungeonCrawlerRewardSummaryText = null;
         _isDungeonCrawlerRewardPanelVisible = false;
 
         if (RoundsManager.Instance != null && RoundsManager.Instance.NextRoundButton != null)
@@ -1146,9 +1188,10 @@ public class GameManager : MonoBehaviour
 
     private void RefreshDungeonCrawlerRewardUi()
     {
-        if (_dungeonCrawlerRewardSummaryText != null)
+        string rewardSummaryText = $"Ukończyłeś ten etap podziemi.\nNagroda: {_dungeonCrawlerPendingExp} Punktów Doświadczenia";
+        if (_activeDungeonCrawlerRewardSummaryText != null)
         {
-            _dungeonCrawlerRewardSummaryText.text = $"Ukończyłeś ten etap podziemi.\nNagroda:{_dungeonCrawlerPendingExp} Punktów Doświadczenia";
+            _activeDungeonCrawlerRewardSummaryText.text = rewardSummaryText;
         }
 
         RefreshDungeonCrawlerLootList();
@@ -1192,7 +1235,7 @@ public class GameManager : MonoBehaviour
         {
             WeaponData item = _dungeonCrawlerPendingLoot[i];
             string quality = string.IsNullOrWhiteSpace(item.Quality) ? "Zwykła" : item.Quality;
-            string label = $"{item.Name} [{quality}] (wartość {Mathf.Max(0, item.Value)})";
+            string label = $"{item.Name} [{quality}] (wartość {InventoryManager.FormatCopperValue(Mathf.Max(0, item.Value))})";
 
             Button button = CreateDungeonCrawlerLootButton(_dungeonCrawlerLootScrollContent, label);
             if (button == null) continue;
@@ -1217,9 +1260,13 @@ public class GameManager : MonoBehaviour
                 _dungeonCrawlerLootCustomDropdown = _dungeonCrawlerLootScrollContent.GetComponent<CustomDropdown>();
             }
 
-            if (_dungeonCrawlerLootCustomDropdown == null && _dungeonCrawlerRewardPanel != null)
+            GameObject panelForRefs = _activeDungeonCrawlerRewardPanel != null
+                ? _activeDungeonCrawlerRewardPanel
+                : GetSelectedDungeonCrawlerRewardPanel();
+
+            if (_dungeonCrawlerLootCustomDropdown == null && panelForRefs != null)
             {
-                _dungeonCrawlerLootCustomDropdown = _dungeonCrawlerRewardPanel.GetComponentInChildren<CustomDropdown>(true);
+                _dungeonCrawlerLootCustomDropdown = panelForRefs.GetComponentInChildren<CustomDropdown>(true);
             }
         }
 
@@ -1229,32 +1276,48 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void ConfigureDungeonCrawlerRewardUi()
+    private void ConfigureDungeonCrawlerRewardUi(GameObject panelOverride = null)
     {
-        if (_dungeonCrawlerRewardPanel == null)
+        GameObject panel = panelOverride != null ? panelOverride : GetSelectedDungeonCrawlerRewardPanel();
+        if (panel == null)
         {
-            Debug.LogWarning("Brak przypiętego panelu nagród Dungeon Crawler w Inspectorze (GameManager)._dungeonCrawlerRewardPanel");
+            Debug.LogWarning("Brak przypiętego panelu nagród Dungeon Crawler w Inspectorze (GameManager). Ustaw _dungeonCrawlerRewardPanel i opcjonalnie _dungeonCrawlerRewardWithoutLootPanel.");
             return;
         }
 
-        if (_dungeonCrawlerRewardSummaryText == null)
-        {
-            _dungeonCrawlerRewardSummaryText = _dungeonCrawlerRewardPanel.transform.Find("SummaryText")?.GetComponent<TMP_Text>();
+        _activeDungeonCrawlerRewardPanel = panel;
 
-            if (_dungeonCrawlerRewardSummaryText == null)
-            {
-                _dungeonCrawlerRewardSummaryText = _dungeonCrawlerRewardPanel.GetComponentsInChildren<TMP_Text>(true)
-                    .FirstOrDefault(text => text != null && text.name == "SummaryText");
-            }
+        TMP_Text inspectorSummaryText = panel == _dungeonCrawlerRewardWithoutLootPanel
+            ? _dungeonCrawlerRewardSummaryTextWithoutLoot
+            : _dungeonCrawlerRewardSummaryText;
+
+        _activeDungeonCrawlerRewardSummaryText = inspectorSummaryText;
+
+        if (_activeDungeonCrawlerRewardSummaryText == null)
+        {
+            _activeDungeonCrawlerRewardSummaryText = panel.transform.Find("SummaryTextWithoutLoot")?.GetComponent<TMP_Text>();
         }
 
+        if (_activeDungeonCrawlerRewardSummaryText == null)
+        {
+            _activeDungeonCrawlerRewardSummaryText = panel.transform.Find("SummaryText")?.GetComponent<TMP_Text>();
+        }
+
+        if (_activeDungeonCrawlerRewardSummaryText == null)
+        {
+            _activeDungeonCrawlerRewardSummaryText = panel.GetComponentsInChildren<TMP_Text>(true)
+                .FirstOrDefault(text => text != null && (text.name == "SummaryText" || text.name == "SummaryTextWithoutLoot"));
+        }
+
+        _dungeonCrawlerLootCustomDropdown = null;
+        _dungeonCrawlerLootScrollContent = null;
         ResolveDungeonCrawlerLootListRefs();
 
-        if (_dungeonCrawlerTakeButton == null) _dungeonCrawlerTakeButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "TakeButton");
-        if (_dungeonCrawlerTakeAllButton == null) _dungeonCrawlerTakeAllButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "TakeAllButton");
-        if (_dungeonCrawlerSellButton == null) _dungeonCrawlerSellButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "SellButton");
-        if (_dungeonCrawlerSellAllButton == null) _dungeonCrawlerSellAllButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "SellAllButton");
-        if (_dungeonCrawlerCloseButton == null) _dungeonCrawlerCloseButton = FindButtonByName(_dungeonCrawlerRewardPanel.transform, "CloseButton");
+        _dungeonCrawlerTakeButton = FindButtonByName(panel.transform, "TakeButton");
+        _dungeonCrawlerTakeAllButton = FindButtonByName(panel.transform, "TakeAllButton");
+        _dungeonCrawlerSellButton = FindButtonByName(panel.transform, "SellButton");
+        _dungeonCrawlerSellAllButton = FindButtonByName(panel.transform, "SellAllButton");
+        _dungeonCrawlerCloseButton = FindButtonByName(panel.transform, "CloseButton");
     }
 
     private Button FindButtonByName(Transform root, string buttonName)

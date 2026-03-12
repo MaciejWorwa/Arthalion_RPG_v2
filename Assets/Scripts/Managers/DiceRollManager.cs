@@ -53,13 +53,13 @@ public class DiceRollManager : MonoBehaviour
 
     // wynik gotowy do odebrania przez korutynę
     private int[] _pendingResult;
-
+    private bool _isRollInputForceCancelled;
 
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape) && IsWaitingForRoll)
         {
-            IsWaitingForRoll = false; // Przerywamy oczekiwanie
+            ForceCancelPendingRollInput();
         }
     }
 
@@ -85,6 +85,7 @@ public class DiceRollManager : MonoBehaviour
         _pendingCallback = callback;
         _pendingRollContext = rollContext;
         _pendingResult = null;
+        _isRollInputForceCancelled = false;
         IsWaitingForRoll = true;
 
         // Ustala interaktywność 2. kości:
@@ -123,8 +124,24 @@ public class DiceRollManager : MonoBehaviour
         if (_roll2InputField != null) _roll2InputField.text = "";
 
         // Czekaj aż OnSubmitRoll policzy TestSkill i zapisze _pendingResult
-        while (_pendingResult == null)
+        while (_pendingResult == null && !_isRollInputForceCancelled)
             yield return null;
+
+        if (_isRollInputForceCancelled)
+        {
+            if (_applyRollResultPanel != null)
+                _applyRollResultPanel.SetActive(false);
+
+            IsWaitingForRoll = false;
+
+            _pendingStats = null;
+            _pendingAttributeName = null;
+            _pendingSkillName = null;
+            _pendingCallback = null;
+            _pendingRollContext = null;
+
+            yield break;
+        }
 
         // Schowaj panel i zwróć wynik
         if (_applyRollResultPanel != null)
@@ -141,7 +158,22 @@ public class DiceRollManager : MonoBehaviour
         _pendingCallback = null;
         _pendingRollContext = null;
     }
+    public void ForceCancelPendingRollInput()
+    {
+        _isRollInputForceCancelled = true;
+        IsWaitingForRoll = false;
 
+        if (_roll1InputField != null) _roll1InputField.text = "";
+        if (_roll2InputField != null) _roll2InputField.text = "";
+        if (_applyRollResultPanel != null) _applyRollResultPanel.SetActive(false);
+
+        _pendingResult = null;
+        _pendingStats = null;
+        _pendingAttributeName = null;
+        _pendingSkillName = null;
+        _pendingCallback = null;
+        _pendingRollContext = null;
+    }
     public void OnSubmitRoll()
     {
         if (_roll1InputField == null || _roll2InputField == null)

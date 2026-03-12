@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -6,10 +6,10 @@ using UnityEngine;
 
 public class InitiativeQueueManager : MonoBehaviour
 {
-    // Prywatne statyczne pole przechowujące instancję
+    // Prywatne statyczne pole przechowujÄ…ce instancjÄ™
     private static InitiativeQueueManager instance;
 
-    // Publiczny dostęp do instancji
+    // Publiczny dostÄ™p do instancji
     public static InitiativeQueueManager Instance
     {
         get { return instance; }
@@ -24,7 +24,7 @@ public class InitiativeQueueManager : MonoBehaviour
         }
         else if (instance != this)
         {
-            // Jeśli instancja już istnieje, a próbujemy utworzyć kolejną, niszczymy nadmiarową
+            // JeĹ›li instancja juĹĽ istnieje, a prĂłbujemy utworzyÄ‡ kolejnÄ…, niszczymy nadmiarowÄ…
             Destroy(gameObject);
         }
     }
@@ -32,18 +32,18 @@ public class InitiativeQueueManager : MonoBehaviour
     public Unit ActiveUnit;
     public Transform InitiativeScrollViewContent;
     public Transform PlayersCamera_InitiativeScrollViewContent;
-    [SerializeField] private GameObject _initiativeOptionPrefab; // Prefab odpowiadający każdej jednostce na liście inicjatywy
-    private Color _defaultColor = new Color(0f, 0f, 0f, 0f); // Domyślny kolor przycisku
+    [SerializeField] private GameObject _initiativeOptionPrefab; // Prefab odpowiadajÄ…cy kaĹĽdej jednostce na liĹ›cie inicjatywy
+    private Color _defaultColor = new Color(0f, 0f, 0f, 0f); // DomyĹ›lny kolor przycisku
     private Color _selectedColor = new Color(0f, 0f, 0f, 0.5f); // Kolor wybranego przycisku (zaznaczonej jednostki)
-    private Color _activeColor = new Color(0.15f, 1f, 0.45f, 0.2f); // Kolor aktywnego przycisku (jednostka, której tura obecnie trwa)
-    private Color _selectedActiveColor = new Color(0.08f, 0.5f, 0.22f, 0.5f); // Kolor wybranego przycisku, gdy jednocześnie jest to aktywna jednostka
-    public UnityEngine.UI.Slider DominanceBar; // Pasek przewagi sił w bitwie
+    private Color _activeColor = new Color(0.15f, 1f, 0.45f, 0.2f); // Kolor aktywnego przycisku (jednostka, ktĂłrej tura obecnie trwa)
+    private Color _selectedActiveColor = new Color(0.08f, 0.5f, 0.22f, 0.5f); // Kolor wybranego przycisku, gdy jednoczeĹ›nie jest to aktywna jednostka
+    public UnityEngine.UI.Slider DominanceBar; // Pasek przewagi siĹ‚ w bitwie
 
-
+    private Coroutine _selectUnitByQueueCoroutine;
     #region Initiative queue
     public void AddUnitToInitiativeQueue(Unit unit)
     {
-        //Nie dodaje do kolejki inicjatywy jednostek, które są ukryte
+        //Nie dodaje do kolejki inicjatywy jednostek, ktĂłre sÄ… ukryte
         Collider2D collider = Physics2D.OverlapPoint(unit.gameObject.transform.position);
         if (collider.CompareTag("TileCover") || InitiativeQueue.ContainsKey(unit)) return;
 
@@ -68,7 +68,7 @@ public class InitiativeQueueManager : MonoBehaviour
 
     public void UpdateInitiativeQueue()
     {
-        //Sortowanie malejąco według wartości inicjatywy
+        //Sortowanie malejÄ…co wedĹ‚ug wartoĹ›ci inicjatywy
         InitiativeQueue = InitiativeQueue.OrderByDescending(pair => pair.Value).ToDictionary(pair => pair.Key, pair => pair.Value);
 
         DisplayInitiativeQueue();
@@ -76,19 +76,19 @@ public class InitiativeQueueManager : MonoBehaviour
 
     private void DisplayInitiativeQueue()
     {
-        // Resetuje wyświetlaną kolejkę, usuwając wszystkie obiekty "dzieci"
+        // Resetuje wyĹ›wietlanÄ… kolejkÄ™, usuwajÄ…c wszystkie obiekty "dzieci"
         ResetScrollViewContent(InitiativeScrollViewContent);
         ResetScrollViewContent(PlayersCamera_InitiativeScrollViewContent);
 
         ActiveUnit = null;
 
-        // Ustala wyświetlaną kolejkę inicjatywy
+        // Ustala wyĹ›wietlanÄ… kolejkÄ™ inicjatywy
         foreach (var pair in InitiativeQueue)
         {
-            // Dodaje jednostkę do głównej kolejki ScrollViewContent
+            // Dodaje jednostkÄ™ do gĹ‚Ăłwnej kolejki ScrollViewContent
             GameObject optionObj = CreateInitiativeOption(pair, InitiativeScrollViewContent);
 
-            // Dodaje jednostkę do Players kolejki ScrollViewContent
+            // Dodaje jednostkÄ™ do Players kolejki ScrollViewContent
             GameObject playersOptionObj = CreateInitiativeOption(pair, PlayersCamera_InitiativeScrollViewContent);
 
             // Sprawdza, czy jest aktywna tura dla tej jednostki
@@ -99,7 +99,7 @@ public class InitiativeQueueManager : MonoBehaviour
                 SetOptionColor(playersOptionObj, _activeColor);
             }
 
-            // Wyróżnia zaznaczoną jednostkę
+            // WyrĂłĹĽnia zaznaczonÄ… jednostkÄ™
             if (Unit.SelectedUnit != null && pair.Key == Unit.SelectedUnit.GetComponent<Unit>())
             {
                 Color selectedColor = pair.Key == ActiveUnit ? _selectedActiveColor : _selectedColor;
@@ -113,7 +113,7 @@ public class InitiativeQueueManager : MonoBehaviour
             }
         }
 
-        // Aktualiuje listę dostępnych do wyboru wierzchowców
+        // Aktualiuje listÄ™ dostÄ™pnych do wyboru wierzchowcĂłw
         MountsManager.Instance.DisplayMountsList();
     }
 
@@ -134,7 +134,7 @@ public class InitiativeQueueManager : MonoBehaviour
         TextMeshProUGUI nameText = optionObj.transform.Find("Name_Text").GetComponent<TextMeshProUGUI>();
         nameText.text = pair.Key.GetComponent<Stats>().Name;
 
-        // Odniesienie do wartości inicjatywy
+        // Odniesienie do wartoĹ›ci inicjatywy
         TextMeshProUGUI initiativeText = optionObj.transform.Find("Initiative_Text").GetComponent<TextMeshProUGUI>();
         initiativeText.text = pair.Value.ToString();
 
@@ -146,35 +146,53 @@ public class InitiativeQueueManager : MonoBehaviour
         optionObj.GetComponent<UnityEngine.UI.Image>().color = color;
     }
 
+    public void CancelPendingSelectUnitByQueue()
+    {
+        if (_selectUnitByQueueCoroutine != null)
+        {
+            StopCoroutine(_selectUnitByQueueCoroutine);
+            _selectUnitByQueueCoroutine = null;
+        }
+    }
+
     public void SelectUnitByQueue()
     {
-        StartCoroutine(InvokeSelectUnitCoroutine());
+        CancelPendingSelectUnitByQueue();
+        _selectUnitByQueueCoroutine = StartCoroutine(InvokeSelectUnitCoroutine());
+    }
 
-        IEnumerator InvokeSelectUnitCoroutine()
+    private IEnumerator InvokeSelectUnitCoroutine()
+    {
+        yield return new WaitForSeconds(0.05f);
+
+        // Wait until current unit finishes movement/combat sequence.
+        while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
+            || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning))
         {
-            yield return new WaitForSeconds(0.05f);
-
-            //Czeka ze zmianą postaci, aż obecna postać zakończy ruch
-            while (MovementManager.Instance.IsMoving == true || DiceRollManager.Instance.IsWaitingForRoll)
-            {
-                yield return null; // Czekaj na następną klatkę
-            }
-
-            DisplayInitiativeQueue();
-
-            //Gdy jest aktywny tryb automatycznego wybierania postaci na podstawie kolejki inicjatywy to taka postać jest wybierana. Jeżeli wszystkie wykonały akcje to następuje kolejna runda
-            if (GameManager.IsAutoSelectUnitMode && ActiveUnit != null && ActiveUnit.gameObject != Unit.SelectedUnit)
-            {
-                ActiveUnit.SelectUnit();
-            }
-            else if (GameManager.IsAutoSelectUnitMode && ActiveUnit == null && (!GameManager.IsAutoCombatMode || GameManager.IsStatsHidingMode))
-            {
-                while (DiceRollManager.Instance.IsWaitingForRoll) yield return null; // Czekaj na następną klatkę
-                yield return new WaitForSeconds(0.05f);
-
-                RoundsManager.Instance.NextRound();
-            }
+            yield return null; // wait next frame
         }
+
+        DisplayInitiativeQueue();
+
+        // Auto-select active unit; if none is active, try advancing to next round safely.
+
+        if (GameManager.IsAutoSelectUnitMode && ActiveUnit != null && ActiveUnit.gameObject != Unit.SelectedUnit)
+        {
+            ActiveUnit.SelectUnit();
+        }
+        else if (GameManager.IsAutoSelectUnitMode && ActiveUnit == null)
+        {
+            while (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
+            {
+                yield return null;
+            }
+
+            yield return new WaitForSeconds(0.05f);
+            RoundsManager.Instance?.TryAdvanceRoundIfComplete();
+        }
+
+        _selectUnitByQueueCoroutine = null;
     }
     #endregion
 
@@ -183,7 +201,7 @@ public class InitiativeQueueManager : MonoBehaviour
         int playerTotal = 0;
         int enemyTotal = 0;
 
-        // Przechodzimy przez całą kolejkę inicjatywy i sumujemy "Overall" dla obu stron
+        // Przechodzimy przez caĹ‚Ä… kolejkÄ™ inicjatywy i sumujemy "Overall" dla obu stron
         foreach (var unit in InitiativeQueue.Keys)
         {
             Stats unitStats = unit.GetComponent<Stats>();
@@ -206,7 +224,7 @@ public class InitiativeQueueManager : MonoBehaviour
         DominanceBar.maxValue = totalPower;
         DominanceBar.value = playerTotal;
 
-        // Aktywujemy pasek, jeśli ma sens go wyświetlać
+        // Aktywujemy pasek, jeĹ›li ma sens go wyĹ›wietlaÄ‡
         if (DominanceBar.maxValue > 1 && !DominanceBar.gameObject.activeSelf && !GameManager.IsStatsHidingMode)
         {
             DominanceBar.gameObject.SetActive(true);

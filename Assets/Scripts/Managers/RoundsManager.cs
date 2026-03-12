@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -36,20 +36,27 @@ public class RoundsManager : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Toggle _canDoActionToggle;
     [SerializeField] private GameObject _useFortunePointsButton;
     private bool _isFortunePointSpent; //informacja o tym, że punkt szczęścia został zużyty, aby nie można było ponownie go użyć do wczytania tego samego autozapisu
+    private Coroutine _autoCombatCoroutine;
+    private bool _isRoundAdvanceScheduled;
+    private bool _isRoundGenerationInProgress;
 
     private void Start()
     {
         RoundNumber = 0;
-        _roundNumberDisplay.text = "Zaczynamy?";
-        _playersRoundNumberDisplay.text = "";
-
-        NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Start";
+        ResetRoundsToStartUi();
+        _isRoundAdvanceScheduled = false;
+        _isRoundGenerationInProgress = false;
+        _autoCombatCoroutine = null;
 
         _useFortunePointsButton.SetActive(false);
     }
 
     public void NextRound()
     {
+        if (_isRoundGenerationInProgress) return;
+        _isRoundGenerationInProgress = true;
+        _isRoundAdvanceScheduled = false;
+
         RoundNumber++;
         _roundNumberDisplay.text = "Runda: " + RoundNumber;
         _playersRoundNumberDisplay.text = "Runda: " + RoundNumber;
@@ -196,8 +203,20 @@ public class RoundsManager : MonoBehaviour
         //Wykonuje automatyczną akcję za każdą jednostkę
         if (GameManager.IsAutoCombatMode)
         {
-            StartCoroutine(AutoCombat());
+            if (_autoCombatCoroutine != null)
+            {
+                StopCoroutine(_autoCombatCoroutine);
+            }
+
+            _autoCombatCoroutine = StartCoroutine(AutoCombat());
         }
+        else if (_autoCombatCoroutine != null)
+        {
+            StopCoroutine(_autoCombatCoroutine);
+            _autoCombatCoroutine = null;
+        }
+
+        _isRoundGenerationInProgress = false;
     }
 
     IEnumerator AutoCombat()
@@ -280,7 +299,7 @@ public class RoundsManager : MonoBehaviour
                 }
 
                 // Czeka, aż jednostka zakończy ruch
-                yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false);
+                yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false && (CombatManager.Instance == null || !CombatManager.Instance.IsAttackSequenceRunning));
                 if (!ReinforcementLearningManager.Instance.IsLearning)
                 {
                     yield return new WaitForSeconds(0.6f);
@@ -334,6 +353,8 @@ public class RoundsManager : MonoBehaviour
             GridManager.Instance.CheckTileOccupancy();
             NextRound();
         }
+
+        _autoCombatCoroutine = null;
     }
 
     private IEnumerator WaitForLearningStepResolution(Unit unit)
@@ -391,7 +412,7 @@ public class RoundsManager : MonoBehaviour
             //MovementManager.Instance.UpdateMovementRange(1);
 
             //W przypadku ręcznego zadawania obrażeń, czekamy na wpisanie wartości obrażeń przed zmianą jednostki (jednostka jest wtedy zmieniana w funkcji ExecuteAttack w CombatManager)
-            if (!CombatManager.Instance.IsManualPlayerAttack && !unit.CanMove && !unit.CanDoAction)
+            if (!GameManager.IsAutoCombatMode && !CombatManager.Instance.IsManualPlayerAttack && !unit.CanMove && !unit.CanDoAction)
             {
                 FinishTurn();
             }
@@ -454,11 +475,23 @@ public class RoundsManager : MonoBehaviour
     {
         if (Unit.SelectedUnit == null) return;
         FinishTurn(Unit.SelectedUnit.GetComponent<Unit>());
+        TryAdvanceRoundAfterManualFinish();
     }
 
     public void FinishTurn(Unit unit, bool selectNextUnit = true)
     {
         if (unit == null) return;
+
+        if (unit.IsTurnFinished)
+        {
+            if (selectNextUnit)
+            {
+                InitiativeQueueManager.Instance.SelectUnitByQueue();
+            }
+
+            TryAdvanceRoundIfComplete();
+            return;
+        }
 
         unit.IsTurnFinished = true;
 
@@ -474,20 +507,235 @@ public class RoundsManager : MonoBehaviour
         {
             InitiativeQueueManager.Instance.SelectUnitByQueue();
         }
+
+        TryAdvanceRoundIfComplete();
     }
     #endregion
 
+    public void ResetRoundsToStartUi()
+    {
+        RoundNumber = 0;
+        _roundNumberDisplay.text = "Zaczynamy?";
+        _playersRoundNumberDisplay.text = "";
+
+        if (NextRoundButton != null && NextRoundButton.transform.childCount > 0)
+        {
+            NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Start";
+        }
+    }
+
+    public void ResetRoundFlowState(bool resetRoundCounter = false)
+    {
+        if (_autoCombatCoroutine != null)
+        {
+            StopCoroutine(_autoCombatCoroutine);
+            _autoCombatCoroutine = null;
+        }
+
+        _isRoundAdvanceScheduled = false;
+        _isRoundGenerationInProgress = false;
+
+        if (MovementManager.Instance != null)
+        {
+            MovementManager.Instance.IsMoving = false;
+        }
+
+        if (CombatManager.Instance != null)
+        {
+            CombatManager.Instance.ResetAttackSequenceTracking();
+        }
+
+        if (DiceRollManager.Instance != null)
+        {
+            DiceRollManager.Instance.ForceCancelPendingRollInput();
+        }
+
+        if (InitiativeQueueManager.Instance != null)
+        {
+            InitiativeQueueManager.Instance.CancelPendingSelectUnitByQueue();
+        }
+
+        if (NextRoundButton != null)
+        {
+            NextRoundButton.gameObject.SetActive(true);
+            NextRoundButton.interactable = true;
+        }
+
+        if (resetRoundCounter)
+        {
+            ResetRoundsToStartUi();
+        }
+    }
+
+    public void ResetForNewDungeonCrawlerFloor()
+    {
+        ResetRoundFlowState(true);
+
+        if (UnitsManager.Instance == null) return;
+
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit == null) continue;
+
+            unit.IsTurnFinished = false;
+            unit.CanDoAction = true;
+
+            Stats stats = unit.GetComponent<Stats>();
+            unit.CanMove = !(unit.Entangled || unit.Grappled || (stats != null && stats.Sz == 0));
+        }
+
+        ClearSelectedUnitVisualState();
+
+        InitiativeQueueManager.Instance?.UpdateInitiativeQueue();
+    }
+
+
+    private void ClearSelectedUnitVisualState()
+    {
+        if (Unit.SelectedUnit != null)
+        {
+            Unit selectedUnitComponent = Unit.SelectedUnit.GetComponent<Unit>();
+            if (selectedUnitComponent != null)
+            {
+                selectedUnitComponent.IsSelected = false;
+                selectedUnitComponent.ChangeUnitColor(selectedUnitComponent.gameObject);
+            }
+        }
+
+        Unit.SelectedUnit = null;
+        Unit.LastSelectedUnit = null;
+    }
+    private bool AreAllTurnsFinished()
+    {
+        if (InitiativeQueueManager.Instance == null) return false;
+
+        foreach (var pair in InitiativeQueueManager.Instance.InitiativeQueue)
+        {
+            Unit unit = pair.Key;
+            if (unit == null) continue;
+
+            if (!unit.IsTurnFinished && (unit.CanDoAction || unit.CanMove))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsBattleStillOngoing()
+    {
+        if (UnitsManager.Instance == null) return false;
+
+        bool hasLivingPlayers = false;
+        bool hasLivingEnemies = false;
+
+        for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+        {
+            Unit unit = UnitsManager.Instance.AllUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy) continue;
+
+            Stats stats = unit.GetComponent<Stats>();
+            if (stats == null || stats.TempHealth <= 0) continue;
+
+            if (unit.CompareTag("PlayerUnit")) hasLivingPlayers = true;
+            else if (unit.CompareTag("EnemyUnit")) hasLivingEnemies = true;
+
+            if (hasLivingPlayers && hasLivingEnemies) return true;
+        }
+
+        return false;
+    }
+
+    public void TryAdvanceRoundIfComplete()
+    {
+        if (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning) return;
+        if (_isRoundAdvanceScheduled || _isRoundGenerationInProgress) return;
+        if (RoundNumber <= 0) return;
+        if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
+        if (!AreAllTurnsFinished()) return;
+        if (!IsBattleStillOngoing()) return;
+
+        _isRoundAdvanceScheduled = true;
+        StartCoroutine(AdvanceRoundWhenReady());
+    }
+
+
+    private void TryAdvanceRoundAfterManualFinish()
+    {
+        if (_isRoundAdvanceScheduled || _isRoundGenerationInProgress) return;
+        if (RoundNumber <= 0) return;
+        if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsLearning) return;
+        if (!AreAllTurnsFinished()) return;
+        if (!IsBattleStillOngoing()) return;
+
+        _isRoundAdvanceScheduled = true;
+        StartCoroutine(AdvanceRoundAfterManualFinishWhenReady());
+    }
+    private IEnumerator AdvanceRoundWhenReady()
+    {
+        while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
+            || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning)
+            || (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading))
+        {
+            yield return null;
+        }
+
+        _isRoundAdvanceScheduled = false;
+
+        if ((ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning) && GameManager.IsAutoCombatMode)
+        {
+            yield break;
+        }
+
+        if (!AreAllTurnsFinished() || !IsBattleStillOngoing())
+        {
+            yield break;
+        }
+
+        NextRound();
+    }
+
+    private IEnumerator AdvanceRoundAfterManualFinishWhenReady()
+    {
+        while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
+            || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning)
+            || (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading))
+        {
+            yield return null;
+        }
+
+        _isRoundAdvanceScheduled = false;
+
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsLearning)
+        {
+            yield break;
+        }
+
+        if (!AreAllTurnsFinished() || !IsBattleStillOngoing())
+        {
+            yield break;
+        }
+
+        NextRound();
+    }
     public void LoadRoundsManagerData(RoundsManagerData data)
     {
         RoundNumber = data.RoundNumber;
         if (RoundNumber > 0)
         {
             _roundNumberDisplay.text = "Runda: " + RoundNumber;
+            _playersRoundNumberDisplay.text = "Runda: " + RoundNumber;
             NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Następna runda";
         }
         else
         {
             _roundNumberDisplay.text = "Zaczynamy?";
+            _playersRoundNumberDisplay.text = "";
             NextRoundButton.transform.GetChild(0).GetComponent<TMP_Text>().text = "Start";
         }
     }
