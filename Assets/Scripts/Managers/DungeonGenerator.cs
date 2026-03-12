@@ -155,6 +155,30 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private List<string> _disallowedStandaloneEnemyRaces = new List<string> { "Koń", "Kuc" };
     private int _lastGeneratedEnemyUnitId = -1;
     private string _lastGeneratedEncounterName = string.Empty;
+
+    // Prywatne statyczne pole przechowujące instancję
+    private static DungeonGenerator instance;
+
+    // Publiczny dostęp do instancji
+    public static DungeonGenerator Instance
+    {
+        get { return instance; }
+    }
+
+    void Awake()
+    {
+        if (instance == null)
+        {
+            instance = this;
+            //DontDestroyOnLoad(gameObject);
+        }
+        else if (instance != this)
+        {
+            // Jeśli instancja już istnieje, a próbujemy utworzyć kolejną, niszczymy nadmiarową
+            Destroy(gameObject);
+        }
+    }
+
     public void GenerateDungeonFromButton()
     {
         if (_seedInputField != null && int.TryParse(_seedInputField.text, out int parsedSeed))

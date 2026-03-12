@@ -600,6 +600,7 @@ public class RoundsManager : MonoBehaviour
             {
                 selectedUnitComponent.IsSelected = false;
                 selectedUnitComponent.ChangeUnitColor(selectedUnitComponent.gameObject);
+                GridManager.Instance.ResetColorOfTilesInMovementRange();
             }
         }
 

@@ -144,7 +144,8 @@ public class GameManager : MonoBehaviour
             {_statsHidingButton, IsStatsHidingMode},
             {_healthPointsHidingButton, IsHealthPointsHidingMode},
             {_autosaveButton, IsAutosaveMode},
-            {_showAnimationsButton, IsShowAnimationsMode}
+            {_showAnimationsButton, IsShowAnimationsMode},
+            {_dungeonCrawlerButton, IsDungeonCrawlerMode }
         };
 
         // Ustawia kolory przycisków na podstawie początkowych wartości trybów
@@ -436,6 +437,7 @@ public class GameManager : MonoBehaviour
         {
             ConfigureDungeonCrawlerRewardUi();
             Debug.Log("Tryb eksploracji podziemi został włączony. Podziemia wraz z przeciwnikami będą generowane automatycznie. Postać będzie otrzymywała Punkty Doświadczenia i ekwipunek za pokonanych wrogów.");
+            DungeonGenerator.Instance.GenerateDungeon();
         }
         else
         {

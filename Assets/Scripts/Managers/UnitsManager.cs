@@ -531,9 +531,18 @@ public class UnitsManager : MonoBehaviour
 
             _unitsDropdown.SelectedIndex = previousSelectedIndex;
             _unitsDropdown.SelectedButton = previousSelectedButton;
-
-            Unit.SelectedUnit = previousSelectedUnit;
-            Unit.LastSelectedUnit = previousLastSelectedUnit;
+            // Przywracamy wskaźniki zaznaczenia tylko wtedy, gdy poprzednia jednostka
+            // faktycznie pozostała zaznaczona. Chroni to przed sytuacją, w której
+            // SelectedUnit wskazuje odznaczoną jednostkę i pozostawia błędny highlight pól.
+            if (previousSelectedUnit != null)
+            {
+                Unit previousSelectedUnitComponent = previousSelectedUnit.GetComponent<Unit>();
+                if (previousSelectedUnitComponent != null && previousSelectedUnitComponent.IsSelected)
+                {
+                    Unit.SelectedUnit = previousSelectedUnit;
+                    Unit.LastSelectedUnit = previousLastSelectedUnit;
+                }
+            }
         }
     }
 
