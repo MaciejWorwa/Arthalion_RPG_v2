@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -40,34 +40,80 @@ public class InitiativeQueueManager : MonoBehaviour
     public UnityEngine.UI.Slider DominanceBar; // Pasek przewagi siĹ‚ w bitwie
 
     private Coroutine _selectUnitByQueueCoroutine;
+
+    private void PurgeInvalidInitiativeEntries()
+    {
+        if (InitiativeQueue == null)
+        {
+            InitiativeQueue = new Dictionary<Unit, int>();
+            return;
+        }
+
+        List<Unit> invalidUnits = new List<Unit>();
+        foreach (var pair in InitiativeQueue)
+        {
+            if (pair.Key == null)
+            {
+                invalidUnits.Add(pair.Key);
+            }
+        }
+
+        for (int i = 0; i < invalidUnits.Count; i++)
+        {
+            InitiativeQueue.Remove(invalidUnits[i]);
+        }
+
+        if (ActiveUnit == null)
+        {
+            ActiveUnit = null;
+        }
+    }
     #region Initiative queue
     public void AddUnitToInitiativeQueue(Unit unit)
     {
-        //Nie dodaje do kolejki inicjatywy jednostek, ktĂłre sÄ… ukryte
-        Collider2D collider = Physics2D.OverlapPoint(unit.gameObject.transform.position);
-        if (collider.CompareTag("TileCover") || InitiativeQueue.ContainsKey(unit)) return;
+        if (unit == null) return;
 
-        InitiativeQueue.Add(unit, unit.GetComponent<Stats>().Initiative);
+        PurgeInvalidInitiativeEntries();
+
+        //Nie dodaje do kolejki inicjatywy jednostek, które są ukryte
+        Collider2D collider = Physics2D.OverlapPoint(unit.gameObject.transform.position);
+        if ((collider != null && collider.CompareTag("TileCover")) || InitiativeQueue.ContainsKey(unit)) return;
+
+        Stats stats = unit.GetComponent<Stats>();
+        if (stats == null) return;
+
+        InitiativeQueue.Add(unit, stats.Initiative);
 
         //Aktualizuje pasek przewagi w bitwie
-        unit.GetComponent<Stats>().Overall = unit.GetComponent<Stats>().CalculateOverall();
+        stats.Overall = stats.CalculateOverall();
 
         CalculateDominance();
     }
 
     public void RemoveUnitFromInitiativeQueue(Unit unit)
     {
-        if (!InitiativeQueue.ContainsKey(unit)) return;
+        PurgeInvalidInitiativeEntries();
+
+        if (unit == null || !InitiativeQueue.ContainsKey(unit))
+        {
+            return;
+        }
 
         InitiativeQueue.Remove(unit);
 
         //Aktualizuje pasek przewagi w bitwie
-        unit.GetComponent<Stats>().Overall = unit.GetComponent<Stats>().CalculateOverall();
+        Stats stats = unit.GetComponent<Stats>();
+        if (stats != null)
+        {
+            stats.Overall = stats.CalculateOverall();
+        }
+
         CalculateDominance();
     }
 
     public void UpdateInitiativeQueue()
     {
+        PurgeInvalidInitiativeEntries();
         //Sortowanie malejÄ…co wedĹ‚ug wartoĹ›ci inicjatywy
         InitiativeQueue = InitiativeQueue.OrderByDescending(pair => pair.Value).ToDictionary(pair => pair.Key, pair => pair.Value);
 
@@ -76,6 +122,7 @@ public class InitiativeQueueManager : MonoBehaviour
 
     private void DisplayInitiativeQueue()
     {
+        PurgeInvalidInitiativeEntries();
         // Resetuje wyĹ›wietlanÄ… kolejkÄ™, usuwajÄ…c wszystkie obiekty "dzieci"
         ResetScrollViewContent(InitiativeScrollViewContent);
         ResetScrollViewContent(PlayersCamera_InitiativeScrollViewContent);
@@ -198,19 +245,26 @@ public class InitiativeQueueManager : MonoBehaviour
 
     public void CalculateDominance()
     {
+        PurgeInvalidInitiativeEntries();
+
         int playerTotal = 0;
         int enemyTotal = 0;
 
-        // Przechodzimy przez caĹ‚Ä… kolejkÄ™ inicjatywy i sumujemy "Overall" dla obu stron
+        // Przechodzimy przez całą kolejkę inicjatywy i sumujemy "Overall" dla obu stron
         foreach (var unit in InitiativeQueue.Keys)
         {
+            if (unit == null) continue;
+
             Stats unitStats = unit.GetComponent<Stats>();
+            if (unitStats == null) continue;
 
             if (unit.CompareTag("PlayerUnit"))
                 playerTotal += unitStats.Overall;
             else if (unit.CompareTag("EnemyUnit"))
                 enemyTotal += unitStats.Overall;
         }
+
+        if (DominanceBar == null) return;
 
         int totalPower = playerTotal + enemyTotal;
         if (totalPower == 0)
@@ -224,7 +278,7 @@ public class InitiativeQueueManager : MonoBehaviour
         DominanceBar.maxValue = totalPower;
         DominanceBar.value = playerTotal;
 
-        // Aktywujemy pasek, jeĹ›li ma sens go wyĹ›wietlaÄ‡
+        // Aktywujemy pasek, jeśli ma sens go wyświetlać
         if (DominanceBar.maxValue > 1 && !DominanceBar.gameObject.activeSelf && !GameManager.IsStatsHidingMode)
         {
             DominanceBar.gameObject.SetActive(true);

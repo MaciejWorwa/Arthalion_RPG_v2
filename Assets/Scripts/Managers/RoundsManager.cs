@@ -221,6 +221,7 @@ public class RoundsManager : MonoBehaviour
 
     IEnumerator AutoCombat()
     {
+        bool shouldStartNextRound = false;
         NextRoundButton.gameObject.SetActive(false);
         _useFortunePointsButton.SetActive(false);
 
@@ -323,10 +324,22 @@ public class RoundsManager : MonoBehaviour
             if (battleEnded)
             {
                 // Wylicz zwycięzcę: true jeśli gracz wciąż ma jednostki, a enemy nie
-                bool playerUnitsExist = UnitsManager.Instance.AllUnits.Any(u =>
-                    u != null && u.CompareTag("PlayerUnit") && u.GetComponent<Stats>().TempHealth > 0);
-                bool enemyUnitsExist = UnitsManager.Instance.AllUnits.Any(u =>
-                    u != null && u.CompareTag("EnemyUnit") && u.GetComponent<Stats>().TempHealth > 0);
+                bool playerUnitsExist = UnitsManager.Instance != null
+                    && UnitsManager.Instance.AllUnits != null
+                    && UnitsManager.Instance.AllUnits.Any(u =>
+                    {
+                        if (u == null || !u.CompareTag("PlayerUnit")) return false;
+                        Stats s = u.GetComponent<Stats>();
+                        return s != null && s.TempHealth > 0;
+                    });
+                bool enemyUnitsExist = UnitsManager.Instance != null
+                    && UnitsManager.Instance.AllUnits != null
+                    && UnitsManager.Instance.AllUnits.Any(u =>
+                    {
+                        if (u == null || !u.CompareTag("EnemyUnit")) return false;
+                        Stats s = u.GetComponent<Stats>();
+                        return s != null && s.TempHealth > 0;
+                    });
                 bool didAIWin = !playerUnitsExist && enemyUnitsExist;
 
                 // Terminalna nagroda dla wszystkich zapisanych akcji
@@ -337,13 +350,10 @@ public class RoundsManager : MonoBehaviour
                 ReinforcementLearningManager.Instance.NotifyEpisodeEnd(didAIWin);
 
                 // Wczytaj ponownie scenę/stan rozpoczynający kolejne epizody
-                SaveAndLoadManager.Instance.SetLoadingType("units");
-                SaveAndLoadManager.Instance.LoadGame("AIlearning");
-
-                for (int i = 0; i < UnitsManager.Instance.AllUnits.Count; i++)
+                if (!SaveAndLoadManager.Instance.IsLoading)
                 {
-                    if (UnitsManager.Instance.AllUnits[i] == null || !InitiativeQueueManager.Instance.InitiativeQueue.ContainsKey(UnitsManager.Instance.AllUnits[i])) continue;
-                    UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().Overall = UnitsManager.Instance.AllUnits[i].GetComponent<Stats>().CalculateOverall();
+                    SaveAndLoadManager.Instance.SetLoadingType("units");
+                    SaveAndLoadManager.Instance.LoadGame("AIlearning");
                 }
             }
 
@@ -351,10 +361,15 @@ public class RoundsManager : MonoBehaviour
             yield return new WaitUntil(() => SaveAndLoadManager.Instance.IsLoading == false);
 
             GridManager.Instance.CheckTileOccupancy();
-            NextRound();
+            shouldStartNextRound = true;
         }
 
         _autoCombatCoroutine = null;
+
+        if (shouldStartNextRound)
+        {
+            NextRound();
+        }
     }
 
     private IEnumerator WaitForLearningStepResolution(Unit unit)
@@ -766,4 +781,3 @@ public class RoundsManager : MonoBehaviour
         return null;
     }
 }
-

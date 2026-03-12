@@ -1217,14 +1217,24 @@ public class ReinforcementLearningManager : MonoBehaviour
 
     public bool BothTeamsExist()
     {
+        if (UnitsManager.Instance == null || UnitsManager.Instance.AllUnits == null)
+        {
+            return false;
+        }
+
         bool p = false, e = false;
         foreach (var u in UnitsManager.Instance.AllUnits)
         {
             if (u == null) continue;
-            if (u.CompareTag("PlayerUnit") && u.Stats.TempHealth > 0) p = true;
-            if (u.CompareTag("EnemyUnit") && u.Stats.TempHealth > 0) e = true;
+
+            Stats stats = u.Stats != null ? u.Stats : u.GetComponent<Stats>();
+            if (stats == null) continue;
+
+            if (u.CompareTag("PlayerUnit") && stats.TempHealth > 0) p = true;
+            if (u.CompareTag("EnemyUnit") && stats.TempHealth > 0) e = true;
             if (p && e) return true;
         }
+
         if (p && !e) _playerWins++;
         if (!p && e) _enemyWins++;
         return false;
