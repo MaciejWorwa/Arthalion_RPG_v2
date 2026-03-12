@@ -225,10 +225,6 @@ public class DungeonGenerator : MonoBehaviour
 
             if (SceneManager.GetActiveScene().buildIndex == 1)
             {
-                if (Unit.SelectedUnit != null)
-                {
-                    Unit.SelectedUnit.GetComponent<Unit>().SelectUnit();
-                }
                 UnitsManager.Instance.UpdateUnitPanel(null);
             }
 
