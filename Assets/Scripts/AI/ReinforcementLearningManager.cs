@@ -144,6 +144,7 @@ public class ReinforcementLearningManager : MonoBehaviour
     private Dictionary<string, Dictionary<int, float[]>> QTables = new Dictionary<string, Dictionary<int, float[]>>();
 
     public bool IsLearning;
+    private bool _wasLearningEnabledLastFrame;
     private HashSet<string> _trainedRaces = new HashSet<string>();
 
     private struct LastStep
@@ -172,16 +173,35 @@ public class ReinforcementLearningManager : MonoBehaviour
 
     void Start()
     {
+        _wasLearningEnabledLastFrame = IsLearning;
         if (!IsLearning) return;
 
-        LoadQTables();
-        InitializeTrainingRun();
-        UpdateTrainingDebugUI();
+        StartLearningSession(forceLoadFromDisk: true);
     }
 
     void Update()
     {
+        if (IsLearning && !_wasLearningEnabledLastFrame)
+        {
+            // Gdy IsLearning jest przełączone w runtime (np. toggle w Inspectorze),
+            // od razu dociągamy zapisane Q-tabele, żeby kontynuować trening.
+            StartLearningSession(forceLoadFromDisk: false);
+        }
+
+        _wasLearningEnabledLastFrame = IsLearning;
+
         if (Input.GetKeyDown(KeyCode.R) && IsLearning) SaveQTables();
+    }
+
+    private void StartLearningSession(bool forceLoadFromDisk)
+    {
+        if (forceLoadFromDisk || QTables.Count == 0)
+        {
+            LoadQTables();
+        }
+
+        InitializeTrainingRun();
+        UpdateTrainingDebugUI();
     }
 
     void OnApplicationQuit()
