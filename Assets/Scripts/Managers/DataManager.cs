@@ -780,6 +780,7 @@ public class StatsData
     public int Exp; // Punkty doświadczenia
     public string Name;
     public string Race;
+    public string TokenKey;
     public string Type;
 
     public SizeCategory Size; // Rozmiar

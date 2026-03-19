@@ -41,6 +41,115 @@ public class TokensManager : MonoBehaviour
         FileBrowser.SetDefaultFilter(".jpg");
     }
 
+    public void ApplyDefaultTokenIfMissing(GameObject unitObject)
+    {
+        if (unitObject == null) return;
+
+        Unit unit = unitObject.GetComponent<Unit>();
+        if (unit == null) return;
+        if (unit.HasTokenSprite) return;
+        if (!string.IsNullOrWhiteSpace(unit.TokenFilePath)) return;
+
+        TryApplyDefaultTokenFromResources(unitObject);
+    }
+
+    public bool TryApplyDefaultTokenFromResources(GameObject unitObject)
+    {
+        if (unitObject == null) return false;
+
+        Unit unit = unitObject.GetComponent<Unit>();
+        Stats stats = unitObject.GetComponent<Stats>();
+        if (unit == null || stats == null) return false;
+
+        List<string> tokenCandidates = new List<string>();
+        HashSet<string> usedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddCandidate(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            string trimmed = key.Trim();
+            if (usedKeys.Add(trimmed))
+            {
+                tokenCandidates.Add(trimmed);
+            }
+
+            string underscored = trimmed.Replace(" ", "_");
+            if (usedKeys.Add(underscored))
+            {
+                tokenCandidates.Add(underscored);
+            }
+        }
+
+        AddCandidate(stats.TokenKey);
+        AddCandidate(stats.Race);
+        AddCandidate("_default");
+
+        for (int i = 0; i < tokenCandidates.Count; i++)
+        {
+            if (TryApplyTokenFromResources(unitObject, tokenCandidates[i]))
+            {
+                unit.TokenFilePath = string.Empty;
+                unit.HasTokenSprite = true;
+                return true;
+            }
+        }
+
+        unit.HasTokenSprite = false;
+        return false;
+    }
+
+    private bool TryApplyTokenFromResources(GameObject unitObject, string tokenName)
+    {
+        if (unitObject == null || string.IsNullOrWhiteSpace(tokenName)) return false;
+
+        Sprite sourceSprite = Resources.Load<Sprite>($"Tokens/{tokenName}");
+        if (sourceSprite == null) return false;
+
+        Transform tokenTransform = unitObject.transform.Find("Token");
+        if (tokenTransform == null) return false;
+
+        SpriteRenderer tokenRenderer = tokenTransform.GetComponent<SpriteRenderer>();
+        if (tokenRenderer == null) return false;
+
+        tokenTransform.gameObject.SetActive(true);
+
+        if (!TryApplyTokenTextureToRenderer(sourceSprite.texture, sourceSprite.rect, tokenRenderer))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryApplyTokenTextureToRenderer(Texture2D sourceTexture, Rect sourceRect, SpriteRenderer tokenRenderer)
+    {
+        if (sourceTexture == null || tokenRenderer == null) return false;
+
+        // Set token tint to neutral so unit highlight color does not overlay token art.
+        tokenRenderer.material.color = Color.white;
+        tokenRenderer.material.SetColor("_EmissionColor", Color.black);
+
+        float width = sourceRect.width;
+        float height = sourceRect.height;
+        if (width <= 0f || height <= 0f) return false;
+
+        // Center-crop to square, same behavior as loading token from disk.
+        float minSize = Mathf.Min(width, height);
+        float offsetX = sourceRect.x + (width - minSize) / 2f;
+        float offsetY = sourceRect.y + (height - minSize) / 2f;
+        Rect rect = new Rect(offsetX, offsetY, minSize, minSize);
+
+        // Match world-space size to the renderer, as in LoadTokenImage.
+        float spriteSize = Mathf.Min(tokenRenderer.size.x, tokenRenderer.size.y);
+        if (spriteSize <= 0f) spriteSize = 1f;
+        float pixelsPerUnit = minSize / spriteSize;
+
+        Sprite newSprite = Sprite.Create(sourceTexture, rect, new Vector2(0.5f, 0.5f), pixelsPerUnit);
+        tokenRenderer.sprite = newSprite;
+        return true;
+    }
+
     public void OpenFileBrowser()
     {
         if(Unit.SelectedUnit == null) return;
@@ -62,6 +171,8 @@ public class TokensManager : MonoBehaviour
     public IEnumerator LoadTokenImage(string filePath, GameObject unitObject)
     {
         if(unitObject == null || filePath.Length < 1) yield break;
+
+        Unit unitComponent = unitObject.GetComponent<Unit>();
 
         // Sprawdza, czy plik istnieje
         if (!File.Exists(filePath))
@@ -87,33 +198,28 @@ public class TokensManager : MonoBehaviour
             else
             {
                 //Ustawienie koloru na biały, żeby nie było overlaya koloru na tokenie
-                imageRenderer.material.color = Color.white;
-                imageRenderer.material.SetColor("_EmissionColor", Color.black);
-
-                // Obliczanie nowego Rect, aby zachować proporcje 1:1
-                int minSize = Mathf.Min(texture.width, texture.height);
-                float offsetX = (texture.width - minSize) / 2f;
-                float offsetY = (texture.height - minSize) / 2f;
-                Rect rect = new Rect(offsetX, offsetY, minSize, minSize);
-
-                // Obliczenie pixelsPerUnit, zachowując dopasowanie do wielkości sprite'a
-                float spriteSize = Mathf.Min(imageRenderer.size.x, imageRenderer.size.y);
-                float pixelsPerUnit = minSize / spriteSize;
-
-                // Używanie nowego Rect i pixelsPerUnit do stworzenia sprite'a
-                Sprite newSprite = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), pixelsPerUnit);
-                imageRenderer.sprite = newSprite;
+                if (!TryApplyTokenTextureToRenderer(texture, new Rect(0f, 0f, texture.width, texture.height), imageRenderer))
+                {
+                    Debug.LogError("Nie udało się dopasować tokena.");
+                    yield break;
+                }
 
                 // Aktualizacja ścieżki do tokena jednostki
-                unitObject.GetComponent<Unit>().TokenFilePath = filePath;
+                if (unitComponent != null)
+                {
+                    unitComponent.TokenFilePath = filePath;
+                    unitComponent.HasTokenSprite = true;
+                }
 
                 UnitsManager.Instance.UpdateUnitPanel(unitObject);
             }
         }
         else
         {
-            //Dezatywuje token
-            unitObject.transform.Find("Token").gameObject.SetActive(false);
+            if (unitComponent != null && !unitComponent.HasTokenSprite)
+            {
+                unitObject.transform.Find("Token").gameObject.SetActive(false);
+            }
             Debug.LogError("Nie udało się załadować obrazu.");
         }
 

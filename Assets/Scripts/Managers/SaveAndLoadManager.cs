@@ -9,10 +9,10 @@ using UnityEngine;
 
 public class SaveAndLoadManager : MonoBehaviour
 {
-    // Prywatne statyczne pole przechowuj�ce instancj�
+    // Prywatne statyczne pole przechowujące instancję
     private static SaveAndLoadManager instance;
 
-    // Publiczny dost�p do instancji
+    // Publiczny dostęp do instancji
     public static SaveAndLoadManager Instance
     {
         get { return instance; }
@@ -27,7 +27,7 @@ public class SaveAndLoadManager : MonoBehaviour
         }
         else if (instance != this)
         {
-            // Je�li instancja ju� istnieje, a pr�bujemy utworzy� kolejn�, niszczymy nadmiarow�
+            // Jeśli instancja już istnieje, a próbujemy utworzyć kolejną, niszczymy nadmiarową
             Destroy(gameObject);
         }
     }
@@ -35,7 +35,7 @@ public class SaveAndLoadManager : MonoBehaviour
     [SerializeField] private TMP_InputField _saveNameInput;
     [SerializeField] private TMP_InputField _searchInputField;
     [SerializeField] private Transform _savesScrollViewContent;
-    [SerializeField] private GameObject _buttonPrefab; // Przycisk odpowiadaj�cy ka�demu zapisowi na li�cie
+    [SerializeField] private GameObject _buttonPrefab; // Przycisk odpowiadający każdemu zapisowi na liście
     [SerializeField] private GameObject _loadGamePanel;
     [SerializeField] private GameObject _saveGamePanel;
     [SerializeField] private GameObject _removeSaveFilePanel;
@@ -50,13 +50,13 @@ public class SaveAndLoadManager : MonoBehaviour
     #region Saving methods
     public void SaveSettings()
     {
-        // �cie�ka do pliku ustawie�
+        // Ścieżka do pliku ustawień
         string settingsFilePath = Path.Combine(Application.persistentDataPath, "GameSettings.json");
 
-        // Tworzenie obiektu ustawie�
+        // Tworzenie obiektu ustawień
         GameSettings settings = new GameSettings();
 
-        // Pobieranie wszystkich p�l typu bool z GameManager i przypisywanie ich do settings
+        // Pobieranie wszystkich pól typu bool z GameManager i przypisywanie ich do settings
         foreach (var field in typeof(GameManager).GetFields(BindingFlags.Static | BindingFlags.Public))
         {
             if (field.FieldType == typeof(bool))
@@ -69,7 +69,7 @@ public class SaveAndLoadManager : MonoBehaviour
             }
         }
 
-        // Ustawienia dla kolor�w t�a
+        // Ustawienia dla kolorów tła
         settings.BackgroundColorR = CameraManager.BackgroundColor.r;
         settings.BackgroundColorG = CameraManager.BackgroundColor.g;
         settings.BackgroundColorB = CameraManager.BackgroundColor.b;
@@ -96,7 +96,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         if (allUnits.Count < 1)
         {
-            Debug.Log($"<color=red>Zapis nieudany. Aby zapisa� gr�, musisz umie�ci� na polu bitwy chocia� jedn� jednostk�.</color>");
+            Debug.Log($"<color=red>Zapis nieudany. Aby zapisać grę, musisz umieścić na polu bitwy chociaż jedną jednostkę.</color>");
             return;
         }
 
@@ -104,7 +104,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         SaveRoundsManager(_saveNameInput.text);
 
-        //Zapisanie wszystkich element�w mapy
+        //Zapisanie wszystkich elementów mapy
         SaveMap();
 
         //Przechowanie nazwy aktualnej gry (potrzebne do wykonywania automatycznego zapisu)
@@ -126,7 +126,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
     public void SaveUnits(List<Unit> allUnits, string savesFolderName = "")
     {
-        // Je�li nazwa folderu nie zosta�a podana, u�yj nazwy z pola wej�ciowego
+        // Jeśli nazwa folderu nie została podana, użyj nazwy z pola wejściowego
         if (string.IsNullOrEmpty(savesFolderName))
         {
             savesFolderName = _saveNameInput.text;
@@ -134,10 +134,10 @@ public class SaveAndLoadManager : MonoBehaviour
 
         String filePath = Application.persistentDataPath + "/" + savesFolderName;
 
-        //Je�li kopiujemy jednostki do schowka, to czy�cimy schowek
+        //Jeśli kopiujemy jednostki do schowka, to czyścimy schowek
         if (Directory.Exists(filePath) && savesFolderName != "savedUnitsList")
         {
-            Directory.Delete(filePath, true); // Usuwa katalog wraz z zawarto�ci�
+            Directory.Delete(filePath, true); // Usuwa katalog wraz z zawartością
         }
 
         if (!Directory.Exists(filePath))
@@ -155,7 +155,7 @@ public class SaveAndLoadManager : MonoBehaviour
             string inventoryPath = Path.Combine(Application.persistentDataPath, savesFolderName, unitName + "_inventory.json");
             string tokenJsonPath = Path.Combine(Application.persistentDataPath, savesFolderName, unitName + "_token.json");
 
-            // Resetowanie broni do warto�ci bazowych przed zapisem
+            // Resetowanie broni do wartości bazowych przed zapisem
             foreach (Weapon weapon in unit.GetComponent<Inventory>().AllWeapons)
             {
                 InventoryManager.Instance.ResetToBaseWeaponStats(weapon);
@@ -180,7 +180,7 @@ public class SaveAndLoadManager : MonoBehaviour
             File.WriteAllText(inventoryPath, inventoryJsonData);
             File.WriteAllText(tokenJsonPath, tokenJsonData);
 
-            // Po zapisaniu ponownie nak�adamy efekty amunicji
+            // Po zapisaniu ponownie nakładamy efekty amunicji
             foreach (Weapon weapon in unit.GetComponent<Inventory>().AllWeapons)
             {
                 InventoryManager.Instance.ApplyAmmoModifiers(weapon);
@@ -189,7 +189,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         if (savesFolderName == "savedUnitsList")
         {
-            Debug.Log($"<color=green>Jednostka '{Unit.SelectedUnit.GetComponent<Stats>().Name}' zosta�a zapisana.</color>");
+            Debug.Log($"<color=green>Jednostka '{Unit.SelectedUnit.GetComponent<Stats>().Name}' została zapisana.</color>");
             DataManager.Instance.LoadAndUpdateStats();
         }
     }
@@ -235,11 +235,11 @@ public class SaveAndLoadManager : MonoBehaviour
     {
         string savesFolderName;
 
-        // Stworzenie folderu dla zapis�w
+        // Stworzenie folderu dla zapisów
         savesFolderName = _saveNameInput.text;
         Directory.CreateDirectory(Application.persistentDataPath + "/" + savesFolderName);
 
-        // Pobranie listy zapisanych plik�w
+        // Pobranie listy zapisanych plików
         string previousFile = Path.Combine(Application.persistentDataPath, savesFolderName, "MapElements.json");
 
         // Usuwa plik z poprzedniego zapisu
@@ -249,7 +249,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         if (MapEditor.Instance == null) return;
 
-        // Zbieranie danych z ka�dego elementu
+        // Zbieranie danych z każdego elementu
         foreach (var element in MapEditor.Instance.AllElements)
         {
             if(element == null) continue;
@@ -275,16 +275,16 @@ public class SaveAndLoadManager : MonoBehaviour
         container.BackgroundPositionY = MapEditor.BackgroundPositionY;
         container.BackgroundScale = MapEditor.BackgroundScale;
 
-        // Zapis koloru t�a
+        // Zapis koloru tła
         Color backgroundColor = CameraManager.BackgroundColor;
         container.BackgroundColorR = backgroundColor.r;
         container.BackgroundColorG = backgroundColor.g;
         container.BackgroundColorB = backgroundColor.b;
 
-        // �cie�ka do pliku JSON
+        // Ścieżka do pliku JSON
         string mapElementsPath = Path.Combine(Application.persistentDataPath, savesFolderName, "MapElements.json");
 
-        // Konwersja kontenera z list� danych do JSON
+        // Konwersja kontenera z listą danych do JSON
         string mapElementsJsonData = JsonUtility.ToJson(container, true);
 
         // Zapis do pliku
@@ -293,13 +293,13 @@ public class SaveAndLoadManager : MonoBehaviour
         //Zapisanie siatki
         SaveGridManager(savesFolderName);
 
-        Debug.Log($"<color=green>Zapisano map�.</color>");
+        Debug.Log($"<color=green>Zapisano mapę.</color>");
     }
     #endregion
 
     #region Loading methods
 
-    //Ustala, czy wczytujemy ca�� gr�, czy jedynie jednostki
+    //Ustala, czy wczytujemy całą grę, czy jedynie jednostki
     public void SetLoadingType(string value)
     {
         IsOnlyUnitsLoading = value == "units" ? true : false;
@@ -316,16 +316,16 @@ public class SaveAndLoadManager : MonoBehaviour
 
             if (buttonText == null) continue;
 
-            // Sprawdzaj, czy tekst zawiera wyszukiwan� fraz�
+            // Sprawdzaj, czy tekst zawiera wyszukiwaną frazę
             bool matchesSearch = buttonText.text.ToLower().Contains(searchText);
 
-            // Ukryj/wy�wietl przycisk na podstawie wyniku wyszukiwania
+            // Ukryj/wyświetl przycisk na podstawie wyniku wyszukiwania
             child.gameObject.SetActive(matchesSearch);
         }
     }
     public void LoadSettings()
     {
-        // �cie�ka do pliku ustawie�
+        // Ścieżka do pliku ustawień
         string settingsFilePath = Path.Combine(Application.persistentDataPath, "GameSettings.json");
 
         // Sprawdzanie, czy plik istnieje
@@ -335,7 +335,7 @@ public class SaveAndLoadManager : MonoBehaviour
             string json = File.ReadAllText(settingsFilePath);
             GameSettings settings = JsonUtility.FromJson<GameSettings>(json);
 
-            // Ustawianie warto�ci p�l typu bool w GameManager na podstawie za�adowanych danych
+            // Ustawianie wartości pól typu bool w GameManager na podstawie załadowanych danych
             foreach (var field in typeof(GameManager).GetFields(BindingFlags.Static | BindingFlags.Public))
             {
                 if (field.FieldType == typeof(bool))
@@ -348,14 +348,14 @@ public class SaveAndLoadManager : MonoBehaviour
                 }
             }
 
-            // Wczytuje kolor t�a
+            // Wczytuje kolor tła
             Color loadedColor = new Color(
                 settings.BackgroundColorR,
                 settings.BackgroundColorG,
                 settings.BackgroundColorB
             );
 
-            // Ustawienie koloru t�a
+            // Ustawienie koloru tła
             if (ColorPicker.Instance != null)
             {
                 ColorPicker.Instance.SetColor(loadedColor);
@@ -383,7 +383,7 @@ public class SaveAndLoadManager : MonoBehaviour
         CustomDropdown dropdown = _savesScrollViewContent.GetComponent<CustomDropdown>();
         if (dropdown == null || (saveName == "" && dropdown.SelectedButton == null))
         {
-            Debug.Log($"<color=red>Aby wczyta� gr� musisz wybra� plik z listy.</color>");
+            Debug.Log($"<color=red>Aby wczytać grę musisz wybrać plik z listy.</color>");
             return;
         }
 
@@ -400,7 +400,7 @@ public class SaveAndLoadManager : MonoBehaviour
             return;
         }
 
-        //Automatycznie zapisuje aktualn� gr� przed wczytaniem innej
+        //Automatycznie zapisuje aktualną grę przed wczytaniem innej
         if (GameManager.IsAutosaveMode && CurrentGameName != null && CurrentGameName.Length > 0 && !IsOnlyMapLoading && !IsOnlyUnitsLoading)
         {
             SaveGame(CurrentGameName);
@@ -426,7 +426,7 @@ public class SaveAndLoadManager : MonoBehaviour
                 Unit.SelectedUnit.GetComponent<Unit>().SelectUnit();
             }
 
-            // Kopiuje list� jednostek do nowej listy, aby m�c bezpiecznie modyfikowa� oryginaln� list�
+            // Kopiuje listę jednostek do nowej listy, aby móc bezpiecznie modyfikować oryginalną listę
             List<Unit> unitsToRemove = new List<Unit>(UnitsManager.Instance.AllUnits);
 
             // Usuwa wszystkie obecne na polu bitwy jednostki
@@ -591,6 +591,11 @@ public class SaveAndLoadManager : MonoBehaviour
             createdUnit = unitGameObject.GetComponent<Unit>();
             createdStats = unitGameObject.GetComponent<Stats>();
             if (createdUnit == null || createdStats == null) continue;
+
+            if (TokensManager.Instance != null)
+            {
+                TokensManager.Instance.ApplyDefaultTokenIfMissing(unitGameObject);
+            }
 
             // Dodaje jednostke do kolejki inicjatywy
             InitiativeQueueManager.Instance.AddUnitToInitiativeQueue(createdUnit);
@@ -871,14 +876,14 @@ public class SaveAndLoadManager : MonoBehaviour
     {
         string filePath = Path.Combine(savesFolderPath, "RoundsManager.json");
 
-        // Sprawd�, czy plik istnieje
+        // Sprawdź, czy plik istnieje
         if (File.Exists(filePath))
         {
             // Deserializuj dane z pliku JSON do obiektu RoundsManagerData
             string jsonData = File.ReadAllText(filePath);
             RoundsManagerData data = JsonUtility.FromJson<RoundsManagerData>(jsonData);
 
-            // Za�aduj wczytane dane do istniej�cego obiektu RoundsManager
+            // Załaduj wczytane dane do istniejącego obiektu RoundsManager
             RoundsManager.Instance.LoadRoundsManagerData(data);
         }
         else
@@ -889,14 +894,14 @@ public class SaveAndLoadManager : MonoBehaviour
 
     private void LoadGridManager(string filePath)
     {
-        // Sprawd�, czy plik istnieje
+        // Sprawdź, czy plik istnieje
         if (File.Exists(filePath))
         {
             // Deserializuj dane z pliku JSON do obiektu GridManagerData
             string jsonData = File.ReadAllText(filePath);
             GridManagerData data = JsonUtility.FromJson<GridManagerData>(jsonData);
 
-            // Za�aduj wczytane dane do istniej�cego obiektu GridManager
+            // Załaduj wczytane dane do istniejącego obiektu GridManager
             GridManager.Instance.LoadGridManagerData(data);
 
             GridManager.Instance.GenerateGrid();
@@ -915,7 +920,7 @@ public class SaveAndLoadManager : MonoBehaviour
         CustomDropdown dropdown = _savesScrollViewContent.GetComponent<CustomDropdown>();
         if (dropdown == null || dropdown.SelectedButton == null)
         {
-            Debug.Log($"<color=red>Aby wczyta� gr� musisz wybra� plik z listy.</color>");
+            Debug.Log($"<color=red>Aby wczytać grę musisz wybrać plik z listy.</color>");
             return;
         }
 
@@ -926,18 +931,18 @@ public class SaveAndLoadManager : MonoBehaviour
 
         LoadGridManager(gridFilePath);
 
-        // Sprawd�, czy plik istnieje
+        // Sprawdź, czy plik istnieje
         if (File.Exists(mapElementsFilePath) && MapEditor.Instance != null)
         {
             string jsonData = File.ReadAllText(mapElementsFilePath);
             MapElementsContainer data = JsonUtility.FromJson<MapElementsContainer>(jsonData);
 
-            // Za�aduj wczytane dane do istniej�cego obiektu MapEditor
+            // Załaduj wczytane dane do istniejącego obiektu MapEditor
             MapEditor.Instance.LoadMapData(data);
         }
         else
         {
-            Debug.LogError("Pliku z map� nie znaleziono.");
+            Debug.LogError("Pliku z mapę nie znaleziono.");
         }
 
         if (_loadGamePanel != null)
@@ -947,7 +952,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         if (IsOnlyMapLoading)
         {
-            Debug.Log($"<color=green>Wczytano map�: {CurrentGameName}</color>");
+            Debug.Log($"<color=green>Wczytano mapę: {CurrentGameName}</color>");
         }
     }
     #endregion
@@ -963,35 +968,35 @@ public class SaveAndLoadManager : MonoBehaviour
     {
         CustomDropdown dropdown = _savesScrollViewContent.GetComponent<CustomDropdown>();
 
-        // Wczytanie wszystkich zapisanych folder�w w Application.persistentDataPath
+        // Wczytanie wszystkich zapisanych folderów w Application.persistentDataPath
         string[] saveFolders = Directory.GetDirectories(Application.persistentDataPath);
 
-        // Sortowanie zapis�w w zale�no�ci od stanu Toggle
+        // Sortowanie zapisów w zależności od stanu Toggle
         if (_sortByDateToggle.isOn)
         {
-            saveFolders = saveFolders.OrderByDescending(folder => Directory.GetLastWriteTime(folder)).ToArray(); // Sortowanie wed�ug daty modyfikacji
+            saveFolders = saveFolders.OrderByDescending(folder => Directory.GetLastWriteTime(folder)).ToArray(); // Sortowanie według daty modyfikacji
         }
         else
         {
             saveFolders = saveFolders.OrderBy(folder => folder).ToArray(); // Sortowanie alfabetyczne
         }
 
-        // Usuni�cie istniej�cych przycisk�w z listy i ekranu
+        // Usunięcie istniejących przycisków z listy i ekranu
         foreach (Transform child in _savesScrollViewContent)
         {
-            Destroy(child.gameObject); // Usuni�cie obiekt�w przycisk�w
+            Destroy(child.gameObject); // Usunięcie obiektów przycisków
         }
-        dropdown.Buttons.Clear(); // Wyczyszczenie listy przycisk�w w dropdownie
+        dropdown.Buttons.Clear(); // Wyczyszczenie listy przycisków w dropdownie
 
         foreach (var folderPath in saveFolders)
         {
-            // Uzyskanie nazwy folderu do wy�wietlenia
+            // Uzyskanie nazwy folderu do wyświetlenia
             string folderName = new DirectoryInfo(folderPath).Name;
 
-            // Sprawd�, czy jest to folder tymczasowy ze skopiowanymi jednostkami
+            // Sprawdź, czy jest to folder tymczasowy ze skopiowanymi jednostkami
             if (folderName == "temp" || folderName == "autosave" || folderName == "savedUnitsList") continue;
 
-            //Dodaje nazw� pliku do ScrollViewContent w postaci buttona
+            //Dodaje nazwę pliku do ScrollViewContent w postaci buttona
             GameObject buttonObj = Instantiate(_buttonPrefab, _savesScrollViewContent);
             TextMeshProUGUI buttonText = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
             //Ustala text buttona
@@ -999,15 +1004,15 @@ public class SaveAndLoadManager : MonoBehaviour
 
             UnityEngine.UI.Button button = buttonObj.GetComponent<UnityEngine.UI.Button>();
 
-            //Dodaje opcj� do CustomDropdowna ze wszystkimi zapisami
+            //Dodaje opcję do CustomDropdowna ze wszystkimi zapisami
             dropdown.Buttons.Add(button);
 
             int currentIndex = dropdown.Buttons.Count; // Pobiera indeks nowego przycisku
 
-            // Zdarzenie po klikni�ciu na konkretny zapis z listy
+            // Zdarzenie po kliknięciu na konkretny zapis z listy
             button.onClick.AddListener(() =>
             {
-                dropdown.SetSelectedIndex(currentIndex); // Wybiera element i aktualizuje jego wygl�d
+                dropdown.SetSelectedIndex(currentIndex); // Wybiera element i aktualizuje jego wygląd
             });
         }
     }
@@ -1017,7 +1022,7 @@ public class SaveAndLoadManager : MonoBehaviour
         CustomDropdown dropdown = _savesScrollViewContent.GetComponent<CustomDropdown>();
         if (dropdown == null || dropdown.SelectedButton == null)
         {
-            Debug.Log($"<color=red>Aby usun�� zapis musisz wybra� plik z listy.</color>");
+            Debug.Log($"<color=red>Aby usunąć zapis musisz wybrać plik z listy.</color>");
             return;
         }
 
@@ -1030,7 +1035,7 @@ public class SaveAndLoadManager : MonoBehaviour
         CustomDropdown dropdown = _savesScrollViewContent.GetComponent<CustomDropdown>();
         if (dropdown == null || dropdown.SelectedButton == null)
         {
-            Debug.Log($"<color=red>Aby usun�� zapis musisz wybra� plik z listy.</color>");
+            Debug.Log($"<color=red>Aby usunąć zapis musisz wybrać plik z listy.</color>");
             return;
         }
 
@@ -1038,11 +1043,11 @@ public class SaveAndLoadManager : MonoBehaviour
 
         string saveFolderPath = Path.Combine(Application.persistentDataPath, saveName);
 
-        // Usuni�cie folderu zapisu
+        // Usunięcie folderu zapisu
         if (Directory.Exists(saveFolderPath))
         {
-            Directory.Delete(saveFolderPath, true); // Drugi argument 'true' pozwala na usuni�cie niepustych folder�w
-            Debug.Log($"Plik '{saveName}' zosta� usuni�ty.");
+            Directory.Delete(saveFolderPath, true); // Drugi argument 'true' pozwala na usunięcie niepustych folderów
+            Debug.Log($"Plik '{saveName}' został usunięty.");
         }
         else
         {
@@ -1050,7 +1055,7 @@ public class SaveAndLoadManager : MonoBehaviour
             return;
         }
 
-        // Usuni�cie przycisku z UI
+        // Usunięcie przycisku z UI
         int indexToRemove = dropdown.Buttons.IndexOf(dropdown.SelectedButton);
 
         Destroy(dropdown.Buttons[indexToRemove].gameObject);

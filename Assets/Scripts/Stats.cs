@@ -24,6 +24,7 @@ public class Stats : MonoBehaviour
 
     [Header("Rasa")]
     public string Race;
+    public string TokenKey;
 
     [Header("Type")]
     public string Type;

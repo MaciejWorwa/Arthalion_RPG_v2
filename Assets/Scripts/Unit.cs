@@ -12,6 +12,7 @@ public class Unit : MonoBehaviour
     public static GameObject SelectedUnit;
     public static GameObject LastSelectedUnit;
     public string TokenFilePath;
+    public bool HasTokenSprite;
     public Color DefaultColor;
     public Color HighlightColor;
 
@@ -277,8 +278,8 @@ public class Unit : MonoBehaviour
         Color emission = IsSelected ? unitComponent.DefaultColor * 1f : Color.black;
         mat.SetColor("_EmissionColor", emission);
 
-        // Jeśli nie ma obrazka tokena, ustaw też jego kolor i emisję
-        if (unitComponent.TokenFilePath.Length < 1)
+        // Jeśli nie ma dedykowanego sprite'a tokena, ustaw też jego kolor i emisję
+        if (!unitComponent.HasTokenSprite)
         {
             SpriteRenderer tokenRenderer = unit.transform.Find("Token").GetComponent<SpriteRenderer>();
             tokenRenderer.material = mat; ;

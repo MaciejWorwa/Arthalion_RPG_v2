@@ -254,6 +254,11 @@ public class UnitsManager : MonoBehaviour
         //Wczytuje statystyki dla danego typu jednostki
         DataManager.Instance.LoadAndUpdateStats(newUnitObject);
 
+        if (TokensManager.Instance != null)
+        {
+            TokensManager.Instance.ApplyDefaultTokenIfMissing(newUnitObject);
+        }
+
         //Ustala nazwę GameObjectu jednostki
         if (unitName.Length < 1)
         {
@@ -962,6 +967,13 @@ public class UnitsManager : MonoBehaviour
 
             //Aktualizuje statystyki
             DataManager.Instance.LoadAndUpdateStats(unit);
+
+            Unit unitComponent = unit.GetComponent<Unit>();
+            if (TokensManager.Instance != null && unitComponent != null && string.IsNullOrWhiteSpace(unitComponent.TokenFilePath))
+            {
+                unitComponent.HasTokenSprite = false;
+                TokensManager.Instance.ApplyDefaultTokenIfMissing(unit);
+            }
 
             //Losuje początkowe statystyki dla człowieka, elfa, krasnoluda i niziołka
             if (stats.Id <= 4 && !IsSavedUnitsManaging)

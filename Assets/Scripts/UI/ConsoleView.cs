@@ -16,6 +16,7 @@ public class ConsoleView : MonoBehaviour
     private readonly StringBuilder _logBuilder = new StringBuilder(8192);
     private bool _doShow = true;
     private bool _isDirty;
+    private const char ReplacementChar = '\uFFFD';
 
     void Start()
     {
@@ -46,7 +47,7 @@ public class ConsoleView : MonoBehaviour
 
     private void HandleLog(string logString, string stackTrace, LogType type)
     {
-        _myLogs.Add(logString);
+        _myLogs.Add(SanitizeForTmp(logString));
 
         if (_myLogs.Count > 200)
         {
@@ -54,6 +55,23 @@ public class ConsoleView : MonoBehaviour
         }
 
         _isDirty = true;
+    }
+
+    private static string SanitizeForTmp(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        // Remove Unicode replacement characters (U+FFFD) that can appear after
+        // decoding errors and trigger TMP missing-glyph warnings.
+        if (value.IndexOf(ReplacementChar) >= 0)
+        {
+            value = value.Replace(ReplacementChar.ToString(), string.Empty);
+        }
+
+        return value;
     }
 
     private void UpdateConsoleText()

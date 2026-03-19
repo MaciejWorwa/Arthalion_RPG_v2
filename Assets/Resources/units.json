@@ -2,41 +2,62 @@
   "Units": [
     {
       "Race": "Człowiek",
+      "TokenKey": "Człowiek",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Pałka" ],
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Pałka"
+      ],
       "Sz": 4,
       "ExtraPoints": 4
     },
     {
       "Race": "Elf",
+      "TokenKey": "Elf",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Łuk" ],
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Łuk"
+      ],
       "Sz": 5,
       "ExtraPoints": 3
     },
     {
       "Race": "Gnom",
+      "TokenKey": "Gnom",
       "Type": "Humanoid",
       "Size": 1,
-      "PrimaryWeaponNames": [ "Miecz", "Krótki łuk" ],
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Krótki łuk"
+      ],
       "Sz": 3,
       "ExtraPoints": 5
     },
     {
       "Race": "Krasnolud",
+      "TokenKey": "Krasnolud",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Buława", "Miecz", "Topór", "Młot bojowy" ],
+      "PrimaryWeaponNames": [
+        "Buława",
+        "Miecz",
+        "Topór",
+        "Młot bojowy"
+      ],
       "Sz": 3,
       "ExtraPoints": 4
     },
     {
       "Race": "Bagienny Golem",
+      "TokenKey": "Bagienny Golem",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -59,13 +80,18 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Unaffected": [ "Poison" ]
+      "Unaffected": [
+        "Poison"
+      ]
     },
     {
       "Race": "Demon",
+      "TokenKey": "Demon",
       "Type": "Undead",
       "Size": 4,
-      "PrimaryWeaponNames": [ "Topór dwuręczny" ],
+      "PrimaryWeaponNames": [
+        "Topór dwuręczny"
+      ],
       "S": 7,
       "K": 6,
       "Zw": 0,
@@ -80,13 +106,25 @@
       "Tough": true,
       "Spellcasting": 4,
       "MeleeCombat": 3,
-      "Magic": [ "Death" ],
+      "Magic": [
+        "Death"
+      ],
       "Chosen": true
     },
     {
       "Race": "Drimhar",
+      "TokenKey": "Drimhar",
       "Type": "Giant",
-      "PrimaryWeaponNames": [ "Pałka", "Topór dwuręczny", "Młot dwuręczny", "Pałka z kolcami", "Włócznia", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
+      "PrimaryWeaponNames": [
+        "Pałka",
+        "Topór dwuręczny",
+        "Młot dwuręczny",
+        "Pałka z kolcami",
+        "Włócznia",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice"
+      ],
       "Size": 3,
       "S": 5,
       "K": 4,
@@ -103,8 +141,11 @@
     },
     {
       "Race": "Duch",
+      "TokenKey": "Duch",
       "Type": "Undead",
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -123,14 +164,19 @@
       "Sz": 4,
       "Undead": true,
       "Flight": 4,
-      "Unaffected": [ "Physical" ],
+      "Unaffected": [
+        "Physical"
+      ],
       "Scary": 14,
       "Dodge": 1
     },
     {
       "Race": "Dzik",
+      "TokenKey": "Dzik",
       "Type": "Beast",
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "Size": 2,
       "S": 3,
       "K": 3,
@@ -144,8 +190,16 @@
     },
     {
       "Race": "Goblin",
+      "TokenKey": "Goblin",
       "Type": "Humanoid",
-      "PrimaryWeaponNames": [ "Miecz", "Pałka", "Krótki łuk", "Puklerz", "Kiścień", "Włócznia" ],
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Pałka",
+        "Krótki łuk",
+        "Puklerz",
+        "Kiścień",
+        "Włócznia"
+      ],
       "Size": 1,
       "S": -2,
       "K": 0,
@@ -162,8 +216,14 @@
     },
     {
       "Race": "Goblin Szaman",
+      "TokenKey": "Goblin Szaman",
       "Type": "Humanoid",
-      "PrimaryWeaponNames": [ "Kostur", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
+      "PrimaryWeaponNames": [
+        "Kostur",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice"
+      ],
       "Size": 1,
       "S": -1,
       "K": 1,
@@ -176,21 +236,35 @@
       "Sz": 4,
       "Spellcasting": 3,
       "Dodge": 2,
-      "Magic": [ "Fire", "Ice", "Earth", "Water", "Air", "Death" ]
+      "Magic": [
+        "Fire",
+        "Ice",
+        "Earth",
+        "Water",
+        "Air",
+        "Death"
+      ]
     },
     {
       "Race": "Hasai",
+      "TokenKey": "Hasai",
       "Type": "Beast",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Poisonous",
           "Value": 2
         }
       ],
-      "Resistance": [ "Ice" ],
-      "Unaffected": [ "Poison" ],
+      "Resistance": [
+        "Ice"
+      ],
+      "Unaffected": [
+        "Poison"
+      ],
       "S": 1,
       "K": 3,
       "Zw": 4,
@@ -204,9 +278,12 @@
     },
     {
       "Race": "Kamienny Golem",
+      "TokenKey": "Kamienny Golem",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -232,9 +309,12 @@
     },
     {
       "Race": "Koń",
+      "TokenKey": "Koń",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -254,9 +334,12 @@
     },
     {
       "Race": "Koszmar",
+      "TokenKey": "Koszmar",
       "Type": "Undead",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 5,
       "K": 5,
       "Zw": 3,
@@ -273,14 +356,21 @@
       "Spellcasting": 1,
       "MeleeCombat": 2,
       "Dodge": 2,
-      "Magic": [ "Death" ],
-      "Unaffected": [ "Physical" ]
+      "Magic": [
+        "Death"
+      ],
+      "Unaffected": [
+        "Physical"
+      ]
     },
     {
       "Race": "Krwiopij",
+      "TokenKey": "Krwiopij",
       "Type": "Beast",
       "Size": 0,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -298,13 +388,18 @@
       "Sz": 2,
       "Reflex": 5,
       "Flight": 6,
-      "Resistance": [ "Poison" ]
+      "Resistance": [
+        "Poison"
+      ]
     },
     {
       "Race": "Krwiożerczy Ogar",
+      "TokenKey": "Krwiożerczy Ogar",
       "Type": "Beast",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 3,
       "K": 2,
       "Zw": 3,
@@ -322,9 +417,12 @@
     },
     {
       "Race": "Kuc",
+      "TokenKey": "Kuc",
       "Type": "Beast",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -344,9 +442,12 @@
     },
     {
       "Race": "Kurhaniec",
+      "TokenKey": "Kurhaniec",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 3,
       "K": 5,
       "Zw": 3,
@@ -363,9 +464,21 @@
     },
     {
       "Race": "Licz",
+      "TokenKey": "Licz",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Kostur", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
+      "PrimaryWeaponNames": [
+        "Kostur",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice",
+        "Kolczuga",
+        "Czepiec kolczy",
+        "Hełm",
+        "Płytowe nagolenniki",
+        "Płytowe naramienniki",
+        "Płytowy napierśnik"
+      ],
       "S": 2,
       "K": 4,
       "Zw": 2,
@@ -380,13 +493,18 @@
       "Scary": 16,
       "Spellcasting": 5,
       "Dodge": 3,
-      "Magic": [ "Death" ]
+      "Magic": [
+        "Death"
+      ]
     },
     {
       "Race": "Liściopiór",
+      "TokenKey": "Liściopiór",
       "Type": "Beast",
       "Size": 1,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -407,9 +525,12 @@
     },
     {
       "Race": "Lodowy Golem",
+      "TokenKey": "Lodowy Golem",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -431,13 +552,18 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Unaffected": [ "Ice" ]
+      "Unaffected": [
+        "Ice"
+      ]
     },
     {
       "Race": "Magmowy Golem",
+      "TokenKey": "Magmowy Golem",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -459,13 +585,18 @@
       "Unmeaning": true,
       "Slow": true,
       "Undead": true,
-      "Unaffected": [ "Fire" ]
+      "Unaffected": [
+        "Fire"
+      ]
     },
     {
       "Race": "Mamut",
+      "TokenKey": "Mamut",
       "Type": "Beast",
       "Size": 4,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 7,
       "K": 8,
       "Zw": -3,
@@ -480,9 +611,21 @@
     },
     {
       "Race": "Morgras",
+      "TokenKey": "Morgras",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Topór", "Młot bojowy", "Tarcza", "Buława", "Kiścień", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Kolczuga", "Czepiec kolczy" ],
+      "PrimaryWeaponNames": [
+        "Topór",
+        "Młot bojowy",
+        "Tarcza",
+        "Buława",
+        "Kiścień",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice",
+        "Kolczuga",
+        "Czepiec kolczy"
+      ],
       "S": 2,
       "K": 3,
       "Zw": 0,
@@ -498,9 +641,22 @@
     },
     {
       "Race": "Murahiński Barbarzyńca",
+      "TokenKey": "Murahiński Barbarzyńca",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Włócznia", "Topór", "Topór dwuręczny", "Glewia", "Kiścień", "Sieć", "Oszczep", "Łuk", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
+      "PrimaryWeaponNames": [
+        "Włócznia",
+        "Topór",
+        "Topór dwuręczny",
+        "Glewia",
+        "Kiścień",
+        "Sieć",
+        "Oszczep",
+        "Łuk",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice"
+      ],
       "S": 3,
       "K": 3,
       "Zw": 1,
@@ -519,9 +675,13 @@
     },
     {
       "Race": "Murahiński Szaman",
+      "TokenKey": "Murahiński Szaman",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Kostur", "Sztylet" ],
+      "PrimaryWeaponNames": [
+        "Kostur",
+        "Sztylet"
+      ],
       "S": 0,
       "K": 2,
       "Zw": -2,
@@ -536,9 +696,12 @@
     },
     {
       "Race": "Niedźwiedź",
+      "TokenKey": "Niedźwiedź",
       "Type": "Beast",
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
       "S": 4,
       "K": 2,
       "Zw": 2,
@@ -553,9 +716,12 @@
     },
     {
       "Race": "Nienazwany",
+      "TokenKey": "Nienazwany",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 0,
       "K": 0,
       "Zw": 2,
@@ -569,13 +735,18 @@
       "Flight": 4,
       "Scary": 14,
       "Spellcasting": 1,
-      "Magic": [ "Death" ]
+      "Magic": [
+        "Death"
+      ]
     },
     {
       "Race": "Nosorożec Włochaty",
+      "TokenKey": "Nosorożec Włochaty",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 6,
       "K": 7,
       "Zw": -2,
@@ -590,9 +761,12 @@
     },
     {
       "Race": "Olbrzymi Pająk",
+      "TokenKey": "Olbrzymi Pająk",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Poisonous",
@@ -612,14 +786,19 @@
       "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 1,
-      "Unaffected": [ "Poison" ],
+      "Unaffected": [
+        "Poison"
+      ],
       "MeleeCombat": 2
     },
     {
       "Race": "Olbrzymi Skorpion",
+      "TokenKey": "Olbrzymi Skorpion",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Poisonous",
@@ -639,14 +818,22 @@
       "Reflex": 3,
       "Scary": 14,
       "NaturalArmor": 2,
-      "Unaffected": [ "Poison" ],
+      "Unaffected": [
+        "Poison"
+      ],
       "MeleeCombat": 2
     },
     {
       "Race": "Oprych",
+      "TokenKey": "Oprych",
       "Type": "Humanoid",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Pałka", "Nóż", "Nóż do rzucania", "Sztylet" ],
+      "PrimaryWeaponNames": [
+        "Pałka",
+        "Nóż",
+        "Nóż do rzucania",
+        "Sztylet"
+      ],
       "S": 2,
       "K": 0,
       "Zw": 2,
@@ -661,9 +848,12 @@
     },
     {
       "Race": "Peszak",
+      "TokenKey": "Peszak",
       "Type": "Beast",
       "Size": 1,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -684,7 +874,10 @@
     {
       "Race": "Pokutnik",
       "Type": "Plant",
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "TokenKey": "Pokutnik",
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -707,16 +900,23 @@
       "Sz": 4,
       "MeleeCombat": 1,
       "Spellcasting": 2,
-      "Magic": [ "Earth" ],
+      "Magic": [
+        "Earth"
+      ],
       "Hardy": true,
-      "Unaffected": [ "Poison" ],
+      "Unaffected": [
+        "Poison"
+      ],
       "NaturalArmor": 2
     },
     {
       "Race": "Pomiot Kainera",
+      "TokenKey": "Pomiot Kainera",
       "Type": "Undead",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 3,
       "K": 4,
       "Zw": -2,
@@ -734,9 +934,12 @@
     },
     {
       "Race": "Pożeracz Dusz",
+      "TokenKey": "Pożeracz Dusz",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -764,9 +967,19 @@
     },
     {
       "Race": "Równy Żywiołom",
+      "TokenKey": "Równy Żywiołom",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz dwuręczny", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
+      "PrimaryWeaponNames": [
+        "Miecz dwuręczny",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice",
+        "Hełm",
+        "Płytowe nagolenniki",
+        "Płytowe naramienniki",
+        "Płytowy napierśnik"
+      ],
       "S": 3,
       "K": 3,
       "Zw": 2,
@@ -787,7 +1000,10 @@
     {
       "Race": "Skamielec",
       "Type": "Plant",
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "TokenKey": "Skamielec",
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -811,15 +1027,23 @@
       "MeleeCombat": 2,
       "Endurance": 2,
       "Hardy": true,
-      "Resistance": [ "Fire", "Ice" ],
-      "Unaffected": [ "Poison" ],
+      "Resistance": [
+        "Fire",
+        "Ice"
+      ],
+      "Unaffected": [
+        "Poison"
+      ],
       "NaturalArmor": 3
     },
     {
       "Race": "Smok",
+      "TokenKey": "Smok",
       "Type": "Dragon",
       "Size": 4,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 8,
       "K": 8,
       "Zw": 2,
@@ -832,16 +1056,24 @@
       "Scary": 18,
       "Tough": true,
       "Flight": 10,
-      "Unaffected": [ "Fire", "Poison", "Ice", "Electricity" ],
+      "Unaffected": [
+        "Fire",
+        "Poison",
+        "Ice",
+        "Electricity"
+      ],
       "NaturalArmor": 3,
       "MeleeCombat": 5,
       "Cool": 5
     },
     {
       "Race": "Szczur",
+      "TokenKey": "Szczur",
       "Type": "Beast",
       "Size": 0,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -860,9 +1092,20 @@
     },
     {
       "Race": "Szkielet",
+      "TokenKey": "Szkielet",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz", "Topór", "Buława", "Młot bojowy", "Włócznia", "Puklerz", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice" ],
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Topór",
+        "Buława",
+        "Młot bojowy",
+        "Włócznia",
+        "Puklerz",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice"
+      ],
       "S": -1,
       "K": -1,
       "Zw": 0,
@@ -878,9 +1121,12 @@
     },
     {
       "Race": "Tarczogrzbiet",
+      "TokenKey": "Tarczogrzbiet",
       "Type": "Beast",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 3,
       "K": 4,
       "Zw": 3,
@@ -897,9 +1143,12 @@
     },
     {
       "Race": "Topielica",
+      "TokenKey": "Topielica",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 0,
       "K": 1,
       "Zw": 0,
@@ -911,14 +1160,19 @@
       "Sz": 4,
       "Undead": true,
       "Scary": 13,
-      "Resistance": [ "Water" ],
+      "Resistance": [
+        "Water"
+      ],
       "Endurance": 2
     },
     {
       "Race": "Torfun",
+      "TokenKey": "Torfun",
       "Type": "Humanoid",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 3,
       "K": 3,
       "Zw": 0,
@@ -933,9 +1187,12 @@
     },
     {
       "Race": "Troll górski",
+      "TokenKey": "Troll górski",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Pałka" ],
+      "PrimaryWeaponNames": [
+        "Pałka"
+      ],
       "S": 5,
       "K": 4,
       "Zw": -2,
@@ -953,9 +1210,12 @@
     },
     {
       "Race": "Troll leśny",
+      "TokenKey": "Troll leśny",
       "Type": "Giant",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Pałka" ],
+      "PrimaryWeaponNames": [
+        "Pałka"
+      ],
       "S": 5,
       "K": 4,
       "Zw": -2,
@@ -973,9 +1233,19 @@
     },
     {
       "Race": "Upiór",
+      "TokenKey": "Upiór",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Miecz dwuręczny", "Skórzany hełm", "Skórzana kurta", "Skórzane nogawice", "Hełm", "Płytowe nagolenniki", "Płytowe naramienniki", "Płytowy napierśnik" ],
+      "PrimaryWeaponNames": [
+        "Miecz dwuręczny",
+        "Skórzany hełm",
+        "Skórzana kurta",
+        "Skórzane nogawice",
+        "Hełm",
+        "Płytowe nagolenniki",
+        "Płytowe naramienniki",
+        "Płytowy napierśnik"
+      ],
       "S": 2,
       "K": 0,
       "Zw": 2,
@@ -987,15 +1257,20 @@
       "Sz": 4,
       "Undead": true,
       "Scary": 16,
-      "Resistance": [ "Physical" ],
+      "Resistance": [
+        "Physical"
+      ],
       "Dodge": 2,
       "MeleeCombat": 3
     },
     {
       "Race": "Wargul",
+      "TokenKey": "Wargul",
       "Type": "Beast",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "S": 5,
       "K": 6,
       "Zw": -2,
@@ -1009,9 +1284,12 @@
     },
     {
       "Race": "Wilk",
+      "TokenKey": "Wilk",
       "Type": "Beast",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1032,9 +1310,17 @@
     },
     {
       "Race": "Xit'lan'",
+      "TokenKey": "Xit'lan'",
       "Type": "Humanoid",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Szabla", "Buława", "Miecz", "Sztylet", "Włócznia", "Nadziak" ],
+      "PrimaryWeaponNames": [
+        "Szabla",
+        "Buława",
+        "Miecz",
+        "Sztylet",
+        "Włócznia",
+        "Nadziak"
+      ],
       "S": -1,
       "K": 1,
       "Zw": 3,
@@ -1051,9 +1337,12 @@
     },
     {
       "Race": "Złodziej Myśli",
+      "TokenKey": "Złodziej Myśli",
       "Type": "Beast",
       "Size": 1,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1074,9 +1363,16 @@
     },
     {
       "Race": "Zombie",
+      "TokenKey": "Zombie",
       "Type": "Undead",
       "Size": 2,
-      "PrimaryWeaponNames": [ "Broń naturalna", "Nóż", "Miecz", "Topór", "Pałka" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna",
+        "Nóż",
+        "Miecz",
+        "Topór",
+        "Pałka"
+      ],
       "S": 0,
       "K": 0,
       "Zw": -2,
@@ -1095,8 +1391,11 @@
     {
       "Race": "Żmijorośl",
       "Type": "Plant",
+      "TokenKey": "Żmijorośl",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1128,12 +1427,17 @@
       "Unmeaning": true,
       "Slow": true,
       "Stink": true,
-      "Unaffected": [ "Poison" ]
+      "Unaffected": [
+        "Poison"
+      ]
     },
     {
       "Race": "Żywiołak Lodu",
+      "TokenKey": "Żywiołak Lodu",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1151,13 +1455,20 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Ice" ],
-      "Unaffected": [ "Ice" ]
+      "Magic": [
+        "Ice"
+      ],
+      "Unaffected": [
+        "Ice"
+      ]
     },
     {
       "Race": "Żywiołak Ognia",
+      "TokenKey": "Żywiołak Ognia",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1175,13 +1486,20 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Fire" ],
-      "Unaffected": [ "Fire" ]
+      "Magic": [
+        "Fire"
+      ],
+      "Unaffected": [
+        "Fire"
+      ]
     },
     {
       "Race": "Żywiołak Powietrza",
+      "TokenKey": "Żywiołak Powietrza",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1199,13 +1517,20 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Air" ],
-      "Unaffected": [ "Electric" ]
+      "Magic": [
+        "Air"
+      ],
+      "Unaffected": [
+        "Electric"
+      ]
     },
     {
       "Race": "Żywiołak Wody",
+      "TokenKey": "Żywiołak Wody",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1223,13 +1548,20 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Water" ],
-      "Unaffected": [ "Fire" ]
+      "Magic": [
+        "Water"
+      ],
+      "Unaffected": [
+        "Fire"
+      ]
     },
     {
       "Race": "Żywiołak Ziemi",
+      "TokenKey": "Żywiołak Ziemi",
       "Size": 3,
-      "PrimaryWeaponNames": [ "Broń naturalna" ],
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
       "PrimaryWeaponAttributes": [
         {
           "Key": "Damage",
@@ -1247,8 +1579,12 @@
       "Sz": 4,
       "Undead": true,
       "Spellcasting": 2,
-      "Magic": [ "Earth" ],
-      "Unaffected": [ "Poison" ]
+      "Magic": [
+        "Earth"
+      ],
+      "Unaffected": [
+        "Poison"
+      ]
     }
   ]
 }

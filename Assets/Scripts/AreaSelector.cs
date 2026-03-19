@@ -48,8 +48,8 @@ public class AreaSelector : MonoBehaviour
                 // Wyłączenie emisji
                 mat.SetColor("_EmissionColor", Color.black);
 
-                // Aktualizuje kolor tokena, jeśli nie jest wgrany żaden obraz
-                if (unit.TokenFilePath.Length < 1)
+                // Aktualizuje kolor tokena, jeśli nie ma dedykowanego sprite'a tokena
+                if (!unit.HasTokenSprite)
                 {
                     SpriteRenderer tokenRenderer = unit.transform.Find("Token").GetComponent<SpriteRenderer>();
                     tokenRenderer.material = mat;
@@ -208,8 +208,8 @@ public class AreaSelector : MonoBehaviour
                 // Podświetlenie przez emisję
                 mat.SetColor("_EmissionColor", unit.DefaultColor * 1f);
 
-                // Aktualizuje kolor tokena, jeśli nie jest wgrany żaden obraz
-                if (unit.TokenFilePath.Length < 1)
+                // Aktualizuje kolor tokena, jeśli nie ma dedykowanego sprite'a tokena
+                if (!unit.HasTokenSprite)
                 {
                     SpriteRenderer tokenRenderer = unit.transform.Find("Token").GetComponent<SpriteRenderer>();
                     tokenRenderer.material = mat;
