@@ -52,7 +52,6 @@ public class Stats : MonoBehaviour
     public int MaxHealth;
     public int TempHealth;
     public int CriticalWounds; // Ilość Ran Krytycznych
-    public int SinPoints; // Punkty Grzechu (istotne dla kapłanów)
     public int TempPL; // Punkty losu aktualne
     public int MaxPL; // Punkty Losu Maksymalne
     public int PB; // Punkty Bohatera

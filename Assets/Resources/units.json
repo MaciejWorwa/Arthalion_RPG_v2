@@ -85,6 +85,35 @@
       ]
     },
     {
+      "Race": "Bies",
+      "TokenKey": "Bies",
+      "Type": "Beast",
+      "Size": 2,
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
+      "PrimaryWeaponAttributes": [
+        {
+          "Key": "Damage",
+          "Value": 8
+        }
+      ],
+      "S": 3,
+      "K": 2,
+      "Zw": 3,
+      "Zr": 1,
+      "Int": -3,
+      "P": 2,
+      "Ch": -5,
+      "SW": 2,
+      "Sz": 5,
+      "Athletics": 2,
+      "MeleeCombat": 3,
+      "Pitiless": 1,
+      "Scary": 14,
+      "Hungry": true
+    },
+    {
       "Race": "Demon",
       "TokenKey": "Demon",
       "Type": "Undead",
@@ -138,6 +167,30 @@
       "MeleeCombat": 3,
       "Hardy": true,
       "Scary": 12
+    },
+    {
+      "Race": "Druid",
+      "TokenKey": "Druid",
+      "Type": "Humanoid",
+      "Size": 2,
+      "PrimaryWeaponNames": [
+        "Kostur",
+        "Nóż"
+      ],
+      "S": -2,
+      "K": 0,
+      "Zw": 0,
+      "Zr": 0,
+      "Int": 4,
+      "P": 0,
+      "Ch": 0,
+      "SW": 2,
+      "Sz": 4,
+      "Spellcasting": 2,
+      "Endurance": 2,
+      "Magic": [
+        "Earth"
+      ]
     },
     {
       "Race": "Duch",
@@ -243,6 +296,36 @@
         "Water",
         "Air",
         "Death"
+      ]
+    },
+    {
+      "Race": "Gulgot",
+      "TokenKey": "Gulgot",
+      "Type": "Humanoid",
+      "Size": 1,
+      "PrimaryWeaponNames": [
+        "Miecz",
+        "Pałka",
+        "Proca",
+        "Włócznia"
+      ],
+      "S": -2,
+      "K": 1,
+      "Zw": 2,
+      "Zr": 1,
+      "Int": 0,
+      "P": 2,
+      "Ch": -1,
+      "SW": 0,
+      "Sz": 5,
+      "Athletics": 2,
+      "Reflex": 2,
+      "Dodge": 2,
+      "RangedCombat": 2,
+      "MeleeCombat": 2,
+      "Resistance": [
+        "Ice",
+        "Water"
       ]
     },
     {
@@ -649,10 +732,8 @@
         "Topór",
         "Topór dwuręczny",
         "Glewia",
-        "Kiścień",
-        "Sieć",
-        "Oszczep",
         "Łuk",
+        "Krótki łuk",
         "Skórzany hełm",
         "Skórzana kurta",
         "Skórzane nogawice"
@@ -660,14 +741,14 @@
       "S": 3,
       "K": 3,
       "Zw": 1,
-      "Zr": 0,
+      "Zr": 2,
       "Int": -2,
       "P": 0,
       "Ch": -3,
       "SW": 1,
       "Sz": 4,
-      "MeleeCombat": 4,
-      "RangedCombat": 2,
+      "MeleeCombat": 3,
+      "RangedCombat": 1,
       "Pitiless": 1,
       "Endurance": 2,
       "Dodge": 2,
@@ -847,6 +928,27 @@
       "RangedCombat": 1
     },
     {
+      "Race": "Orox",
+      "TokenKey": "Orox",
+      "Type": "Beast",
+      "Size": 3,
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
+      "S": 5,
+      "K": 5,
+      "Zw": -1,
+      "Zr": 0,
+      "Int": -3,
+      "P": 2,
+      "Ch": -2,
+      "SW": 0,
+      "Sz": 6,
+      "MeleeCombat": 1,
+      "Hardy": true,
+      "NaturalArmor": 1
+    },
+    {
       "Race": "Peszak",
       "TokenKey": "Peszak",
       "Type": "Beast",
@@ -870,6 +972,34 @@
       "SW": -4,
       "Sz": 4,
       "SurvivalInstinct": 3
+    },
+    {
+      "Race": "Piaskun",
+      "TokenKey": "Piaskun",
+      "Type": "Undead",
+      "Size": 2,
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
+      "S": 1,
+      "K": 2,
+      "Zw": 1,
+      "Zr": 1,
+      "Int": -2,
+      "P": 0,
+      "Ch": -5,
+      "SW": 0,
+      "Sz": 5,
+      "Endurance": 4,
+      "Resistance": [
+        "Physical",
+        "Electricity"
+      ],
+      "Undead": true,
+      "Unaffected": [
+        "Fire",
+        "Poison"
+      ]
     },
     {
       "Race": "Pokutnik",
@@ -964,6 +1094,29 @@
       "Pitiless": 2,
       "Undead": true,
       "Scary": 16
+    },
+    {
+      "Race": "Rogodziób",
+      "TokenKey": "Rogodziób",
+      "Type": "Beast",
+      "Size": 3,
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
+      "S": 5,
+      "K": 4,
+      "Zw": 3,
+      "Zr": 0,
+      "Int": -3,
+      "P": 3,
+      "Ch": -3,
+      "SW": 0,
+      "Sz": 5,
+      "Reflex": 2,
+      "MeleeCombat": 3,
+      "Flight": 10,
+      "Scary": 14,
+      "Hungry": true
     },
     {
       "Race": "Równy Żywiołom",
@@ -1309,10 +1462,29 @@
       "Reflex": 3
     },
     {
-      "Race": "Xit'lan'",
-      "TokenKey": "Xit'lan'",
-      "Type": "Humanoid",
+      "Race": "Wrzątnik",
+      "TokenKey": "Wrzątnik",
+      "Type": "Beast",
       "Size": 3,
+      "PrimaryWeaponNames": [
+        "Broń naturalna"
+      ],
+      "S": 6,
+      "K": 6,
+      "Zw": -3,
+      "Zr": -2,
+      "Int": -3,
+      "P": 0,
+      "Ch": -2,
+      "SW": -1,
+      "Sz": 4,
+      "NaturalArmor": 2
+    },
+    {
+      "Race": "Xit'lan",
+      "TokenKey": "Xit'lan",
+      "Type": "Humanoid",
+      "Size": 2,
       "PrimaryWeaponNames": [
         "Szabla",
         "Buława",

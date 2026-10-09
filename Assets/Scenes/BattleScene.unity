@@ -11975,7 +11975,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "\u015Acie\u017Cka magii"
 --- !u!114 &96165561
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -49215,7 +49215,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "Typ jednostek, kt\xF3rych dotyczy talent Zab\xF3jca"
 --- !u!114 &423303237
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -125043,7 +125043,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "\u015Acie\u017Cka magii"
 --- !u!114 &1076613091
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -130208,7 +130208,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: -95.00009}
+  m_AnchoredPosition: {x: 0, y: -95.00012}
   m_SizeDelta: {x: 900, y: 190}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1124138939
@@ -150600,7 +150600,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "\u015Acie\u017Cka magii"
 --- !u!114 &1311334800
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -155085,7 +155085,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "\u015Acie\u017Cka magii"
 --- !u!114 &1352588854
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -168763,7 +168763,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "Typ jednostek, kt\xF3rych dotyczy talent Zab\xF3jca"
 --- !u!114 &1470500313
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -220778,7 +220778,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4ff3129ab0598740bcb046be06186f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tooltipText: "Umiej\u0119tno\u015B\u0107, kt\xF3rej dotyczy talent Specjalista"
+  _tooltipText: "\u015Acie\u017Cka magii"
 --- !u!114 &1918088473
 MonoBehaviour:
   m_ObjectHideFlags: 0

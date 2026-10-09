@@ -56,6 +56,19 @@
       "Value": 250
     },
     {
+      "Name": "Bolas",
+      "Type": [
+        "ranged",
+        "throwing",
+        "no-damage"
+      ],
+      "Zr": 2,
+      "AttackRange": 6.0,
+      "Entangle": true,
+      "Penetrating": true,
+      "Value": 100
+    },
+    {
       "Name": "Buława",
       "Type": [
         "melee"
@@ -139,6 +152,19 @@
       ],
       "Penetrating": true,
       "Value": 600
+    },
+    {
+      "Name": "Kastet",
+      "Type": [
+        "melee"
+      ],
+
+      "AttackRange": 1.5,
+      "Damage": [
+        5
+      ],
+      "Pummel": true,
+      "Value": 50
     },
     {
       "Name": "Kij",
@@ -336,22 +362,6 @@
       "Value": 200
     },
     {
-      "Name": "Pawęż",
-      "Type": [
-        "melee",
-        "shield"
-      ],
-      "S": 3,
-      "Damage": [
-        4
-      ],
-      "Defensive": 4,
-      "Pummel": true,
-      "Slow": true,
-      "AttackRange": 1.5,
-      "Value": 500
-    },
-    {
       "Name": "Pałka",
       "Type": [
         "melee"
@@ -374,6 +384,22 @@
       "Penetrating": true,
       "AttackRange": 1.5,
       "Value": 200
+    },
+    {
+      "Name": "Pawęż",
+      "Type": [
+        "melee",
+        "shield"
+      ],
+      "S": 3,
+      "Damage": [
+        4
+      ],
+      "Defensive": 4,
+      "Pummel": true,
+      "Slow": true,
+      "AttackRange": 1.5,
+      "Value": 500
     },
     {
       "Name": "Pistolet",
