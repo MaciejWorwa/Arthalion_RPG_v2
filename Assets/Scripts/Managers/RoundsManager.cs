@@ -39,6 +39,45 @@ public class RoundsManager : MonoBehaviour
     private Coroutine _autoCombatCoroutine;
     private bool _isRoundAdvanceScheduled;
     private bool _isRoundGenerationInProgress;
+    private Coroutine _turnStartCoroutine;
+    public Unit TurnStartUnit { get; private set; }
+    public bool IsResolvingTurnStart { get; private set; }
+
+    public bool CanUnitAct(Unit unit)
+    {
+        if (unit == null) return false;
+        if (RoundNumber <= 0) return true;
+        if (unit.IsTurnFinished) return false;
+        BeginTurn(unit);
+        return unit != null && !IsResolvingTurnStart && unit.TurnStartedInRound == RoundNumber;
+    }
+
+    public void BeginTurn(Unit unit)
+    {
+        if (unit == null || RoundNumber <= 0 || unit.IsTurnFinished || unit.TurnStartedInRound == RoundNumber) return;
+        if (_isRoundGenerationInProgress || IsResolvingTurnStart) return;
+        if (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning) return;
+        if (MovementManager.Instance != null && MovementManager.Instance.IsMoving) return;
+        if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
+        unit.TurnStartedInRound = RoundNumber;
+        if (!unit.Ablaze) return;
+        TurnStartUnit = unit;
+        IsResolvingTurnStart = true;
+        GameManager.Instance?.RefreshPauseState();
+        _turnStartCoroutine = StartCoroutine(ResolveUnitTurnStart(unit));
+    }
+
+    private IEnumerator ResolveUnitTurnStart(Unit unit)
+    {
+        yield return StatesManager.Instance.ResolveTurnStart(unit);
+        TurnStartUnit = null;
+        IsResolvingTurnStart = false;
+        GameManager.Instance?.RefreshPauseState();
+        _turnStartCoroutine = null;
+        if (unit != null && !unit.CanDoAction && !unit.CanMove && !unit.IsTurnFinished)
+            FinishTurn(unit);
+        InitiativeQueueManager.Instance.UpdateInitiativeQueue();
+    }
 
     private void Start()
     {
@@ -53,7 +92,7 @@ public class RoundsManager : MonoBehaviour
 
     public void NextRound()
     {
-        if (_isRoundGenerationInProgress) return;
+        if (_isRoundGenerationInProgress || IsResolvingTurnStart) return;
         _isRoundGenerationInProgress = true;
         _isRoundAdvanceScheduled = false;
 
@@ -83,6 +122,7 @@ public class RoundsManager : MonoBehaviour
             Stats stats = unit.GetComponent<Stats>();
 
             unit.IsTurnFinished = false;
+            unit.HasUsedOpportunityAttack = false;
             unit.CanDoAction = true;
             SetCanDoActionToggle(true);
 
@@ -200,6 +240,9 @@ public class RoundsManager : MonoBehaviour
             InitiativeQueueManager.Instance.SelectUnitByQueue();
         }
 
+        _isRoundGenerationInProgress = false;
+        BeginTurn(InitiativeQueueManager.Instance.ActiveUnit);
+
         //Wykonuje automatyczną akcję za każdą jednostkę
         if (GameManager.IsAutoCombatMode)
         {
@@ -216,7 +259,6 @@ public class RoundsManager : MonoBehaviour
             _autoCombatCoroutine = null;
         }
 
-        _isRoundGenerationInProgress = false;
     }
 
     IEnumerator AutoCombat()
@@ -240,6 +282,10 @@ public class RoundsManager : MonoBehaviour
             {
                 yield return new WaitForSeconds(0.05f);
             }
+
+            BeginTurn(unit);
+            yield return new WaitUntil(() => !IsResolvingTurnStart);
+            if (unit == null || unit.IsTurnFinished) continue;
 
             // Jeśli jednostka to PlayerUnit i gramy w trybie ukrywania statystyk wrogów
             if (unit.CompareTag("PlayerUnit") && GameManager.IsStatsHidingMode)
@@ -404,10 +450,13 @@ public class RoundsManager : MonoBehaviour
     }    
     
     #region Units actions
-    public void DoAction(Unit unit)
+    public bool DoAction(Unit unit, bool finishTurnIfNoActions = true)
     {
+        if (unit == null || unit.IsTurnFinished || (IsResolvingTurnStart && finishTurnIfNoActions)) return false;
         //Zapobiega zużywaniu akcji przed rozpoczęciem bitwy
-        if (RoundNumber == 0) return;
+        if (RoundNumber == 0) return true;
+        if (finishTurnIfNoActions && !CanUnitAct(unit)) return false;
+        if (IsResolvingTurnStart && TurnStartUnit != unit) return false;
 
         if (unit.CanDoAction)
         {
@@ -427,17 +476,17 @@ public class RoundsManager : MonoBehaviour
             //MovementManager.Instance.UpdateMovementRange(1);
 
             //W przypadku ręcznego zadawania obrażeń, czekamy na wpisanie wartości obrażeń przed zmianą jednostki (jednostka jest wtedy zmieniana w funkcji ExecuteAttack w CombatManager)
-            if (!GameManager.IsAutoCombatMode && !CombatManager.Instance.IsManualPlayerAttack && !unit.CanMove && !unit.CanDoAction)
+            if (finishTurnIfNoActions && !GameManager.IsAutoCombatMode && !CombatManager.Instance.IsManualPlayerAttack && !unit.CanMove && !unit.CanDoAction)
             {
-                FinishTurn();
+                FinishTurn(unit);
             }
 
-            return;
+            return true;
         }
         else
         {
             Debug.Log("Ta jednostka nie może w tej rundzie wykonać więcej akcji.");
-            return;
+            return false;
         }
     }
 
@@ -495,7 +544,7 @@ public class RoundsManager : MonoBehaviour
 
     public void FinishTurn(Unit unit, bool selectNextUnit = true)
     {
-        if (unit == null) return;
+        if (unit == null || IsResolvingTurnStart) return;
 
         if (unit.IsTurnFinished)
         {
@@ -508,12 +557,17 @@ public class RoundsManager : MonoBehaviour
             return;
         }
 
+        if (!CanUnitAct(unit)) return;
+        bool hadUnusedActions = unit.CanMove || unit.CanDoAction;
         unit.IsTurnFinished = true;
+        unit.CanDoAction = false;
+        unit.CanMove = false;
+        if (Unit.SelectedUnit == unit.gameObject) DisplayActionsLeft();
 
         // Bierze pod uwagę efekty ewentualnych stanów postaci
         StatesManager.Instance.UpdateUnitStates(unit);
 
-        if (unit.CanMove || unit.CanDoAction)
+        if (hadUnusedActions)
         {
             Debug.Log($"<color=green>{unit.Stats.Name} konczy swoja ture.</color>");
         }
@@ -541,6 +595,12 @@ public class RoundsManager : MonoBehaviour
 
     public void ResetRoundFlowState(bool resetRoundCounter = false)
     {
+        if (_turnStartCoroutine != null) StopCoroutine(_turnStartCoroutine);
+        _turnStartCoroutine = null;
+        TurnStartUnit = null;
+        IsResolvingTurnStart = false;
+        GameManager.Instance?.RefreshPauseState();
+        StatesManager.Instance?.ResetTurnStartState();
         if (_autoCombatCoroutine != null)
         {
             StopCoroutine(_autoCombatCoroutine);
@@ -594,6 +654,8 @@ public class RoundsManager : MonoBehaviour
             if (unit == null) continue;
 
             unit.IsTurnFinished = false;
+            unit.TurnStartedInRound = 0;
+            unit.HasUsedOpportunityAttack = false;
             unit.CanDoAction = true;
 
             Stats stats = unit.GetComponent<Stats>();
@@ -693,6 +755,7 @@ public class RoundsManager : MonoBehaviour
     private IEnumerator AdvanceRoundWhenReady()
     {
         while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || IsResolvingTurnStart
             || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
             || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning)
             || (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading))
@@ -718,6 +781,7 @@ public class RoundsManager : MonoBehaviour
     private IEnumerator AdvanceRoundAfterManualFinishWhenReady()
     {
         while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || IsResolvingTurnStart
             || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
             || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning)
             || (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading))

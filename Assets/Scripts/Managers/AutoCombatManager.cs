@@ -53,7 +53,7 @@ public class AutoCombatManager : MonoBehaviour
         float effectiveAttackRange = weapon.Type.Contains("ranged") && !weapon.Type.Contains("entangling") ? weapon.AttackRange * 3 : weapon.AttackRange;
         if (weapon.Type.Contains("throwing")) // Oblicza właściwy zasięg ataku, uwzględniając broń miotaną
         {
-            effectiveAttackRange *= unit.GetComponent<Stats>().S / 10;
+            effectiveAttackRange *= unit.GetComponent<Stats>().S / 10f;
         }
 
         // Jeśli rywal jest w zasięgu ataku to wykonuje atak

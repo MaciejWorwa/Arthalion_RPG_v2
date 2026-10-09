@@ -162,6 +162,7 @@ public class InitiativeQueueManager : MonoBehaviour
 
         // Aktualiuje listÄ™ dostÄ™pnych do wyboru wierzchowcĂłw
         MountsManager.Instance.DisplayMountsList();
+        RoundsManager.Instance?.BeginTurn(ActiveUnit);
     }
 
     private void ResetScrollViewContent(Transform scrollViewContent)
@@ -214,6 +215,7 @@ public class InitiativeQueueManager : MonoBehaviour
 
         // Wait until current unit finishes movement/combat sequence.
         while ((MovementManager.Instance != null && MovementManager.Instance.IsMoving)
+            || (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart)
             || (DiceRollManager.Instance != null && DiceRollManager.Instance.IsWaitingForRoll)
             || (CombatManager.Instance != null && CombatManager.Instance.IsAttackSequenceRunning))
         {

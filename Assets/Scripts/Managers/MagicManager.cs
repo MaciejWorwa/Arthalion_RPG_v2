@@ -74,6 +74,13 @@ public class MagicManager : MonoBehaviour
     public void CastingSpellMode()
     {
         if (Unit.SelectedUnit == null) return;
+        if (GameManager.IsGamePaused || (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart)) return;
+        if (!RoundsManager.Instance.CanUnitAct(Unit.SelectedUnit.GetComponent<Unit>())) return;
+        if (!DiceRollManager.CanPerformTest(Unit.SelectedUnit.GetComponent<Stats>(), "SW", "Spellcasting"))
+        {
+            Debug.Log("Bezrozumna istota nie może rzucać zaklęć ani wykonywać testów Siły Woli.");
+            return;
+        }
 
         if (Unit.SelectedUnit.GetComponent<Stats>().Spellcasting == 0)
         {
@@ -103,7 +110,7 @@ public class MagicManager : MonoBehaviour
             return;
         }
 
-        RoundsManager.Instance.DoAction(Unit.SelectedUnit.GetComponent<Unit>());
+        if (!RoundsManager.Instance.DoAction(Unit.SelectedUnit.GetComponent<Unit>())) return;
 
         StartCoroutine(CastSpell());
     }
@@ -115,6 +122,7 @@ public class MagicManager : MonoBehaviour
         Stats stats = Unit.SelectedUnit.GetComponent<Stats>();
         Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
         Spell spell = Unit.SelectedUnit.GetComponent<Spell>();
+        if (!DiceRollManager.CanPerformTest(stats, "SW", "Spellcasting")) yield break;
 
         unit.CanCastSpell = false;
         CriticalCastingString = "";
@@ -190,6 +198,8 @@ public class MagicManager : MonoBehaviour
             yield return null;
         }
 
+        float spellRange = spell.Range * (CriticalCastingString == "range" ? 2 : 1);
+        int spellAreaSize = spell.AreaSize * (CriticalCastingString == "area_size" ? 2 : 1);
         foreach (GameObject target in Targets)
         {
             Stats targetStats = target.GetComponent<Stats>();
@@ -198,20 +208,16 @@ public class MagicManager : MonoBehaviour
             //Sprawdza dystans
             _spellDistance = CombatManager.Instance.CalculateDistance(Unit.SelectedUnit, target);
 
-            if (CriticalCastingString == "range") spell.Range *= 2;
+            Debug.Log($"Dystans do celu: {_spellDistance}. Zasięg zaklęcia: {spellRange}");
 
-            Debug.Log($"Dystans do celu: {_spellDistance}. Zasięg zaklęcia: {spell.Range}");
-
-            if (_spellDistance > spell.Range)
+            if (_spellDistance > spellRange)
             {
                 Debug.Log($"{targetStats.Name} znajduje się poza zasięgiem zaklęcia.");
                 continue;
             }
 
-            if (CriticalCastingString == "area_size") spell.AreaSize *= 2;
-
             // Pobiera wszystkie collidery w obszarze działania zaklęcia
-            List<Collider2D> allTargets = Physics2D.OverlapCircleAll(target.transform.position, spell.AreaSize).ToList();
+            List<Collider2D> allTargets = Physics2D.OverlapCircleAll(target.transform.position, spellAreaSize).ToList();
 
             // Filtruje wśród colliderów jednostki, na których można użyć tego zaklęcia
             allTargets.RemoveAll(collider =>
@@ -251,40 +257,16 @@ public class MagicManager : MonoBehaviour
     #region Handle spell effect
     private IEnumerator HandleSpellEffect(Stats spellcasterStats, Stats targetStats, Spell spell, int rollResult, int[] castingTest)
     {
+        if (targetStats == null) yield break;
+        if (!DiceRollManager.CanPerformTest(targetStats, spell.SaveAttribute, spell.SaveSkill))
+        {
+            Debug.Log($"{targetStats.Name} posiada cechę Bezrozumny i jest odporny/a na zaklęcie {spell.Name}, wymagające testu Charyzmy, Inteligencji lub Siły Woli.");
+            yield break; // Przed dodaniem efektu czasowego, zmianą statystyk i obrażeniami.
+        }
         Unit targetUnit = targetStats.GetComponent<Unit>();
         int successLevel = 0;
-
-        if (CriticalCastingString == "duration") spell.Duration *= 2;
-
-        //Uwzględnienie czasu trwania zaklęcia, które wpływa na statystyki postaci
-        if (spell.Duration != 0)
-        {
-            // Przygotowanie słownika modyfikacji – iterujemy po liście atrybutów, które zaklęcie ma zmieniać
-            Dictionary<string, int> modifications = new Dictionary<string, int>();
-
-            // Przykładowa logika: dla każdego atrybutu pobieramy klucz i wartość
-            // Jeśli chcemy skalować pierwszy atrybut przez SW, można to zrobić warunkowo
-            for (int i = 0; i < spell.Attributes.Count; i++)
-            {
-                string attributeName = spell.Attributes[i].Key;
-                int baseModifier = spell.Attributes[i].Value;
-                modifications[attributeName] = baseModifier;
-            }
-
-            // Jeśli efekt dotyczy jednostki, która już ma jakiś efekt tego samego zaklęcia, możesz zdecydować czy mają się kumulować,
-            // czy nadpisywać – poniżej przykład, gdzie zawsze nadpisujemy poprzedni efekt z danego spellName.
-            var existingEffect = targetStats.ActiveSpellEffects.FirstOrDefault(e => e.SpellName == spell.Name);
-            if (existingEffect != null)
-            {
-                existingEffect.RemainingRounds = spell.Duration;
-                Debug.Log($"Nadpisujemy poprzedni efekt zaklęcia {spell.Name} u {targetStats.Name}.");
-                yield break;
-            }
-
-            // Tworzymy nowy efekt
-            SpellEffect newEffect = new SpellEffect(spell.Name, spell.Duration, modifications);
-            targetStats.ActiveSpellEffects.Add(newEffect);
-        }
+        SpellEffect appliedSpellEffect = null;
+        int spellDuration = spell.Duration * (CriticalCastingString == "duration" ? 2 : 1);
 
         //Próba obrony przed zaklęciem
         if (!string.IsNullOrEmpty(spell.SaveAttribute) || !string.IsNullOrEmpty(spell.SaveSkill))
@@ -323,6 +305,23 @@ public class MagicManager : MonoBehaviour
             }
         }
 
+        Stats affectedStats = spell.Type.Contains("self-attribute") ? spellcasterStats : targetStats;
+        Unit affectedUnit = affectedStats.GetComponent<Unit>();
+
+        // Dopiero nieudana obrona pozwala nałożyć lub odnowić efekt czasowy.
+        if (spellDuration != 0)
+        {
+            var existingEffect = affectedStats.ActiveSpellEffects.FirstOrDefault(e => e.SpellName == spell.Name);
+            if (existingEffect != null)
+            {
+                existingEffect.RemainingRounds = spellDuration;
+                Debug.Log($"Nadpisujemy poprzedni efekt zaklęcia {spell.Name} u {affectedStats.Name}.");
+                yield break;
+            }
+            appliedSpellEffect = new SpellEffect(spell.Name, spellDuration, new Dictionary<string, int>());
+            affectedStats.ActiveSpellEffects.Add(appliedSpellEffect);
+        }
+
         if (spell.Attributes != null && spell.Attributes.Count > 0)
         {
             // Konwersja listy Attributes do listy kluczy
@@ -332,9 +331,6 @@ public class MagicManager : MonoBehaviour
             {
                 string attributeName = keys[i];
                 int baseValue = (spell.Strength != null && spell.Strength.Length > 0) ? UnityEngine.Random.Range(1, Mathf.Max(1, spell.Strength[0]) + 1) : spell.Attributes.First(a => a.Key == attributeName).Value;
-
-                Stats affectedStats = spell.Type.Contains("self-attribute") ? spellcasterStats : targetStats;
-                Unit affectedUnit = affectedStats.GetComponent<Unit>();
 
                 // Szukamy pola najpierw w Stats
                 FieldInfo field = affectedStats.GetType().GetField(attributeName);
@@ -355,6 +351,11 @@ public class MagicManager : MonoBehaviour
                 if (field.FieldType == typeof(bool))
                 {
                     bool boolValue = value != 0;
+                    if (appliedSpellEffect != null)
+                    {
+                        appliedSpellEffect.PreviousBoolValues[attributeName] = (bool)field.GetValue(targetObject);
+                        appliedSpellEffect.StatModifiers[attributeName] = boolValue ? 1 : 0;
+                    }
                     field.SetValue(targetObject, boolValue);
                     Debug.Log($"Zaklęcie {spell.Name} zmienia u {affectedStats.Name} cechę {attributeName} na {(boolValue ? "aktywną" : "nieaktywną")}.");
 
@@ -365,20 +366,19 @@ public class MagicManager : MonoBehaviour
                 }
                 else if (field.FieldType == typeof(int))
                 {
+                    int current = (int)field.GetValue(targetObject);
                     if (attributeName == "TempHealth" && targetObject is Stats)
                     {
-                        int newValue = (int)field.GetValue(affectedStats) + value;
-                        if (newValue <= affectedStats.MaxHealth)
-                        {
-                            field.SetValue(affectedStats, newValue);
-                            affectedUnit.DisplayUnitHealthPoints();
-                            UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
-                            Debug.Log($"{affectedStats.Name} odzyskuje {value} punktów Żywotności.");
-                        }
+                        int newValue = Mathf.Min(current + value, affectedStats.MaxHealth);
+                        field.SetValue(affectedStats, newValue);
+                        affectedUnit.DisplayUnitHealthPoints();
+                        UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
+                        Debug.Log($"{affectedStats.Name} odzyskuje {newValue - current} punktów Żywotności.");
                     }
                     else
                     {
-                        int current = (int)field.GetValue(targetObject);
+                        if (field.Name == "Poison" && value > 0)
+                            value = StatesManager.GetPoisonLevel(affectedStats, value);
                         int newValue = current + value;
 
                         // jeśli pole to Bleeding albo Poison -> zabezpieczenie przed < 0
@@ -386,10 +386,14 @@ public class MagicManager : MonoBehaviour
                         {
                             newValue = Mathf.Max(0, newValue);
                         }
+                        if (field.Name == "Fatiqued") newValue = Mathf.Clamp(newValue, 0, 5);
 
                         field.SetValue(targetObject, newValue);
                         Debug.Log($"Zaklęcie {spell.Name} zmienia u {affectedStats.Name} cechę {attributeName} o {value}.");
                     }
+
+                    if (appliedSpellEffect != null)
+                        appliedSpellEffect.StatModifiers[attributeName] = (int)field.GetValue(targetObject) - current;
 
                     if (attributeName == "NaturalArmor")
                     {
@@ -692,12 +696,12 @@ public class MagicManager : MonoBehaviour
         int[] test = null;
         if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Gniew Boży", null, null, modifier, callback: result => test = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(stats, "Gniew Boży", null, null, modifier, callback: result => test = result, applyFatigue: false));
             if (test == null) yield break;
         }
         else
         {
-            test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, null, modifier);
+            test = DiceRollManager.Instance.TestSkill(stats, "Gniew Boży", null, null, modifier, applyFatigue: false);
         }
         int score = test[2];
 

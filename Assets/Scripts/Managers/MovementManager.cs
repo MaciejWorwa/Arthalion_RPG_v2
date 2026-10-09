@@ -69,6 +69,7 @@ public class MovementManager : MonoBehaviour
         if (IsMoving == true || GameManager.IsGamePaused) return;
 
         Unit unit = unitGameObject.GetComponent<Unit>();
+        if (!RoundsManager.Instance.CanUnitAct(unit)) return;
 
         if (!unit.CanMove && !unit.IsRunning)
         {
@@ -123,9 +124,6 @@ public class MovementManager : MonoBehaviour
         // Pozycja postaci przed zaczęciem wykonywania ruchu
         Vector2 startCharPos = unit.transform.position;
 
-        // Aktualizuje informację o zajęciu pola, które postać opuszcza
-        GridManager.Instance.ResetTileOccupancy(startCharPos);
-
         // Pozycja pola wybranego jako cel ruchu
         Vector2 selectedTilePos = new Vector2(selectedTile.transform.position.x, selectedTile.transform.position.y);
 
@@ -133,8 +131,10 @@ public class MovementManager : MonoBehaviour
         List<Vector2> path = FindPath(startCharPos, selectedTilePos);
 
         // Sprawdza czy wybrane pole jest w zasięgu ruchu postaci. W przypadku automatycznej walki ten warunek nie jest wymagany.
-        if (path.Count > 0 && (path.Count <= movementRange || GameManager.IsAutoCombatMode))
+        if (movementRange > 0 && path.Count > 0 && (path.Count <= movementRange || GameManager.IsAutoCombatMode))
         {
+            // Zwalniamy pole dopiero po zaakceptowaniu ruchu.
+            GridManager.Instance.ResetTileOccupancy(startCharPos);
             if (!unit.IsRunning && RoundsManager.RoundNumber != 0)
             {
                 unit.CanMove = false;

@@ -707,6 +707,8 @@ public class UnitData
 
     public bool IsSelected;
     public bool IsTurnFinished;
+    public int TurnStartedInRound;
+    public bool HasUsedOpportunityAttack;
     public bool IsRunning; // Biegnie
     public bool IsCharging; // Szarżuje
     public bool IsFlying; // Leci
@@ -716,6 +718,7 @@ public class UnitData
     public int Bleeding; // Krwawienie
     public bool Blinded; // Oślepienie
     public bool Entangled; // Unierumomienie
+    public int Fatiqued; // Zmęczenie (0–5).
     public int Poison; // Zatrucie
     public bool Prone; // Powalenie
     public bool Scared; // Strach
@@ -740,6 +743,7 @@ public class UnitData
     public int AimingBonus;
 
     public bool CanMove;
+    public bool CanDoAction;
     public bool CanAttack;
     public bool CanCastSpell;
 
@@ -1073,6 +1077,7 @@ public class SpellEffectData
     public int RemainingRounds;
     // Używamy listy Pair, gdzie Pair ma pola Key (string) i Value (int)
     public List<Pair> StatModifiers;
+    public List<Pair> PreviousBoolValues;
 
     public SpellEffectData() { }
 
@@ -1081,13 +1086,18 @@ public class SpellEffectData
         SpellName = effect.SpellName;
         RemainingRounds = effect.RemainingRounds;
         StatModifiers = effect.StatModifiers.Select(kvp => new Pair { Key = kvp.Key, Value = kvp.Value }).ToList();
+        PreviousBoolValues = effect.PreviousBoolValues?.Select(kvp => new Pair { Key = kvp.Key, Value = kvp.Value ? 1 : 0 }).ToList();
     }
 
     // Metoda pomocnicza do odtworzenia obiektu SpellEffect po wczytaniu
     public SpellEffect ToSpellEffect()
     {
-        Dictionary<string, int> modifiers = StatModifiers.ToDictionary(p => p.Key, p => p.Value);
-        return new SpellEffect(SpellName, RemainingRounds, modifiers);
+        Dictionary<string, int> modifiers = (StatModifiers ?? new List<Pair>()).ToDictionary(p => p.Key, p => p.Value);
+        return new SpellEffect(SpellName, RemainingRounds, modifiers)
+        {
+            PreviousBoolValues = PreviousBoolValues?.ToDictionary(p => p.Key, p => p.Value != 0)
+                ?? new Dictionary<string, bool>()
+        };
     }
 }
 

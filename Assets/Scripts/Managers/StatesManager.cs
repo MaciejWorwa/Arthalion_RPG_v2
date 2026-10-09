@@ -32,26 +32,94 @@ public class StatesManager : MonoBehaviour
         }
     }
 
+    private GameObject _extinguishPanel;
+    private bool _attemptExtinguish;
+
+    public IEnumerator ResolveTurnStart(Unit unit)
+    {
+        if (unit == null) yield break;
+        yield return StartCoroutine(Ablaze(unit));
+        if (unit != null && Unit.SelectedUnit == unit.gameObject)
+        {
+            UnitsManager.Instance.UpdateUnitPanel(unit.gameObject);
+            LoadUnitStates();
+            RoundsManager.Instance.DisplayActionsLeft();
+        }
+    }
+
+    public void ResetTurnStartState()
+    {
+        StopAllCoroutines();
+        if (_extinguishPanel != null) _extinguishPanel.SetActive(false);
+        _attemptExtinguish = false;
+    }
+
+    public static int GetPoisonLevel(Stats stats, int level)
+    {
+        if (stats.Undead || stats.IsUnaffectedBy("Poison")) return 0;
+        level = Mathf.Max(0, level);
+        return stats.HasResistance("Poison") ? Mathf.CeilToInt(level / 2f) : level;
+    }
+
     public void UpdateUnitStates(Unit unit)
     {
-        StartCoroutine(Ablaze(unit)); // Podpalenie
         StartCoroutine(Bleeding(unit)); // Krwawienie
         StartCoroutine(Poison(unit)); // Zatrucie
     }
 
     private IEnumerator Ablaze(Unit unit)
     {
-        if (!unit.Ablaze) yield break; // jeśli nie płonie, nic nie robimy
+        if (unit == null || !unit.Ablaze) yield break;
         Stats stats = unit.GetComponent<Stats>();
 
-        if (stats.Resistance != null && stats.Resistance.Contains("Fire"))
+        if (stats.IsUnaffectedBy("Fire"))
         {
-            unit.Ablaze = false; // od razu gasimy, bo ogień nie działa
-            Debug.Log($"<color=#FF7F50>{stats.Name} jest odporny na ogień – ignoruje stan Podpalenia.</color>");
+            unit.Ablaze = false;
+            Debug.Log($"<color=#FF7F50>{stats.Name} jest niewrażliwy/a na ogień – ignoruje stan Podpalenia.</color>");
             yield break;
         }
 
-        // 1) Próba ugaszenia: wymagający (14+) test Atletyki (*Zwinność*)
+        // Obrażenia występują na początku tury, przed decyzją o gaszeniu, bez pancerza.
+        int rolledDamage = UnityEngine.Random.Range(1, 7);
+        int damage = stats.HasResistance("Fire") ? Mathf.CeilToInt(rolledDamage / 2f) : rolledDamage;
+        stats.TempHealth -= damage;
+        Debug.Log($"<color=#FF7F50>{stats.Name} traci {damage} Punkty/ów Zdrowia na początku tury w wyniku Podpalenia.</color>");
+        unit.DisplayUnitHealthPoints();
+
+        if (stats.TempHealth < 0 && GameManager.IsAutoKillMode)
+        {
+            UnitsManager.Instance.DestroyUnit(unit.gameObject);
+            yield break;
+        }
+        if (unit.Unconscious || !unit.CanDoAction) yield break;
+        while (DiceRollManager.Instance.IsWaitingForRoll) yield return null;
+        if (unit == null) yield break;
+
+        bool manualDecision = unit.CompareTag("PlayerUnit")
+            && (!GameManager.IsAutoCombatMode || GameManager.IsStatsHidingMode)
+            && (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning);
+
+        _attemptExtinguish = !manualDecision;
+        if (manualDecision)
+        {
+            if (_extinguishPanel == null)
+            {
+                _extinguishPanel = CombatManager.Instance.CreateExtinguishPanel(out var attemptButton, out var skipButton);
+                if (_extinguishPanel == null) yield break;
+                attemptButton.onClick.AddListener(() => ChooseExtinguish(true));
+                skipButton.onClick.AddListener(() => ChooseExtinguish(false));
+            }
+            _extinguishPanel.GetComponentInChildren<TMP_Text>(true).text =
+                $"{stats.Name} płonie.\nUgaszenie ognia wymaga zużycia akcji i zdania testu Atletyki (14+).";
+            _extinguishPanel.transform.SetAsLastSibling();
+            _extinguishPanel.SetActive(true);
+            yield return new WaitUntil(() => unit == null || !_extinguishPanel.activeInHierarchy);
+        }
+
+        if (unit == null || !_attemptExtinguish || !unit.Ablaze || unit.Unconscious || !unit.CanDoAction) yield break;
+
+        // Akcja jest zużywana również w razie niepowodzenia lub anulowania ręcznego rzutu.
+        if (!RoundsManager.Instance.DoAction(unit, finishTurnIfNoActions: false)) yield break;
         int difficulty = 14;
         int[] test = null;
 
@@ -86,11 +154,13 @@ public class StatesManager : MonoBehaviour
             yield break;
         }
 
-        // 2) Porażka testu → obrażenia k6 ignorujące pancerz (efekt Podpalenia)
-        int damage = UnityEngine.Random.Range(1, 7);
-        stats.TempHealth -= damage;
-        Debug.Log($"<color=#FF7F50>{stats.Name} nie udaje się ugasić ognia i traci {damage} Punkty/ów Zdrowia w wyniku podpalenia.</color>");
-        unit.DisplayUnitHealthPoints();
+        Debug.Log($"<color=#FF7F50>{stats.Name} nie udaje się ugasić płomieni. Podpalenie trwa dalej.</color>");
+    }
+
+    private void ChooseExtinguish(bool attempt)
+    {
+        _attemptExtinguish = attempt;
+        _extinguishPanel.SetActive(false);
     }
 
     private IEnumerator Bleeding(Unit unit)
@@ -167,10 +237,10 @@ public class StatesManager : MonoBehaviour
 
         Stats stats = unit.GetComponent<Stats>();
 
-        if ((stats.Resistance != null && stats.Resistance.Contains("Poison")) || stats.Undead)
+        if (stats.IsUnaffectedBy("Poison") || stats.Undead)
         {
             unit.Poison = 0;
-            Debug.Log($"<color=#FF7F50>{stats.Name} jest odporny na truciznę – ignoruje stan Zatrucia.</color>");
+            Debug.Log($"<color=#FF7F50>{stats.Name} jest niewrażliwy/a na truciznę – ignoruje stan Zatrucia.</color>");
             yield break;
         }
 
@@ -382,6 +452,7 @@ public class StatesManager : MonoBehaviour
 
         // Pobiera nazwę cechy z nazwy obiektu InputField (bez "_input")
         string stateName = textInput.name.Replace("_input", "");
+        if (stateName == "Fatigued") stateName = "Fatiqued";
 
         // Szukamy pola
         FieldInfo field = unit.GetType().GetField(stateName);
@@ -398,8 +469,10 @@ public class StatesManager : MonoBehaviour
         {
             // int przez InputField
             int value = int.TryParse(textInput.GetComponent<TMP_InputField>().text, out int inputValue) ? inputValue : 0;
-
+            if (field.Name == "Fatiqued") value = Mathf.Clamp(value, 0, 5);
+            if (field.Name == "Poison") value = GetPoisonLevel(unit.GetComponent<Stats>(), value);
             field.SetValue(unit, value);
+            textInput.GetComponent<TMP_InputField>().SetTextWithoutNotify(value.ToString());
         }
         else if (field.FieldType == typeof(bool))
         {
@@ -442,6 +515,7 @@ public class StatesManager : MonoBehaviour
         {
             // Wyciągamy nazwę stanu z nazwy obiektu InputField
             string stateName = inputField.name.Replace("_input", "");
+            if (stateName == "Fatigued") stateName = "Fatiqued";
 
             FieldInfo field = unit.GetType().GetField(stateName);
             if (field == null)
@@ -453,7 +527,7 @@ public class StatesManager : MonoBehaviour
 
                 if (inputField.GetComponent<TMPro.TMP_InputField>() != null)
                 {
-                    inputField.GetComponent<TMPro.TMP_InputField>().text = value.ToString();
+                    inputField.GetComponent<TMPro.TMP_InputField>().SetTextWithoutNotify(value.ToString());
                 }
             }
             else if (field.FieldType == typeof(bool))
@@ -467,7 +541,12 @@ public class StatesManager : MonoBehaviour
     #region Fear
     public IEnumerator FearTest(Unit target)
     {
-        if (target == null || target.GetComponent<Stats>().Undead || target.GetComponent<Stats>().Unmeaning) yield break;
+        if (target == null) yield break;
+        if (target.GetComponent<Stats>().Undead || target.GetComponent<Stats>().Unmeaning)
+        {
+            target.Scared = false;
+            yield break;
+        }
 
         // znajdź najstraszniejszego przeciwnika (inny tag, aktywny, Scary > 0)
         string otherTag = target.CompareTag("PlayerUnit") ? "EnemyUnit" : "PlayerUnit";

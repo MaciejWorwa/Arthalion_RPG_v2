@@ -160,7 +160,7 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         //Pauzuje grę, gdy jest otwarteokno wczytywania plików
-        IsGamePaused = FileBrowser.IsOpen ? true : false;
+        RefreshPauseState();
 
         if (_isDungeonCrawlerRewardPanelVisible)
         {
@@ -357,6 +357,11 @@ public class GameManager : MonoBehaviour
     public void ShowPanel(GameObject panel)
     {
         panel.SetActive(true);
+    }
+
+    public void RefreshPauseState()
+    {
+        IsGamePaused = FileBrowser.IsOpen || (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart);
     }
 
     public void ShowOrHidePanel(GameObject panel)

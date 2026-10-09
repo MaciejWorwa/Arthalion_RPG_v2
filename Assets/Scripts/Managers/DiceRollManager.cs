@@ -31,7 +31,9 @@ public class DiceRollManager : MonoBehaviour
     }
 
     // Zmienne do przechowywania wyniku
-    public bool IsWaitingForRoll;
+    public bool IsWaitingForRoll => _pendingRollCount > 0;
+    private bool _hasActiveRoll;
+    private int _pendingRollCount;
 
     [SerializeField] private TMP_InputField _roll1InputField;
     [SerializeField] private TMP_InputField _roll2InputField;
@@ -48,18 +50,19 @@ public class DiceRollManager : MonoBehaviour
     private string _pendingSkillName;
     private int _pendingModifier;
     private int _pendingDifficultyLevel;
-    private Action<int[]> _pendingCallback;
     private string _pendingRollContext;
+    private bool _pendingApplyFatigue;
 
     // wynik gotowy do odebrania przez korutynę
     private int[] _pendingResult;
-    private bool _isRollInputForceCancelled;
+    private int _rollInputVersion;
+    private int _rollQueueVersion;
 
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape) && IsWaitingForRoll)
         {
-            ForceCancelPendingRollInput();
+            ForceCancelPendingRollInput(cancelQueuedRolls: false);
         }
     }
 
@@ -70,98 +73,102 @@ public class DiceRollManager : MonoBehaviour
         string skillName = null,
         int modifier = 0,
         int difficultyLevel = 0,
-        Action<int[]> callback = null)
+        Action<int[]> callback = null,
+        bool applyFatigue = true)
     {
-        // Jeśli inny panel jest aktywny — poczekaj
-        while (_applyRollResultPanel != null && _applyRollResultPanel.activeSelf)
-            yield return null;
-
-        // Ustaw kontekst oczekującego testu
-        _pendingStats = stats;
-        _pendingAttributeName = attributeName;
-        _pendingSkillName = skillName;
-        _pendingModifier = modifier;
-        _pendingDifficultyLevel = difficultyLevel;
-        _pendingCallback = callback;
-        _pendingRollContext = rollContext;
-        _pendingResult = null;
-        _isRollInputForceCancelled = false;
-        IsWaitingForRoll = true;
-
-        // Ustala interaktywność 2. kości:
-        if (_roll2InputField != null)
+        if (!CanPerformTest(stats, attributeName, skillName))
         {
-            string rc = _pendingRollContext?.ToLower() ?? "";
-
-            bool isDamageRoll = rc.Contains("obrażenia");
-
-            _roll2InputField.gameObject.SetActive(!isDamageRoll);
-
-            if(isDamageRoll)
-            {
-                _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Suma z kości";
-                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", true);
-                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", false);
-            }
-            else
-            {
-                _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Kość 1";
-                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", false);
-                _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", true);
-            }
-        }
-
-        // UI
-        if (_applyRollResultPanel != null)
-        {
-            _applyRollResultPanel.SetActive(true);
-            var label = _applyRollResultPanel.GetComponentInChildren<TMP_Text>();
-            if (label != null)
-                label.text = $"Wpisz wynik rzutu {stats.Name} na {rollContext}.";
-        }
-
-        if (_roll1InputField != null) _roll1InputField.text = "";
-        if (_roll2InputField != null) _roll2InputField.text = "";
-
-        // Czekaj aż OnSubmitRoll policzy TestSkill i zapisze _pendingResult
-        while (_pendingResult == null && !_isRollInputForceCancelled)
-            yield return null;
-
-        if (_isRollInputForceCancelled)
-        {
-            if (_applyRollResultPanel != null)
-                _applyRollResultPanel.SetActive(false);
-
-            IsWaitingForRoll = false;
-
-            _pendingStats = null;
-            _pendingAttributeName = null;
-            _pendingSkillName = null;
-            _pendingCallback = null;
-            _pendingRollContext = null;
-
+            callback?.Invoke(TestSkill(stats, rollContext, attributeName, skillName));
             yield break;
         }
+        // Panel pozostaje zajęty aż do odebrania wyniku, również po jego ukryciu.
+        int queueVersion = _rollQueueVersion;
+        int version = 0;
+        int[] result = null;
+        _pendingRollCount++;
+        try
+        {
+            while (_hasActiveRoll && queueVersion == _rollQueueVersion)
+                yield return null;
+            if (queueVersion != _rollQueueVersion || stats == null) yield break;
+            version = ++_rollInputVersion;
+            _hasActiveRoll = true;
 
-        // Schowaj panel i zwróć wynik
-        if (_applyRollResultPanel != null)
-            _applyRollResultPanel.SetActive(false);
+            // Ustaw kontekst oczekującego testu
+            _pendingStats = stats;
+            _pendingAttributeName = attributeName;
+            _pendingSkillName = skillName;
+            _pendingModifier = modifier;
+            _pendingDifficultyLevel = difficultyLevel;
+            _pendingRollContext = rollContext;
+            _pendingApplyFatigue = applyFatigue;
+            _pendingResult = null;
 
-        IsWaitingForRoll = false;
+            // Ustala interaktywność 2. kości:
+            if (_roll2InputField != null)
+            {
+                string rc = _pendingRollContext?.ToLower() ?? "";
 
-        _pendingCallback?.Invoke(_pendingResult);
+                bool isDamageRoll = rc.Contains("obrażenia");
 
-        // Sprzątanie kontekstu
-        _pendingStats = null;
-        _pendingAttributeName = null;
-        _pendingSkillName = null;
-        _pendingCallback = null;
-        _pendingRollContext = null;
+                _roll2InputField.gameObject.SetActive(!isDamageRoll);
+
+                if(isDamageRoll)
+                {
+                    _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Suma z kości";
+                    _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", true);
+                    _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", false);
+                }
+                else
+                {
+                    _roll1InputField.GetComponentInChildren<TMP_Text>().text = "Kość 1";
+                    _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDamageRoll", false);
+                    _roll1InputField.GetComponent<InputFieldFilter>().SetBool("_isDiceRoll", true);
+                }
+            }
+
+            // UI
+            if (_applyRollResultPanel != null)
+            {
+                _applyRollResultPanel.SetActive(true);
+                var label = _applyRollResultPanel.GetComponentInChildren<TMP_Text>();
+                if (label != null)
+                    label.text = $"Wpisz wynik rzutu {stats.Name} na {rollContext}.";
+            }
+
+            if (_roll1InputField != null) _roll1InputField.text = "";
+            if (_roll2InputField != null) _roll2InputField.text = "";
+
+            // Czekaj aż OnSubmitRoll policzy TestSkill i zapisze _pendingResult
+            while (_pendingResult == null && version == _rollInputVersion)
+                yield return null;
+
+            if (version != _rollInputVersion) yield break;
+            result = _pendingResult;
+        }
+        finally
+        {
+            // Anulowana, starsza korutyna nie może wyczyścić kontekstu nowego rzutu.
+            if (version != 0 && version == _rollInputVersion) ClearPendingRollInput();
+            if (queueVersion == _rollQueueVersion) _pendingRollCount--;
+        }
+
+        callback?.Invoke(result);
     }
-    public void ForceCancelPendingRollInput()
+    public void ForceCancelPendingRollInput(bool cancelQueuedRolls = true)
     {
-        _isRollInputForceCancelled = true;
-        IsWaitingForRoll = false;
+        _rollInputVersion++;
+        if (cancelQueuedRolls)
+        {
+            _rollQueueVersion++;
+            _pendingRollCount = 0;
+        }
+        ClearPendingRollInput();
+    }
+
+    private void ClearPendingRollInput()
+    {
+        _hasActiveRoll = false;
 
         if (_roll1InputField != null) _roll1InputField.text = "";
         if (_roll2InputField != null) _roll2InputField.text = "";
@@ -171,12 +178,12 @@ public class DiceRollManager : MonoBehaviour
         _pendingStats = null;
         _pendingAttributeName = null;
         _pendingSkillName = null;
-        _pendingCallback = null;
         _pendingRollContext = null;
     }
     public void OnSubmitRoll()
     {
-        if (_roll1InputField == null || _roll2InputField == null)
+        if (!_hasActiveRoll || _pendingStats == null || _pendingResult != null
+            || _roll1InputField == null || _roll2InputField == null)
             return;
 
         string rc = _pendingRollContext?.ToLower() ?? "";
@@ -219,7 +226,8 @@ public class DiceRollManager : MonoBehaviour
             modifier: _pendingModifier,
             roll1: r1,
             roll2: r2,
-            difficultyLevel: _pendingDifficultyLevel
+            difficultyLevel: _pendingDifficultyLevel,
+            applyFatigue: _pendingApplyFatigue
         );
 
         _roll1InputField.text = "";
@@ -230,7 +238,7 @@ public class DiceRollManager : MonoBehaviour
     // Funkcja sprawdzająca, czy liczba ma dwie identyczne cyfry
     public bool IsDoubleDigit(int number1, int number2)
     {
-        if (number1 == number2) return true;
+        if (number1 >= 1 && number1 <= 10 && number1 == number2) return true;
         else return false;
     }
 
@@ -271,6 +279,15 @@ public class DiceRollManager : MonoBehaviour
     }
 
     #region Attributes and skills tests
+    public static bool CanPerformTest(Stats stats, string attributeName, string skillName = null)
+    {
+        if (stats == null) return false;
+        if (!stats.Unmeaning) return true;
+        return attributeName != "SW" && attributeName != "Ch" && attributeName != "Int"
+            && skillName != "Cool" && skillName != "Spellcasting" && skillName != "Pray"
+            && skillName != "Channeling" && skillName != "MagicLanguage";
+    }
+
     public int[] TestSkill(
     Stats stats,
     string rollContext,              // kontekst do logów
@@ -279,8 +296,15 @@ public class DiceRollManager : MonoBehaviour
     int modifier = 0,
     int difficultyLevel = 0,
     int roll1 = 0,
-    int roll2 = 0)
+    int roll2 = 0,
+    bool applyFatigue = true)
     {
+        if (!CanPerformTest(stats, attributeName, skillName))
+        {
+            Debug.Log($"<color=red>{stats.Name} posiada cechę Bezrozumny – nie może wykonywać testów Charyzmy, Inteligencji, Siły Woli ani opartych na nich umiejętności.</color>");
+            ResetRollModifier();
+            return new int[] { 0, 0, 0 }; // Nie wykonano testu; zerowe kości nie wywołują Szczęścia ani Pecha.
+        }
         // Pobieranie wartości umiejętności
         int skillValue = 0;
         if (!string.IsNullOrEmpty(skillName))
@@ -297,16 +321,19 @@ public class DiceRollManager : MonoBehaviour
             roll2 = UnityEngine.Random.Range(1, 11);
         }
 
-        // --- ZAPAMIĘTAJ PIERWOTNE WYNIKI K10 (przed Twardzielem)
-        int rawRoll1 = roll1;
-        int rawRoll2 = roll2;
-
         // Modyfikator z panelu jednostki
         if (RollModifier != 0)
             modifier += RollModifier;
 
         // Modyfikator za Strach
-        if (stats.GetComponent<Unit>().Scared && !stats.GetComponent<Unit>().Blinded) modifier -= 2;
+        Unit unit = stats.GetComponent<Unit>();
+        if (unit != null && unit.Scared && !unit.Blinded) modifier -= 2;
+        if (applyFatigue && unit != null)
+        {
+            int fatigue = Mathf.Clamp(unit.Fatiqued, 0, 5);
+            modifier -= fatigue;
+            if (fatigue > 0) Debug.Log($"{stats.Name}: Zmęczenie obniża wynik testu o {fatigue}.");
+        }
 
         // W przypadku testu Refleksu wybieramy, która cecha jest wyższa
         if (skillName == "Reflex")
@@ -323,28 +350,6 @@ public class DiceRollManager : MonoBehaviour
             var attributeField = typeof(Stats).GetField(attributeName);
             if (attributeField != null)
                 attributeValue = (int)attributeField.GetValue(stats);
-        }
-
-        int finalScore = roll1 + roll2 + Math.Min(skillValue + attributeValue, 10) + modifier;
-        if (finalScore < 0) finalScore = 0;
-
-        // ===== Cecha Bezrozumny =====
-        if (stats.Unmeaning && (attributeName == "SW" || attributeName == "Ch" || attributeName == "Int"))
-        {
-            // Jeśli jest poziom trudności – osiągnij go dokładnie; jeśli brak, daj „bezpieczny” wysoki wynik
-            finalScore = (difficultyLevel > 0) ? difficultyLevel : 20;
-
-            // Ustal etykietę kontekstu jak w Twojej logice
-            if (string.IsNullOrEmpty(rollContext))
-                rollContext = !string.IsNullOrEmpty(skillName) ? skillName :
-                              !string.IsNullOrEmpty(attributeName) ? attributeName : "";
-
-            Debug.Log($"<color=red>{stats.Name} posiada cechę Bezrozumny – nie może wykonywać testów opartych na Inteligencji, Charyźmie ani Sile Woli.</color>");
-
-            ResetRollModifier();
-
-            // Zwracamy „puste” kości (żeby nie odpalić sekcji SZCZĘŚCIE/PECH) i finalny wynik
-            return new int[] { 0, 0, 0, finalScore };
         }
 
         // ===== Użycie talentu SPECJALISTA: warunkowy przerzut niższej kości =====
@@ -372,9 +377,13 @@ public class DiceRollManager : MonoBehaviour
                 string oldStr = oldValue > 0 ? $" z <color=#FF7F50>{oldValue}</color>" : "";
                 Debug.Log($"{stats.Name} korzysta z talentu Specjalista i przerzuca niższą kość{oldStr} na <color=#FF7F50>{newValue}</color>.");
 
-                finalScore = roll1 + roll2 + skillValue + attributeValue + modifier;
             }
         }
+
+        // Dublety sprawdzamy na rzeczywistych kościach, po przerzucie Specjalisty,
+        // ale przed liczbową premią Twardziela.
+        int rawRoll1 = roll1;
+        int rawRoll2 = roll2;
 
         // ===== Talent TWARDZIEL (Hardy): podwajamy niższą kość przy rzucie na Kondycję =====
         if (stats.Hardy && attributeName == "K")
@@ -392,6 +401,8 @@ public class DiceRollManager : MonoBehaviour
             }
             Debug.Log($"{stats.Name} korzysta z talentu Twardziel – niższa kość zostaje zwiększona z <color=#4dd2ff>{oldValue}</color> na <color=#4dd2ff>{Mathf.Min(oldValue * 2, 10)}</color>.");
         }
+
+        int finalScore = Mathf.Max(0, roll1 + roll2 + Math.Min(skillValue + attributeValue, 10) + modifier);
 
         if (string.IsNullOrEmpty(rollContext))
         {
@@ -439,7 +450,7 @@ public class DiceRollManager : MonoBehaviour
         }
 
         ResetRollModifier();
-        return new int[] { roll1, roll2, finalScore };
+        return new int[] { rawRoll1, rawRoll2, finalScore };
     }
     #endregion
 }

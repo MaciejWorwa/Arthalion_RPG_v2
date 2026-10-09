@@ -8,6 +8,8 @@ public class SpellEffect
     public int RemainingRounds;
     // Słownik zawierający modyfikacje (klucz: nazwa statystyki, wartość: modyfikator)
     public Dictionary<string, int> StatModifiers;
+    // Stan sprzed zaklęcia, potrzebny do przywracania pól logicznych.
+    public Dictionary<string, bool> PreviousBoolValues = new Dictionary<string, bool>();
 
     public SpellEffect(string spellName, int remainingRounds, Dictionary<string, int> statModifiers)
     {

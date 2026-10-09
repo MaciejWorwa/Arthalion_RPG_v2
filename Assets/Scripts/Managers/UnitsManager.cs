@@ -774,6 +774,11 @@ public class UnitsManager : MonoBehaviour
 
     private IEnumerator HungryTrait(Stats stats, Stats deadBodyStats)
     {
+        if (!DiceRollManager.CanPerformTest(stats, "SW"))
+        {
+            Debug.Log($"{stats.Name} jest Bezrozumny/a i ignoruje efekt wymagający testu Siły Woli (Żarłoczny).");
+            yield break;
+        }
 
         int[] test = null;
         if (!GameManager.IsAutoDiceRollingMode && stats.CompareTag("PlayerUnit"))

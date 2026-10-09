@@ -90,6 +90,36 @@ public class CombatManager : MonoBehaviour
     public bool IsManualPlayerAttack;
     private int _activeAttackCoroutines = 0;
     public bool IsAttackSequenceRunning => _activeAttackCoroutines > 0;
+    private readonly HashSet<Unit> _pendingOpportunityAttacks = new HashSet<Unit>();
+
+    public GameObject CreateExtinguishPanel(out UnityEngine.UI.Button attemptButton, out UnityEngine.UI.Button skipButton)
+    {
+        attemptButton = null;
+        skipButton = null;
+        if (_entaglingPanel == null || _escapeYesButton == null || _escapeNoButton == null)
+        {
+            Debug.LogError("Brak panelu decyzji, z którego można utworzyć panel gaszenia płomieni.");
+            return null;
+        }
+
+        GameObject panel = Instantiate(_entaglingPanel, _entaglingPanel.transform.parent);
+        panel.name = "Extinguish_Panel";
+        panel.SetActive(false);
+        var buttons = panel.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+        attemptButton = buttons.First(b => b.name == _escapeYesButton.name);
+        skipButton = buttons.First(b => b.name == _escapeNoButton.name);
+        attemptButton.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
+        skipButton.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
+        attemptButton.GetComponentInChildren<TMP_Text>(true).text = "Ugaś płomienie";
+        skipButton.GetComponentInChildren<TMP_Text>(true).text = "Nie gaś";
+        TMP_Text title = panel.GetComponentInChildren<TMP_Text>(true);
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 12;
+        title.fontSizeMax = title.fontSize;
+        foreach (var tooltip in panel.GetComponentsInChildren<UIButtonTooltip>(true))
+            tooltip.ChangeTooltipText("Ugaszenie płomieni wymaga akcji i udanego testu Atletyki (14+).");
+        return panel;
+    }
 
     private Unit[] _groupOfTargets;
     private bool _groupOfTargetsPenalty;
@@ -139,6 +169,7 @@ public class CombatManager : MonoBehaviour
         StopAllCoroutines();
 
         _activeAttackCoroutines = 0;
+        _pendingOpportunityAttacks.Clear();
         IsManualPlayerAttack = false;
         _parryOrDodge = string.Empty;
         _criticalHitEffect = string.Empty;
@@ -267,6 +298,7 @@ public class CombatManager : MonoBehaviour
     #region Attack functions
     public void Attack(Unit attacker, Unit target, bool opportunityAttack = false)
     {
+        if (attacker == null || target == null) return;
         // Sprawdź, czy gra jest wstrzymana
         if (GameManager.IsGamePaused)
         {
@@ -274,10 +306,13 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        if (AttackTypes["MountAttack"]) // Atak wierzchowca
+        if (!opportunityAttack && AttackTypes["MountAttack"]) // Atak wierzchowca
         {
             attacker = attacker.Mount;
         }
+        if (attacker == null) return;
+        if (!opportunityAttack && !RoundsManager.Instance.CanUnitAct(attacker)) return;
+        if (opportunityAttack && (attacker.HasUsedOpportunityAttack || !_pendingOpportunityAttacks.Add(attacker))) return;
 
         // Sprawdź, czy jednostka może wykonać atak
         if (!attacker.CanDoAction && !opportunityAttack)
@@ -295,6 +330,7 @@ public class CombatManager : MonoBehaviour
     {
         _activeAttackCoroutines++;
         yield return StartCoroutine(AttackCoroutine(attacker, target, opportunityAttack));
+        if (opportunityAttack) _pendingOpportunityAttacks.Remove(attacker);
         _activeAttackCoroutines = Mathf.Max(0, _activeAttackCoroutines - 1);
     }
 
@@ -391,13 +427,18 @@ public class CombatManager : MonoBehaviour
         {
             if (attacker.CanDoAction)
             {
-                RoundsManager.Instance.DoAction(attacker);
+                if (!RoundsManager.Instance.DoAction(attacker)) yield break;
             }
             else
             {
                 Debug.Log("Wybrana jednostka nie może wykonać kolejnego ataku w tej rundzie.");
                 yield break;
             }
+        }
+        else
+        {
+            if (attacker.HasUsedOpportunityAttack) yield break;
+            attacker.HasUsedOpportunityAttack = true;
         }
 
         // Rozbrojenie
@@ -644,18 +685,7 @@ public class CombatManager : MonoBehaviour
                 Debug.Log($"{attackerStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 attackerStats.UnfortunateEvents++;
 
-                if (attackerWeapon.Quality == "Zwykła" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
-                {
-                    attackerWeapon.Broken = true;
-                    InventoryManager.RecalculateWeaponValue(attackerWeapon);
-                    Debug.Log($"{attackerStats.Name} uszkodził/a swoją broń ({attackerWeapon.Name}).");
-                }
-                else if (attackerWeapon.Quality == "Słaba" && attackerWeapon.Id != 0 && !attackerWeapon.Type.Contains("natural-weapon"))
-                {
-                    attackerWeapon.Broken = true;
-                    InventoryManager.RecalculateWeaponValue(attackerWeapon);
-                    Debug.Log($"{attackerStats.Name} zniszczył/a swoją broń ({attackerWeapon.Name}). <color=red>Należy usunąć ją z ekwipunku.</color>");
-                }
+                DamageEquipmentOnFumble(attackerStats, attackerWeapon, isArmor: false);
             }
         }
 
@@ -680,83 +710,22 @@ public class CombatManager : MonoBehaviour
                 Debug.Log($"{targetStats.Name} wyrzucił/a <color=red>PECHA</color>!");
                 targetStats.UnfortunateEvents++;
 
-                bool hasArmorOnLocation = false;
-
-                // --- uszkodzenie zbroi na trafionej lokalizacji ---
-                if (!string.IsNullOrEmpty(hitLocation) && targetStats != null)
+                if (_parryOrDodge == "parry")
                 {
-                    string normalizedHitLocation = NormalizeHitLocation(hitLocation);
-
-                    Inventory targetInventory = targetStats.GetComponent<Inventory>();
-                    if (targetInventory != null &&
-                        targetInventory.ArmorByLocation != null &&
-                        targetInventory.ArmorByLocation.TryGetValue(normalizedHitLocation, out var armorsOnLocation))
-                    {
-                        // tylko nieuszkodzone elementy pancerza
-                        var validArmors = armorsOnLocation
-                            .Where(a => a != null && !a.Broken)
-                            .ToList();
-
-                        if (validArmors.Count > 0)
-                        {
-                            hasArmorOnLocation = true;
-
-                            // priorytety: plate > chain > leather
-                            string[] priority = { "plate", "chain", "leather" };
-
-                            var armorPiece = priority
-                                .Select(type => validArmors.FirstOrDefault(a => a.Type != null && a.Type.Contains(type)))
-                                .FirstOrDefault(a => a != null)
-                                ?? validArmors[0];
-
-                            // domyślnie traktujemy brak jakości jako "Zwykła"
-                            string quality = string.IsNullOrEmpty(armorPiece.Quality) ? "Zwykła" : armorPiece.Quality;
-
-                            if (quality == "Słaba")
-                            {
-                                armorPiece.Broken = true;
-                                InventoryManager.RecalculateWeaponValue(armorPiece);
-                                Debug.Log(
-                                    $"{targetStats.Name} zniszczył/a swoją zbroję " +
-                                    $"({armorPiece.Name}). " +
-                                    "<color=red>Należy usunąć ją z ekwipunku.</color>"
-                                );
-                            }
-                            else if (quality == "Zwykła")
-                            {
-                                armorPiece.Broken = true;
-                                InventoryManager.RecalculateWeaponValue(armorPiece);
-                                Debug.Log(
-                                    $"{targetStats.Name} uszkodził/a swoją zbroję " +
-                                    $"({armorPiece.Name})."
-                                );
-                            }
-                        }
-                    }
+                    DamageEquipmentOnFumble(targetStats, weaponUsedForParry, isArmor: false);
                 }
-
-                // --- uszkodzenie broni przy pechu na parowaniu, tylko jeśli brak zbroi na tej lokalizacji ---
-                if (!hasArmorOnLocation &&
-                    _parryOrDodge == "parry" &&
-                    attackerWeapon.Id != 0 &&
-                    targetWeapon != null)
+                else if (_parryOrDodge == "dodge")
                 {
-                    string weaponQuality = string.IsNullOrEmpty(targetWeapon.Quality) ? "Zwykła" : targetWeapon.Quality;
-
-                    if (weaponQuality == "Zwykła" && !targetWeapon.Type.Contains("natural-weapon"))
+                    Weapon armorPiece = GetArmorForDodgeFumble(targetStats.GetComponent<Inventory>(), hitLocation);
+                    if (armorPiece != null)
                     {
-                        targetWeapon.Broken = true;
-                        InventoryManager.RecalculateWeaponValue(targetWeapon);
-                        Debug.Log($"{targetStats.Name} uszkodził/a swoją broń ({targetWeapon.Name}).");
+                        DamageEquipmentOnFumble(targetStats, armorPiece, isArmor: true);
+                        InventoryManager.Instance.CheckForEquippedWeapons(target);
                     }
-                    else if (weaponQuality == "Słaba" && !targetWeapon.Type.Contains("natural-weapon"))
+                    else
                     {
-                        targetWeapon.Broken = true;
-                        InventoryManager.RecalculateWeaponValue(targetWeapon);
-                        Debug.Log(
-                            $"{targetStats.Name} zniszczył/a swoją broń ({targetWeapon.Name}). " +
-                            "<color=red>Należy usunąć ją z ekwipunku.</color>"
-                        );
+                        Debug.Log($"{targetStats.Name} nie nosi pancerza na trafionej lokalizacji ({hitLocation}) i otrzymuje Trafienie Krytyczne wskutek Pecha przy Uniku.");
+                        yield return StartCoroutine(CriticalWoundRoll(attackerStats, targetStats, hitLocation));
                     }
                 }
             }
@@ -937,7 +906,7 @@ public class CombatManager : MonoBehaviour
                         return;
                     }
 
-                    // --- RESISTANCE = połowa obrażeń, zaokrąglając w dół ---
+                    // --- RESISTANCE = połowa obrażeń, zaokrąglając w górę ---
                     bool resistant = false;
                     if (targetStats.Resistance != null && targetStats.Resistance.Length > 0)
                     {
@@ -957,7 +926,7 @@ public class CombatManager : MonoBehaviour
                     if (resistant)
                     {
                         int originalDamage = finalDamage;
-                        finalDamage = Mathf.Max(1, finalDamage / 2);
+                        finalDamage = Mathf.CeilToInt(finalDamage / 2f);
 
                         var dmgPl = UnitsManager.ResistanceEnToPl.TryGetValue(effectiveDamageType, out var pl) ? pl : effectiveDamageType;
                         resistanceLog = $"{targetStats.Name} jest odporny/a na {dmgPl}. Obrażenia zmniejszono z {originalDamage} do {finalDamage}.";
@@ -1015,8 +984,7 @@ public class CombatManager : MonoBehaviour
             if (attackerWeapon != null && attackerWeapon.Poisonous > 0)
             {
                 // sprawdzamy odporności celu
-                bool unaffected = (targetStats.Unaffected?.Contains("Poison") ?? false) || targetStats.Undead;
-                bool resistant = targetStats.Resistance?.Contains("Poison") ?? false;
+                bool unaffected = targetStats.IsUnaffectedBy("Poison") || targetStats.Undead;
 
                 if (unaffected)
                 {
@@ -1024,7 +992,7 @@ public class CombatManager : MonoBehaviour
                     return;
                 }
 
-                int poisonLevel = resistant ? attackerWeapon.Poisonous / 2 : attackerWeapon.Poisonous;
+                int poisonLevel = StatesManager.GetPoisonLevel(targetStats, attackerWeapon.Poisonous);
 
                 if (poisonLevel > 0 && target.Poison < poisonLevel)
                 {
@@ -1071,8 +1039,40 @@ public class CombatManager : MonoBehaviour
     #endregion
 
     #region Defense functions
+    private static void DamageEquipmentOnFumble(Stats stats, Weapon equipment, bool isArmor)
+    {
+        if (equipment == null || equipment.Broken) return;
+        if (!isArmor && (equipment.Id == 0 || (equipment.Type?.Contains("natural-weapon") ?? false))) return;
+        string quality = string.IsNullOrEmpty(equipment.Quality) ? "Zwykła" : equipment.Quality;
+        if (quality != "Zwykła" && quality != "Słaba") return;
+
+        equipment.Broken = true;
+        InventoryManager.RecalculateWeaponValue(equipment);
+        string itemType = isArmor ? "pancerz" : "broń";
+        string consequence = quality == "Słaba" ? "zniszczył/a" : "uszkodził/a";
+        string removal = quality == "Słaba" ? " <color=red>Należy usunąć przedmiot z ekwipunku.</color>" : "";
+        Debug.Log($"{stats.Name} {consequence} {itemType} ({equipment.Name}).{removal}");
+    }
+
+    private Weapon GetArmorForDodgeFumble(Inventory inventory, string hitLocation)
+    {
+        if (inventory == null || inventory.EquippedArmors == null || inventory.ArmorByLocation == null
+            || string.IsNullOrEmpty(hitLocation)
+            || !inventory.ArmorByLocation.TryGetValue(NormalizeHitLocation(hitLocation), out var onLocation)
+            || onLocation == null) return null;
+
+        var wornArmor = onLocation.Where(a => a != null && a.Name != "Naturalny pancerz"
+            && inventory.EquippedArmors.Contains(a)).ToList();
+        var candidates = wornArmor.Where(a => !a.Broken).ToList();
+        string[] priority = { "plate", "chain", "leather" };
+        return priority.Select(type => candidates.FirstOrDefault(a => a.Type?.Contains(type) ?? false))
+            .FirstOrDefault(a => a != null) ?? candidates.FirstOrDefault() ?? wornArmor.FirstOrDefault();
+    }
+
     public IEnumerator Defense(Unit target, Stats targetStats, Weapon targetWeapon, int parryValue, int dodgeValue, int parryModifier, int dodgeModifier, bool canParry)
     {
+        _parryOrDodge = string.Empty;
+        DefenceResults = new int[] { 0, 1, 0 };
         // Jak cel jest nieprzytomny to wynik obrony wynosi 0.
         if(target.Unconscious)
         {
@@ -1162,7 +1162,8 @@ public class CombatManager : MonoBehaviour
 
     private IEnumerator AutoDefense(Unit target, Stats targetStats, Weapon targetWeapon, int parryValue, int dodgeValue, int parryModifier, int dodgeModifier, bool canParry)
     {
-        if (parryValue + parryModifier + targetStats.MeleeCombat >= dodgeValue + dodgeModifier + targetStats.Dodge && canParry)
+        if (canParry && Math.Min(targetStats.Zr + targetStats.MeleeCombat, 10) + parryModifier
+            >= Math.Min(targetStats.Zw + targetStats.Dodge, 10) + dodgeModifier)
         {
             yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryModifier));
         }
@@ -1174,6 +1175,7 @@ public class CombatManager : MonoBehaviour
 
     private IEnumerator Parry(Unit target, Stats targetStats, Weapon targetWeapon, int parryModifier)
     {
+        _parryOrDodge = "parry";
         Debug.Log($"{targetStats.Name} próbuje parować przy użyciu {targetWeapon.Name}.");
 
         // Jeżeli jesteśmy w trybie manualnych rzutów kośćmi i wybrana jednostka to sojusznik to czekamy na wynik rzutu
@@ -1193,6 +1195,7 @@ public class CombatManager : MonoBehaviour
 
     public IEnumerator Dodge(Unit target, Stats targetStats, int dodgeModifier)
     {
+        _parryOrDodge = "dodge";
         // Jeżeli jesteśmy w trybie manualnych rzutów kośćmi i wybrana jednostka to sojusznik to czekamy na wynik rzutu
         int[] defenceTest = null;
         if (!GameManager.IsAutoDiceRollingMode && target.CompareTag("PlayerUnit"))
@@ -1762,12 +1765,12 @@ public class CombatManager : MonoBehaviour
         int[] criticalWoundTest = null;
         if (!GameManager.IsAutoDiceRollingMode && attackerStats.CompareTag("PlayerUnit"))
         {
-            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie krytyczne", null, callback: result => criticalWoundTest = result));
+            yield return StartCoroutine(DiceRollManager.Instance.WaitForRollValue(attackerStats, "trafienie krytyczne", null, callback: result => criticalWoundTest = result, applyFatigue: false));
             if (criticalWoundTest == null) yield break;
         }
         else
         {
-            criticalWoundTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie krytyczne", null);
+            criticalWoundTest = DiceRollManager.Instance.TestSkill(attackerStats, "trafienie krytyczne", null, applyFatigue: false);
         }
         rollResult = criticalWoundTest[2];
 
@@ -2308,6 +2311,8 @@ public class CombatManager : MonoBehaviour
     #region Grappling
     public void Grappling(Unit attacker, Unit target)
     {
+        if (GameManager.IsGamePaused) return;
+        if (!RoundsManager.Instance.CanUnitAct(attacker)) return;
         // Sprawdzamy, czy atakujący może wykonać akcję
         if (!attacker.CanDoAction)
         {
@@ -2555,8 +2560,11 @@ public class CombatManager : MonoBehaviour
 
     public IEnumerator EscapeFromEntanglement(Stats entanglingUnitStats, Stats entangledUnitStats)
     {
+        while (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart) yield return null;
+        if (entanglingUnitStats == null || entangledUnitStats == null) yield break;
         Unit entangledUnit = entangledUnitStats.GetComponent<Unit>();
         Unit entanglingUnit = entanglingUnitStats.GetComponent<Unit>();
+        if (!RoundsManager.Instance.CanUnitAct(entangledUnit)) yield break;
 
         if (!entangledUnit.Entangled)
             yield break;
@@ -2588,7 +2596,7 @@ public class CombatManager : MonoBehaviour
         }
 
         // Wykonuje akcję
-        RoundsManager.Instance.DoAction(entangledUnitStats.GetComponent<Unit>());
+        if (!RoundsManager.Instance.DoAction(entangledUnit)) yield break;
 
         // wybór wyższej cechy: Zwinność (Zw) lub Siła (S)
         int[] targetTest = null;
@@ -2663,11 +2671,13 @@ public class CombatManager : MonoBehaviour
     #region Reloading
     public void Reload()
     {
+        if (GameManager.IsGamePaused) return;
         StartCoroutine(ReloadCoroutine());
     }
     private IEnumerator ReloadCoroutine()
     {
         if (Unit.SelectedUnit == null) yield break;
+        if (!RoundsManager.Instance.CanUnitAct(Unit.SelectedUnit.GetComponent<Unit>())) yield break;
 
         Weapon weapon = Unit.SelectedUnit.GetComponent<Inventory>().EquippedWeapons[0];
         Stats stats = Unit.SelectedUnit.GetComponent<Stats>();
@@ -2687,7 +2697,7 @@ public class CombatManager : MonoBehaviour
             }
 
             //Wykonuje akcję
-            RoundsManager.Instance.DoAction(Unit.SelectedUnit.GetComponent<Unit>());
+            if (!RoundsManager.Instance.DoAction(Unit.SelectedUnit.GetComponent<Unit>())) yield break;
 
             weapon.ReloadLeft--;
 
@@ -2729,11 +2739,13 @@ public class CombatManager : MonoBehaviour
     #region Aiming
     public void SetAim() // DDOAĆ TU DRGUĄ MOŻLIWOŚĆ, CZYLI WYBÓR LOKALIZACJI
     {
+        if (GameManager.IsGamePaused) return;
         if (Unit.SelectedUnit == null) return;
 
         Unit unit = Unit.SelectedUnit.GetComponent<Unit>();
 
         //Sprawdza, czy postać już celuje i chce przestać, czy chce dopiero przycelować
+        if (!RoundsManager.Instance.CanUnitAct(unit)) return;
         if (unit.AimingBonus != 0)
         {
             unit.AimingBonus = 0;
@@ -2792,7 +2804,8 @@ public class CombatManager : MonoBehaviour
             Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
 
             //Jeżeli jest to jednostka unieruchomiona, nieprzytomna lub jednostka z bronią dystansową to ją pomijamy
-            if (weapon.Type.Contains("ranged") || unit.Unconscious || unit.EntangledUnitId != 0 || unit.Entangled) continue;
+            if (weapon.Type.Contains("ranged") || unit.Unconscious || unit.EntangledUnitId != 0 || unit.Entangled
+                || unit.HasUsedOpportunityAttack || _pendingOpportunityAttacks.Contains(unit)) continue;
 
             // Sprawdzenie czy ruch powoduje oddalenie się od przeciwników (czyli atak okazyjny)
             float distanceFromOpponentAfterMove = Vector2.Distance(selectedTilePosition, unit.transform.position);

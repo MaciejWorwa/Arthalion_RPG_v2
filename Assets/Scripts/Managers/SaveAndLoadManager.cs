@@ -804,6 +804,10 @@ public class SaveAndLoadManager : MonoBehaviour
             _isSchedulingLearningAutoStart = true;
             StartCoroutine(StartLearningRoundAfterLoad());
         }
+        else if (!shouldAutoStartLearningRound)
+        {
+            RoundsManager.Instance?.BeginTurn(InitiativeQueueManager.Instance?.ActiveUnit);
+        }
     }
 
     private IEnumerator StartLearningRoundAfterLoad()
@@ -827,10 +831,11 @@ public class SaveAndLoadManager : MonoBehaviour
         if (gameObject == null || !File.Exists(filePath)) return;
 
         TData dataObject = null;
+        string jsonData;
         try
         {
             // Deserializacja JSON do obiektu danych
-            string jsonData = File.ReadAllText(filePath);
+            jsonData = File.ReadAllText(filePath);
             dataObject = JsonUtility.FromJson<TData>(jsonData);
         }
         catch
@@ -850,6 +855,9 @@ public class SaveAndLoadManager : MonoBehaviour
 
         foreach (FieldInfo dataField in dataFields)
         {
+            // Stare zapisy nie zawierały CanDoAction; zachowujemy dotychczasową wartość komponentu.
+            if (typeof(TData) == typeof(UnitData) && dataField.Name == "CanDoAction"
+                && !jsonData.Contains("\"CanDoAction\"")) continue;
             // Pomijamy pole ActiveSpellEffects, aby nie probowac przypisywac List<SpellEffectData> do List<SpellEffect>
             if (dataField.Name == "ActiveSpellEffects")
                 continue;

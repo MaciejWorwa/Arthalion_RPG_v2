@@ -18,6 +18,8 @@ public class Unit : MonoBehaviour
 
     public bool IsSelected = false;
     public bool IsTurnFinished; // Określa, czy postać zakończyła swoją turę (bo mogła to zrobić, np. zostawiając jedną akcję)
+    public int TurnStartedInRound; // Chroni efekty początku tury przed ponownym naliczeniem.
+    public bool HasUsedOpportunityAttack;
     public bool IsRunning; // Biegnie
     public bool IsCharging; // Szarżuje
     public bool IsFlying; // Leci
@@ -28,6 +30,7 @@ public class Unit : MonoBehaviour
     public int Bleeding; // Krwawienie
     public bool Blinded; // Oślepienie
     public bool Entangled; // Unierumomienie
+    [UnityEngine.Range(0, 5)] public int Fatiqued; // Zmęczenie; 0 oznacza brak stanu.
     public int Poison; // Zatrucie
     public bool Prone; // Powalenie
     public bool Scared; // Strach
@@ -87,6 +90,7 @@ public class Unit : MonoBehaviour
 
     private void OnMouseOver()
     {
+        if (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart) return;
         if (Input.GetMouseButton(1) && SelectedUnit != null && SelectedUnit != this.gameObject && !MagicManager.IsTargetSelecting)
         {
             StartCoroutine(CombatManager.Instance.OpenHitLocationPanel());
@@ -127,6 +131,8 @@ public class Unit : MonoBehaviour
     public void SelectUnit()
     {
         if (!gameObject.activeSelf) return;
+        if (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart
+            && (RoundsManager.Instance.TurnStartUnit != this || SelectedUnit == gameObject)) return;
 
         if (SelectedUnit == null)
         {
@@ -170,8 +176,13 @@ public class Unit : MonoBehaviour
         }
         IsSelected = SelectedUnit == this.gameObject;
         ChangeUnitColor(this.gameObject);
+        if (IsSelected)
+        {
+            RoundsManager.Instance?.BeginTurn(this);
+            if (this == null) return; // Podpalenie mogło usunąć jednostkę.
+        }
 
-        if(IsSelected && Entangled && !Grappled && CanDoAction)
+        if(IsSelected && !IsTurnFinished && Entangled && !Grappled && CanDoAction)
         {
             Stats entanglingUnitStats = null;
             foreach (var u in UnitsManager.Instance.AllUnits)

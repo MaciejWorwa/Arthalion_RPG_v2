@@ -444,14 +444,28 @@ public class Stats : MonoBehaviour
                     if (field.FieldType == typeof(int))
                     {
                         int currentValue = (int)field.GetValue(targetObject);
-                        field.SetValue(targetObject, currentValue - mod.Value);
+                        int restoredValue = currentValue - mod.Value;
+                        if (field.Name == "Fatiqued") restoredValue = Mathf.Clamp(restoredValue, 0, 5);
+                        if (field.Name == "Poison") restoredValue = Mathf.Max(0, restoredValue);
+                        field.SetValue(targetObject, restoredValue);
                     }
                     if (field.FieldType == typeof(bool))
                     {
-                        // Załóżmy, że w słowniku mod.Value == 1 oznacza, że buff włączył daną cechę
-                        // Aby odwrócić, ustawiamy ją na false – oczywiście, jeśli oryginalna wartość była false.
-                        // Jeśli mogło być też true – trzeba to odpowiednio przechowywać (np. jako dodatkowe pole w SpellEffect).
-                        field.SetValue(targetObject, false);
+                        bool previousValue = effect.PreviousBoolValues != null
+                            && effect.PreviousBoolValues.TryGetValue(mod.Key, out bool savedValue) && savedValue;
+                        // Późniejszy efekt nadal steruje polem; przekazujemy mu stan bazowy.
+                        var nextEffect = ActiveSpellEffects.Skip(i + 1)
+                            .FirstOrDefault(e => e.StatModifiers.ContainsKey(mod.Key));
+                        if (nextEffect != null)
+                        {
+                            if (nextEffect.PreviousBoolValues == null)
+                                nextEffect.PreviousBoolValues = new Dictionary<string, bool>();
+                            nextEffect.PreviousBoolValues[mod.Key] = previousValue;
+                        }
+                        else if ((bool)field.GetValue(targetObject) == (mod.Value != 0))
+                        {
+                            field.SetValue(targetObject, previousValue);
+                        }
                     }
 
                     if (field.Name == "NaturalArmor")
@@ -473,6 +487,22 @@ public class Stats : MonoBehaviour
 
     //Sprawdza, czy postać specjalizuje się z danej rzeczy
     public bool HasSpecialist(string skill) => !string.IsNullOrEmpty(skill) && Specialist != null && Specialist.Any(s => s == skill);
+    public bool HasResistance(string damageType) => HasDamageType(Resistance, damageType);
+    public bool IsUnaffectedBy(string damageType) => HasDamageType(Unaffected, damageType);
+
+    private static bool HasDamageType(string[] traits, string damageType)
+    {
+        if (traits == null || string.IsNullOrWhiteSpace(damageType)) return false;
+        damageType = damageType.Trim();
+        if (UnitsManager.ResistancePlToEn.TryGetValue(damageType, out var mappedType)) damageType = mappedType;
+        return traits.Any(trait =>
+        {
+            if (string.IsNullOrWhiteSpace(trait)) return false;
+            trait = trait.Trim();
+            if (UnitsManager.ResistancePlToEn.TryGetValue(trait, out var mappedTrait)) trait = mappedTrait;
+            return string.Equals(trait, damageType, StringComparison.OrdinalIgnoreCase);
+        });
+    }
     public bool HasSlayer(string skill) => !string.IsNullOrEmpty(skill) && Slayer != null && Slayer.Any(s => s == skill);
     public bool HasMagic(string path) => !string.IsNullOrEmpty(path) && Magic != null && Magic.Any(m => m == path);
 
