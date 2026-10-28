@@ -329,9 +329,12 @@ public class CombatManager : MonoBehaviour
     private IEnumerator AttackCoroutineTracked(Unit attacker, Unit target, bool opportunityAttack)
     {
         _activeAttackCoroutines++;
-        yield return StartCoroutine(AttackCoroutine(attacker, target, opportunityAttack));
-        if (opportunityAttack) _pendingOpportunityAttacks.Remove(attacker);
-        _activeAttackCoroutines = Mathf.Max(0, _activeAttackCoroutines - 1);
+        try { yield return StartCoroutine(AttackCoroutine(attacker, target, opportunityAttack)); }
+        finally
+        {
+            if (opportunityAttack) _pendingOpportunityAttacks.Remove(attacker);
+            _activeAttackCoroutines = Mathf.Max(0, _activeAttackCoroutines - 1);
+        }
     }
 
     private IEnumerator AttackCoroutine(Unit attacker, Unit target, bool opportunityAttack = false)
@@ -399,7 +402,7 @@ public class CombatManager : MonoBehaviour
             if (attacker.IsCharging)
             {
                 // Jeżeli to miała być szarża, próbujemy ją wykonać
-                Charge(attacker.gameObject, target.gameObject);
+                yield return StartCoroutine(ChargeCoroutine(attacker.gameObject, target.gameObject));
             }
             else
             {
@@ -1081,7 +1084,13 @@ public class CombatManager : MonoBehaviour
             yield break;
         }
 
-        if (!GameManager.IsAutoDefenseMode)
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.ControlsUnit(target))
+        {
+            int reaction = ReinforcementLearningManager.Instance.ChooseReaction(target, 4, canParry ? new[] { 0, 1 } : new[] { 1 });
+            if (reaction == 0) yield return StartCoroutine(Parry(target, targetStats, targetWeapon, parryModifier));
+            else yield return StartCoroutine(Dodge(target, targetStats, dodgeModifier));
+        }
+        else if (!GameManager.IsAutoDefenseMode)
         {
             yield return StartCoroutine(ManualDefense(target, targetStats, targetWeapon, parryModifier, dodgeModifier, canParry));
         }
@@ -1230,21 +1239,23 @@ public class CombatManager : MonoBehaviour
         }
     }
 
-    public bool ValidateRangedAttack(Unit attacker, Unit target, Weapon attackerWeapon, float attackDistance)
+    public bool ValidateRangedAttack(Unit attacker, Unit target, Weapon attackerWeapon, float attackDistance, bool logErrors = true)
     {
+        if (attacker.Blinded) return false;
+        if (!attackerWeapon.Type.Contains("throwing") && (string.IsNullOrEmpty(attackerWeapon.AmmoType) || attackerWeapon.AmmoType == "Brak")) return false;
         // Sprawdza, czy broń jest naładowana
         if (attackerWeapon.ReloadLeft != 0)
         {
-            Debug.Log($"Broń {attacker.GetComponent<Stats>().Name} wymaga przeładowania.");
+            if (logErrors) Debug.Log($"Broń {attacker.GetComponent<Stats>().Name} wymaga przeładowania.");
             return false;
         }
 
         // Sprawdza, czy cel nie znajduje się zbyt blisko
         if (attackDistance <= 1.5f)
         {
-            if(!ReinforcementLearningManager.Instance.IsLearning)
+            if(logErrors)
             {
-                Debug.Log($"{attacker.GetComponent<Stats>().Name} stoi zbyt blisko celu, aby wykonać atak dystansowy.");
+                if (logErrors) Debug.Log($"{attacker.GetComponent<Stats>().Name} stoi zbyt blisko celu, aby wykonać atak dystansowy.");
             }
 
             return false;
@@ -1252,9 +1263,9 @@ public class CombatManager : MonoBehaviour
 
         if(attackDistance > attackerWeapon.AttackRange)
         {
-            if (!ReinforcementLearningManager.Instance.IsLearning)
+            if (logErrors)
             {
-                Debug.Log($"Cel znajduje się poza zasięgiem broni {attacker.GetComponent<Stats>().Name}.");
+                if (logErrors) Debug.Log($"Cel znajduje się poza zasięgiem broni {attacker.GetComponent<Stats>().Name}.");
             }
             return false;
         }
@@ -1262,9 +1273,9 @@ public class CombatManager : MonoBehaviour
         // Sprawdza, czy linia strzału nie przechodzi przez wyłączone pola (ściany)
         if (IsLineBlockedByDisabledTiles(attacker.transform.position, target.transform.position))
         {
-            if (!ReinforcementLearningManager.Instance.IsLearning)
+            if (logErrors)
             {
-                Debug.Log($"Na linii strzału {attacker.GetComponent<Stats>().Name} znajduje się ściana.");
+                if (logErrors) Debug.Log($"Na linii strzału {attacker.GetComponent<Stats>().Name} znajduje się ściana.");
             }
             return false;
         }
@@ -1282,7 +1293,7 @@ public class CombatManager : MonoBehaviour
             {
                 if (mapElement.IsHighObstacle)
                 {
-                    Debug.Log($"Na linii strzału {attacker.GetComponent<Stats>().Name} znajduje się przeszkoda, przez którą strzał jest niemożliwy.");
+                    if (logErrors) Debug.Log($"Na linii strzału {attacker.GetComponent<Stats>().Name} znajduje się przeszkoda, przez którą strzał jest niemożliwy.");
                     return false;
                 }
             }
@@ -2196,60 +2207,29 @@ public class CombatManager : MonoBehaviour
     #region Charge
     public void Charge(GameObject attacker, GameObject target)
     {
-        //Sprawdza pole, w którym atakujący zatrzyma się po wykonaniu szarży
-        GameObject targetTile = GetTileAdjacentToTarget(attacker, target);
+        StartCoroutine(StandaloneCharge(attacker, target));
+    }
 
-        Stats attackerStats = attacker.GetComponent<Stats>();
-        Stats targetStats = target.GetComponent<Stats>();
+    private IEnumerator StandaloneCharge(GameObject attacker, GameObject target)
+    {
+        _activeAttackCoroutines++;
+        try { yield return ChargeCoroutine(attacker, target); }
+        finally { _activeAttackCoroutines = Mathf.Max(0, _activeAttackCoroutines - 1); }
+    }
 
-        Vector2 targetTilePosition;
-
-        if (targetTile != null)
-        {
-            targetTilePosition = new Vector2(targetTile.transform.position.x, targetTile.transform.position.y);
-        }
-        else
-        {
-            Debug.Log($"Cel ataku stoi poza zasięgiem szarży.");
-            return;
-        }
-
-        if (attacker.GetComponent<Unit>().Prone)
-        {
-            Debug.Log("Jednostka w stanie utraty przytomności nie może wykonywać szarży.");
-            return;
-        }
-
-        //Ścieżka ruchu szarżującego
-        List<Vector2> path = MovementManager.Instance.FindPath(attacker.transform.position, targetTilePosition);
-
-        //Sprawdza, czy postać jest wystarczająco daleko do wykonania szarży
-        if (path.Count >= attackerStats.Sz / 2f && path.Count <= attackerStats.TempSz)
-        {
-            //Zapisuje grę przed wykonaniem ruchu, aby użycie punktu szczęścia wczytywało pozycję przed wykonaniem szarży i można było wykonać ją ponownie
-            SaveAndLoadManager.Instance.SaveUnits(UnitsManager.Instance.AllUnits, "autosave");
-
-            MovementManager.Instance.MoveSelectedUnit(targetTile, attacker);
-
-            // Wywołanie funkcji z wyczekaniem na koniec animacji ruchu postaci
-            float delay = 0.25f;
-            StartCoroutine(DelayedAttack(attacker, target, path.Count * delay));
-
-            IEnumerator DelayedAttack(GameObject attacker, GameObject target, float delay)
-            {
-                yield return new WaitForSeconds(delay);
-
-                if (attacker == null || target == null) yield break;
-
-                yield return StartCoroutine(AttackCoroutine(attacker.GetComponent<Unit>(), target.GetComponent<Unit>()));
-            }
-        }
-        else
-        {
-            ChangeAttackType(); // Resetuje szarżę
-
-            Debug.Log("Zbyt mała odległość na wykonanie szarży.");
-        }
+    private IEnumerator ChargeCoroutine(GameObject attacker, GameObject target)
+    {
+        if (attacker == null || target == null) yield break;
+        GameObject tile = GetTileAdjacentToTarget(attacker, target);
+        if (tile == null || attacker.GetComponent<Unit>().Prone) yield break;
+        List<Vector2> path = MovementManager.Instance.FindPath(attacker.transform.position, tile.transform.position);
+        Stats stats = attacker.GetComponent<Stats>();
+        if (path.Count < stats.Sz / 2f || path.Count > stats.TempSz) { ChangeAttackType(); yield break; }
+        if (!GameManager.IsAutoCombatMode) SaveAndLoadManager.Instance.SaveUnits(UnitsManager.Instance.AllUnits, "autosave");
+        MovementManager.Instance.MoveSelectedUnit(tile, attacker);
+        yield return new WaitUntil(() => !MovementManager.Instance.IsMoving);
+        if (attacker != null && target != null)
+            yield return StartCoroutine(AttackCoroutine(attacker.GetComponent<Unit>(), target.GetComponent<Unit>()));
     }
 
     // Szuka wolnej pozycji obok celu szarży, do której droga postaci jest najkrótsza
@@ -2323,7 +2303,14 @@ public class CombatManager : MonoBehaviour
         StartCoroutine(GrapplingActionCoroutine(attacker, target));
     }
 
-    private IEnumerator GrapplingActionCoroutine(Unit attacker, Unit target)
+    public IEnumerator GrapplingForAI(Unit attacker, Unit target, string choice)
+    {
+        if (attacker == null || target == null || !RoundsManager.Instance.CanUnitAct(attacker)) yield break;
+        ChangeAttackType("Grappling");
+        yield return StartCoroutine(GrapplingActionCoroutine(attacker, target, choice));
+    }
+
+    private IEnumerator GrapplingActionCoroutine(Unit attacker, Unit target, string automaticChoice = null)
     {
         //bool isGrappler = (attacker.EntangledUnitId == target.UnitId);
         //bool isGrappled = (attacker.UnitId == target.EntangledUnitId);
@@ -2357,13 +2344,15 @@ public class CombatManager : MonoBehaviour
         // Walka w pochwyceniu
         if (AttackTypes["Grappling"] == true && attacker.GrappledUnitId == target.UnitId)
         {
-            // Pokaż panel
-            _grapplingActionChoice = "";
-            _grapplingActionPanel.SetActive(true);
-            _escapeGrappleButton.gameObject.SetActive(false);
-            _releaseGrappleButton.gameObject.SetActive(true);
-
-            yield return new WaitUntil(() => !_grapplingActionPanel.activeSelf);
+            if (automaticChoice != null) _grapplingActionChoice = automaticChoice;
+            else
+            {
+                _grapplingActionChoice = "";
+                _grapplingActionPanel.SetActive(true);
+                _escapeGrappleButton.gameObject.SetActive(false);
+                _releaseGrappleButton.gameObject.SetActive(true);
+                yield return new WaitUntil(() => !_grapplingActionPanel.activeSelf);
+            }
 
             if (_grapplingActionChoice == "release")
             {
@@ -2386,13 +2375,15 @@ public class CombatManager : MonoBehaviour
         }
         else if (AttackTypes["Grappling"] == true && target.GrappledUnitId == attacker.UnitId)
         {
-            // Pokaż panel
-            _grapplingActionChoice = "";
-            _grapplingActionPanel.SetActive(true);
-            _escapeGrappleButton.gameObject.SetActive(true);
-            _releaseGrappleButton.gameObject.SetActive(false);
-
-            yield return new WaitUntil(() => !_grapplingActionPanel.activeSelf);
+            if (automaticChoice != null) _grapplingActionChoice = automaticChoice;
+            else
+            {
+                _grapplingActionChoice = "";
+                _grapplingActionPanel.SetActive(true);
+                _escapeGrappleButton.gameObject.SetActive(true);
+                _releaseGrappleButton.gameObject.SetActive(false);
+                yield return new WaitUntil(() => !_grapplingActionPanel.activeSelf);
+            }
 
             if (_grapplingActionChoice == "escape")
             {
@@ -2679,7 +2670,7 @@ public class CombatManager : MonoBehaviour
         if (Unit.SelectedUnit == null) yield break;
         if (!RoundsManager.Instance.CanUnitAct(Unit.SelectedUnit.GetComponent<Unit>())) yield break;
 
-        Weapon weapon = Unit.SelectedUnit.GetComponent<Inventory>().EquippedWeapons[0];
+        Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(Unit.SelectedUnit);
         Stats stats = Unit.SelectedUnit.GetComponent<Stats>();
 
         if (weapon == null || weapon.ReloadLeft == 0)

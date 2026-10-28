@@ -1269,6 +1269,11 @@ public class UnitsManager : MonoBehaviour
     #region Update unit panel (at the top of the screen)
     public void UpdateUnitPanel(GameObject unit)
     {
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsFastSimulation)
+        {
+            if (unit != null && unit.GetComponent<Stats>().Spellcasting > 0 && unit.GetComponent<Spell>() == null) unit.AddComponent<Spell>();
+            return;
+        }
         if (unit == null || SaveAndLoadManager.Instance.IsLoading)
         {
             _unitPanel.SetActive(false);

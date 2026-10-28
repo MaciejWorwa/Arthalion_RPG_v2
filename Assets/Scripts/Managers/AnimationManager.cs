@@ -121,6 +121,7 @@ public class AnimationManager : MonoBehaviour
     #region Unit actions animations
     public IEnumerator PlayAnimation(string animationName, GameObject attacker = null, GameObject target = null, int damage = 0)
     {   
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsFastSimulation) yield break;
         if(GameManager.IsShowAnimationsMode == false) yield break;
 
         if (attacker != null && !attacker.activeSelf && attacker.GetComponent<Unit>().HasRider)

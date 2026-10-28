@@ -33,6 +33,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!Tests/CombatAI/CombatAI.csproj
 *.unityproj
 *.sln
 *.suo
@@ -71,3 +72,16 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Local AI training runtimes, checkpoints and builds
+/Tools/AI/.bootstrap/
+/Tools/AI/.venv/
+/Tools/AI/results/
+/Tools/AI/metrics/
+/Builds/AI/
+__pycache__/
+/Assets/Resources/PerformanceTestRunInfo.json*
+/Assets/Resources/PerformanceTestRunSettings.json*
+/Assets/ML-Agents/Timers/
+/Assets/ML-Agents/Timers.meta
+/Assets/ML-Agents.meta

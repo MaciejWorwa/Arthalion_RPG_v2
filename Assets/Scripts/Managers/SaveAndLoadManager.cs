@@ -540,7 +540,7 @@ public class SaveAndLoadManager : MonoBehaviour
             Vector3 position = new Vector3(unitData.position[0], unitData.position[1], unitData.position[2]);
 
             // Jezeli jest to proces uczenia AI to wczytujemy jednostki na losowych pozycjach
-            if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsLearning)
+            if (ReinforcementLearningManager.Instance != null && (ReinforcementLearningManager.Instance.IsLearning && !ReinforcementLearningManager.Instance.IsSessionActive))
             {
                 List<Vector2> availablePositions = GridManager.Instance.AvailablePositions();
 
@@ -795,7 +795,7 @@ public class SaveAndLoadManager : MonoBehaviour
 
         bool shouldAutoStartLearningRound =
             ReinforcementLearningManager.Instance != null
-            && ReinforcementLearningManager.Instance.IsLearning
+            && (ReinforcementLearningManager.Instance.IsLearning && !ReinforcementLearningManager.Instance.IsSessionActive)
             && GameManager.IsAutoCombatMode
             && string.Equals(CurrentGameName, "AIlearning", StringComparison.OrdinalIgnoreCase);
 
@@ -816,7 +816,7 @@ public class SaveAndLoadManager : MonoBehaviour
         _isSchedulingLearningAutoStart = false;
 
         if (IsLoading) yield break;
-        if (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning) yield break;
+        if (ReinforcementLearningManager.Instance == null || !(ReinforcementLearningManager.Instance.IsLearning && !ReinforcementLearningManager.Instance.IsSessionActive)) yield break;
         if (!GameManager.IsAutoCombatMode) yield break;
         if (!string.Equals(CurrentGameName, "AIlearning", StringComparison.OrdinalIgnoreCase)) yield break;
         if (RoundsManager.Instance == null) yield break;

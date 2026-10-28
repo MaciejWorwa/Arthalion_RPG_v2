@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -455,6 +455,28 @@ public class InventoryManager : MonoBehaviour
     }
 
     #region Grabing weapons
+    public bool EquipForAI(Unit unit, Weapon weapon, int hand, bool refreshUi = true)
+    {
+        if (unit == null || !Arthalion.AI.CombatActionRules.CanEquip(unit, weapon)) return false;
+        Inventory inventory = unit.GetComponent<Inventory>();
+        if (!inventory.AllWeapons.Contains(weapon)) return false;
+        Weapon[] hands = inventory.EquippedWeapons;
+        if (hands[0] != null && hands[0].TwoHanded) hands[0] = hands[1] = null;
+        for (int i = 0; i < 2; i++) if (hands[i] == weapon) hands[i] = null;
+        hands[hand] = weapon;
+        if (weapon.TwoHanded) hands[0] = hands[1] = weapon;
+        JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(weapon), unit.GetComponent<Weapon>());
+        unit.GetComponent<Weapon>().WeaponsWithReloadLeft = new Dictionary<int, int>(weapon.WeaponsWithReloadLeft);
+        unit.Stats.Overall = unit.Stats.CalculateOverall();
+        if (refreshUi && Unit.SelectedUnit == unit.gameObject &&
+            (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsFastSimulation))
+        {
+            UpdateInventoryDropdown(inventory.AllWeapons, true);
+            CheckForEquippedWeapons(unit);
+        }
+        return true;
+    }
+
     public void GrabWeapon(int selectedIndex = 0)
     {
         if (Unit.SelectedUnit == null || InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count == 0) return;
@@ -1311,7 +1333,7 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    public void CheckForEquippedWeapons(Unit unit = null)
+    public void CheckForEquippedWeapons(Unit unit = null, bool refreshUi = true)
     {
         if (unit == null && Unit.SelectedUnit == null) return;
         else if(unit == null) unit = Unit.SelectedUnit.GetComponent<Unit>();
@@ -1369,6 +1391,7 @@ public class InventoryManager : MonoBehaviour
             }
         }
 
+        if (!refreshUi) return;
         for (int i = 0; i < allWeaponButtons.Count; i++)
         {
             // Tekst przycisku
@@ -1391,7 +1414,7 @@ public class InventoryManager : MonoBehaviour
             }
         }
 
-        if(unit == Unit.SelectedUnit.GetComponent<Unit>())
+        if(Unit.SelectedUnit != null && unit == Unit.SelectedUnit.GetComponent<Unit>())
         {
             UnitsManager.Instance.UpdateUnitPanel(Unit.SelectedUnit);
             LoadWeaponAttributes();
@@ -1408,8 +1431,10 @@ public class InventoryManager : MonoBehaviour
         Inventory inventory = unit.GetComponent<Inventory>();
 
         //Gdy postać trzyma broń w ręce, która jest oznaczona jako aktywna to atakuje za jej pomocą, w przeciwnym razie używa drugiej ręki
-        int otherHand = SelectedHand == 0 ? 1 : 0;
-        Weapon weapon = inventory.EquippedWeapons[SelectedHand] != null ? inventory.EquippedWeapons[SelectedHand] : inventory.EquippedWeapons[otherHand];
+        int hand = ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsSessionActive
+            ? unit.GetComponent<Unit>().AISelectedHand : SelectedHand;
+        int otherHand = hand == 0 ? 1 : 0;
+        Weapon weapon = inventory.EquippedWeapons[hand] != null ? inventory.EquippedWeapons[hand] : inventory.EquippedWeapons[otherHand];
 
         if (weapon == null || weapon.Broken)
         {

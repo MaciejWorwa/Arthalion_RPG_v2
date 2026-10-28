@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -197,7 +197,8 @@ public class MovementManager : MonoBehaviour
             float elapsedTime = 0f;
             float duration = 0.2f; // Czas trwania interpolacji
 
-            while (elapsedTime < duration && unitGameObject != null && !ReinforcementLearningManager.Instance.IsLearning)
+            while (elapsedTime < duration && unitGameObject != null &&
+                (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsFastSimulation))
             {
                 IsMoving = true;
 
@@ -228,10 +229,35 @@ public class MovementManager : MonoBehaviour
         }
 
         //Zaznacza jako zajęte faktyczne pole, na którym jednostka zakończy ruch, a nie pole do którego próbowała dojść
-        if (GameManager.IsAutoCombatMode || ReinforcementLearningManager.Instance.IsLearning)
+        if (GameManager.IsAutoCombatMode)
         {
             AutoCombatManager.Instance.CheckForTargetTileOccupancy(unitGameObject);
         }
+    }
+
+    public bool CanTraverseTile(Vector2 position, bool flying)
+    {
+        if (!GridManager.Instance.TryGetTileAtWorldPosition(position, out Tile tile) || !tile.gameObject.activeInHierarchy) return false;
+        return flying || !tile.IsOccupied;
+    }
+
+    public Dictionary<Vector2, int> GetReachableDistances(Unit unit, bool flying = false)
+    {
+        var distances = new Dictionary<Vector2, int>();
+        var queue = new Queue<Vector2>();
+        Vector2 start = unit.transform.position;
+        distances.Add(start, 0); queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            Vector2 current = queue.Dequeue();
+            foreach (Vector2 direction in PathDirections)
+            {
+                Vector2 next = current + direction;
+                if (distances.ContainsKey(next) || !CanTraverseTile(next, flying)) continue;
+                distances.Add(next, distances[current] + 1); queue.Enqueue(next);
+            }
+        }
+        return distances;
     }
 
     public List<Vector2> FindPath(Vector2 start, Vector2 goal)
@@ -297,17 +323,7 @@ public class MovementManager : MonoBehaviour
                     continue;
                 }
 
-                Collider2D collider = Physics2D.OverlapPoint(neighborPosition);
-                if (collider == null)
-                {
-                    continue;
-                }
-
-                bool isTile = collider.CompareTag("Tile") && !collider.gameObject.GetComponent<Tile>().IsOccupied;
-                if (!isTile && !isFlyingUnit)
-                {
-                    continue;
-                }
+                if (!CanTraverseTile(neighborPosition, isFlyingUnit)) continue;
 
                 int gCost = current.G + 1;
 

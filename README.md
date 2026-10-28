@@ -8,6 +8,12 @@ With hundreds of map assets, a flexible inventory system, and an intuitive inter
 You can download the game from the Releases section. Both Windows and Linux versions are available.
 Execute the StandaloneWindows64.exe or StandaloneLinux64.exe executable files, located in the downloaded .zip file, and enjoy!
 
+# Combat AI training
+
+Train a shared PPO combat policy locally and benchmark it against AutoCombatManager. See the [training and evaluation guide](Tools/AI/README.md) for the five-race starter scenarios, bounded training sessions, checkpoints and test battles.
+
+**Instrukcja po polsku:** [instalacja na drugim komputerze, trening, podgląd walk i wyników](INSTRUKCJA_TRENOWANIA_AI.md). The repository includes a portable PPO checkpoint in `Tools/AI/checkpoints/StarterV1.zip` for resuming training on another PC.
+
 # Environment
 
 The game was developed in Unity Engine. List of supported OS:

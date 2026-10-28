@@ -35,6 +35,16 @@ public class AutoCombatManager : MonoBehaviour
 
     [Header("Czy w Auto-Combacie jednostki powinny używać Szaleńczego Ataku?")]
     [SerializeField] private bool _allOutAttackEnabled = true;
+    private int _activeActions;
+    public bool IsActing => _activeActions > 0;
+    public void ResetActionTracking() { _activeActions = 0; }
+    private IEnumerator TrackAction(IEnumerator routine)
+    {
+        _activeActions++;
+        try { yield return StartCoroutine(routine); }
+        finally { _activeActions = Mathf.Max(0, _activeActions - 1); }
+    }
+
     public void Act(Unit unit)
     {
         Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
@@ -69,7 +79,7 @@ public class AutoCombatManager : MonoBehaviour
                         // Jeśli broń nie wymaga naladowania to wykonuje atak, w przeciwnym razie wykonuje przeładowanie
                         if (weapon.ReloadLeft == 0)
                         {
-                            StartCoroutine(ExecuteAttack(unit, closestOpponent, weapon, distance));
+                            StartCoroutine(TrackAction(ExecuteAttack(unit, closestOpponent, weapon, distance)));
                         }
                         else
                         {
@@ -84,7 +94,7 @@ public class AutoCombatManager : MonoBehaviour
                         // Jeśli broń nie wymaga naladowania to wykonuje atak, w przeciwnym razie wykonuje przeładowanie
                         if (weapon.ReloadLeft == 0)
                         {
-                            StartCoroutine(AttemptToChangeDistanceAndAttack(unit, closestOpponent, weapon));
+                            StartCoroutine(TrackAction(AttemptToChangeDistanceAndAttack(unit, closestOpponent, weapon)));
                         }
                         else
                         {
@@ -97,11 +107,11 @@ public class AutoCombatManager : MonoBehaviour
                 }
             }
 
-            StartCoroutine(ExecuteAttack(unit, closestOpponent, weapon, distance));
+            StartCoroutine(TrackAction(ExecuteAttack(unit, closestOpponent, weapon, distance)));
         }
         else
         {
-            StartCoroutine(AttemptToChangeDistanceAndAttack(unit, closestOpponent, weapon));
+            StartCoroutine(TrackAction(AttemptToChangeDistanceAndAttack(unit, closestOpponent, weapon)));
         }
     }
 
@@ -126,38 +136,20 @@ public class AutoCombatManager : MonoBehaviour
             //Dobycie broni, jeśli obecna broń uniemożliwia walkę w zwarciu.
             if (!weapon.Type.Contains("melee"))
             {
-                // Sprawdzenie, czy jednostka posiada więcej niż jedną broń
-                if (InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count > 1)
+                var melee = unit.GetComponent<Inventory>().AllWeapons.FirstOrDefault(w =>
+                    w != null && w.Id != 0 && w.Type.Contains("melee") && Arthalion.AI.CombatActionRules.CanEquip(unit, w));
+                if (melee != null)
                 {
-                    SaveAndLoadManager.Instance.IsLoading = true;
-                    int selectedIndex = 1;
-
-                    //  Zmienia bronie dopóki nie znajdzie takiej, którą może walczyć w zwarciu
-                    for (int i = 0; i < InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons.Count; i++)
-                    {
-                        if (weapon.Type.Contains("melee") && weapon.Id != 0) break;
-
-                        InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SetSelectedIndex(selectedIndex);
-                        InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedButton = InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().Buttons[selectedIndex - 1];
-
-                        InventoryManager.Instance.GrabWeapon();
-                        weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-
-                        selectedIndex++;
-                    }
-
-                    Debug.Log($"{unit.GetComponent<Stats>().Name} dobył/a {weapon.Name}.");
-                    SaveAndLoadManager.Instance.IsLoading = false;
+                    InventoryManager.Instance.EquipForAI(unit, melee, 0);
+                    weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
                 }
-                else // Oddala się od przeciwnika
+                else
                 {
                     MoveAwayFromOpponent(unit, closestOpponent);
-
-                    // Czeka aż ruch się zakończy
-                    yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false);
-
-                    //Ponownie sprawdza, czy można wykonać atak dystansowy
-                    if (CombatManager.Instance.ValidateRangedAttack(unit, closestOpponent.GetComponent<Unit>(), weapon, distance) == false) yield break;
+                    yield return new WaitUntil(() => !MovementManager.Instance.IsMoving);
+                    if (unit == null || closestOpponent == null) yield break;
+                    distance = CombatManager.Instance.CalculateDistance(unit.gameObject, closestOpponent);
+                    if (!CombatManager.Instance.ValidateRangedAttack(unit, closestOpponent.GetComponent<Unit>(), weapon, distance)) yield break;
                 }
             }
 
@@ -215,7 +207,7 @@ public class AutoCombatManager : MonoBehaviour
         else if (path.Count < movementRange / 2 && path.Count > 0 && unit.CanDoAction && unit.CanMove) //Wykonuje ruch w kierunku przeciwnika, a następnie atak
         {
             // Uruchomia korutynę odpowiedzialną za ruch i atak
-            StartCoroutine(MoveAndAttack(unit, targetTile, closestOpponent.GetComponent<Unit>(), weapon));
+            StartCoroutine(TrackAction(MoveAndAttack(unit, targetTile, closestOpponent.GetComponent<Unit>(), weapon)));
         }
         else if (path.Count > 0) // Wykonuje ruch w kierunku przeciwnika
         {
@@ -270,7 +262,7 @@ public class AutoCombatManager : MonoBehaviour
         yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false);
 
         // Atak
-        StartCoroutine(ExecuteAttack(unit, closestOpponent.gameObject, weapon, 1f));
+        StartCoroutine(TrackAction(ExecuteAttack(unit, closestOpponent.gameObject, weapon, 1f)));
     }
 
     private void MoveAwayFromOpponent(Unit unit, GameObject closestOpponent)

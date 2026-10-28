@@ -140,7 +140,7 @@ class GameManager {
     public static bool IsAutoDiceRollingMode=true,IsAutoCombatMode,IsStatsHidingMode,IsHealthPointsHidingMode,IsAutoKillMode,IsGamePaused;
     public void RefreshPauseState(){}
 }
-class ReinforcementLearningManager { public static ReinforcementLearningManager Instance; public bool IsLearning; }
+class ReinforcementLearningManager { public static ReinforcementLearningManager Instance; public bool IsLearning; public bool ControlsUnit(Unit unit)=>false; public int ChooseReaction(Unit unit,int phase,int[] choices)=>choices[0]; }
 class SaveAndLoadManager {
     public static SaveAndLoadManager Instance=new SaveAndLoadManager(); public bool IsLoading;
     public void SaveUnits(List<Unit> units,string name){RoundsManager.Instance.Actions++;}
@@ -212,6 +212,7 @@ partial class GridManager {
     public void ResetColorOfTilesInMovementRange(){}
 }
 partial class AutoCombatManager:MonoBehaviour {
+    private IEnumerator TrackAction(IEnumerator routine)=>routine;
     public static AutoCombatManager Instance=new AutoCombatManager();
     public GameObject Opponent;
     public float Distance;
@@ -230,6 +231,7 @@ class Spell:Component {
     public List<KeyValuePair<string,int>> Attributes=new List<KeyValuePair<string,int>>();
 }
 partial class MagicManager:MonoBehaviour {
+    private List<GameObject> _automaticTargets; private string _automaticCriticalChoice;
     public string CriticalCastingString="";
     public string RequestedCritical;
     public static bool IsTargetSelecting;

@@ -263,192 +263,49 @@ public class RoundsManager : MonoBehaviour
 
     IEnumerator AutoCombat()
     {
-        bool shouldStartNextRound = false;
         NextRoundButton.gameObject.SetActive(false);
         _useFortunePointsButton.SetActive(false);
-
+        var learning = ReinforcementLearningManager.Instance;
+        bool experiment = learning != null && learning.IsSessionActive;
         while (true)
         {
             Unit unit = GetNextUnitForAutoCombat();
             if (unit == null) break;
-
-            // Wybór jednostki bez asynchronicznego wyścigu z SelectUnitByQueue.
-            if (Unit.SelectedUnit != unit.gameObject)
-            {
-                unit.SelectUnit();
-            }
-
-            if (!ReinforcementLearningManager.Instance.IsLearning)
-            {
-                yield return new WaitForSeconds(0.05f);
-            }
-
+            if (experiment && learning.CheckBattleResult() != Arthalion.AI.BattleResult.Ongoing) break;
+            if (Unit.SelectedUnit != unit.gameObject) unit.SelectUnit();
+            if (!experiment || !learning.IsFastSimulation) yield return new WaitForSeconds(0.05f);
             BeginTurn(unit);
             yield return new WaitUntil(() => !IsResolvingTurnStart);
             if (unit == null || unit.IsTurnFinished) continue;
-
-            // Jeśli jednostka to PlayerUnit i gramy w trybie ukrywania statystyk wrogów
-            if (unit.CompareTag("PlayerUnit") && GameManager.IsStatsHidingMode)
+            if (!experiment && unit.CompareTag("PlayerUnit") && GameManager.IsStatsHidingMode)
+                yield return new WaitUntil(() => unit == null || (!unit.CanDoAction && !unit.CanMove) || unit.IsTurnFinished);
+            else
             {
-                // Czeka aż jednostka zakończy swoją turę
-                yield return new WaitUntil(() => (unit.CanDoAction == false && unit.CanMove == false) || unit.IsTurnFinished);
-                if (!ReinforcementLearningManager.Instance.IsLearning)
-                {
-                    yield return new WaitForSeconds(0.6f);
-                }
-            }
-            else // Jednostki wrogów lub wszystkie jednostki, jeśli nie ukrywamy ich statystyk
-            {
-                if (ReinforcementLearningManager.Instance.IsLearning)
-                {
-                    if (unit.CompareTag("PlayerUnit"))
-                    {
-                        AutoCombatManager.Instance.Act(unit);
-                        yield return StartCoroutine(WaitForLearningStepResolution(unit));
-
-                        if (ReinforcementLearningManager.Instance.ConsumeStepTimeoutFlag() && !unit.IsTurnFinished)
-                        {
-                            FinishTurn(unit, false);
-                        }
-                    }
-                    else
-                    {
-                        int iterationCount = 0;
-                        int maxIterations = ReinforcementLearningManager.Instance.GetMaxLearningIterationsPerUnitTurn();
-
-                        while ((unit.CanDoAction || unit.CanMove) && !unit.IsTurnFinished && iterationCount < maxIterations)
-                        {
-                            ReinforcementLearningManager.Instance.SimulateUnit(unit);
-                            yield return StartCoroutine(WaitForLearningStepResolution(unit));
-
-                            if (ReinforcementLearningManager.Instance.ConsumeStepTimeoutFlag())
-                            {
-                                if (!unit.IsTurnFinished)
-                                {
-                                    FinishTurn(unit, false);
-                                }
-                                break;
-                            }
-
-                            iterationCount++;
-                        }
-
-                        if (iterationCount >= maxIterations && !unit.IsTurnFinished)
-                        {
-                            FinishTurn(unit, false);
-                        }
-                    }
-                }
+                if (experiment && learning.ControlsUnit(unit)) yield return learning.PlayUnitTurn(unit);
                 else
                 {
-                    // NORMALNA ROZGRYWKA
+                    if (experiment) InventoryManager.Instance.SelectedHand = unit.AISelectedHand = 0;
                     AutoCombatManager.Instance.Act(unit);
+                    if (experiment) yield return learning.WaitForResolution();
+                    else yield return new WaitUntil(() => !MovementManager.Instance.IsMoving && !CombatManager.Instance.IsAttackSequenceRunning && !AutoCombatManager.Instance.IsActing);
                 }
-
-                // Czeka, aż jednostka zakończy ruch
-                yield return new WaitUntil(() => MovementManager.Instance.IsMoving == false && (CombatManager.Instance == null || !CombatManager.Instance.IsAttackSequenceRunning));
-                if (!ReinforcementLearningManager.Instance.IsLearning)
-                {
-                    yield return new WaitForSeconds(0.6f);
-                }
-
-                if (!unit.IsTurnFinished && (unit.CanDoAction || unit.CanMove))
-                {
-                    FinishTurn(unit, false);
-                }
+                if (unit != null && !unit.IsTurnFinished) FinishTurn(unit, false);
+                if (!experiment || !learning.IsFastSimulation) yield return new WaitForSeconds(0.6f);
             }
         }
-
         NextRoundButton.gameObject.SetActive(true);
         _useFortunePointsButton.SetActive(true);
-
-        //DO SZKOLENIA AI
-        if (ReinforcementLearningManager.Instance.IsLearning)
-        {
-            // Sprawdź, czy któraś z drużyn już nie istnieje lub przekroczono limit tur
-            bool battleEnded = !ReinforcementLearningManager.Instance.BothTeamsExist() || RoundNumber > 50;
-            if (battleEnded)
-            {
-                // Wylicz zwycięzcę: true jeśli gracz wciąż ma jednostki, a enemy nie
-                bool playerUnitsExist = UnitsManager.Instance != null
-                    && UnitsManager.Instance.AllUnits != null
-                    && UnitsManager.Instance.AllUnits.Any(u =>
-                    {
-                        if (u == null || !u.CompareTag("PlayerUnit")) return false;
-                        Stats s = u.GetComponent<Stats>();
-                        return s != null && s.TempHealth > 0;
-                    });
-                bool enemyUnitsExist = UnitsManager.Instance != null
-                    && UnitsManager.Instance.AllUnits != null
-                    && UnitsManager.Instance.AllUnits.Any(u =>
-                    {
-                        if (u == null || !u.CompareTag("EnemyUnit")) return false;
-                        Stats s = u.GetComponent<Stats>();
-                        return s != null && s.TempHealth > 0;
-                    });
-                bool didAIWin = !playerUnitsExist && enemyUnitsExist;
-
-                // Terminalna nagroda dla wszystkich zapisanych akcji
-                ReinforcementLearningManager.Instance.GiveTerminalRewardToAll(didAIWin);
-
-                // Zaktualizuj licznik zwycięstw w UI i metryki epizodów
-                ReinforcementLearningManager.Instance.UpdateTeamWins();
-                ReinforcementLearningManager.Instance.NotifyEpisodeEnd(didAIWin);
-
-                // Wczytaj ponownie scenę/stan rozpoczynający kolejne epizody
-                if (!SaveAndLoadManager.Instance.IsLoading)
-                {
-                    SaveAndLoadManager.Instance.SetLoadingType("units");
-                    SaveAndLoadManager.Instance.LoadGame("AIlearning");
-                }
-            }
-
-            // Czekaj na zakończenie ładowania, potem leci dalej
-            yield return new WaitUntil(() => SaveAndLoadManager.Instance.IsLoading == false);
-
-            GridManager.Instance.CheckTileOccupancy();
-            shouldStartNextRound = true;
-        }
-
+        // This coroutine exclusively owns round advancement during an experiment.
+        // Clear its handle before resetting/loading, which cancels old round coroutines.
         _autoCombatCoroutine = null;
-
-        if (shouldStartNextRound)
+        if (experiment && learning.IsSessionActive)
         {
-            NextRound();
+            if (learning.CheckBattleResult(true) != Arthalion.AI.BattleResult.Ongoing)
+                yield return learning.CompleteEpisode();
+            if (learning.IsSessionActive && learning.AutoAdvanceRounds) NextRound();
         }
     }
 
-    private IEnumerator WaitForLearningStepResolution(Unit unit)
-    {
-        int timeoutFrames = ReinforcementLearningManager.Instance.GetLearningStepTimeoutFrames();
-        int settleFrames = ReinforcementLearningManager.Instance.GetLearningSettleFrames();
-        int waited = 0;
-
-        while (MovementManager.Instance.IsMoving)
-        {
-            if (waited >= timeoutFrames)
-            {
-                ReinforcementLearningManager.Instance.ReportLearningStepTimeout(unit);
-                yield break;
-            }
-
-            waited++;
-            yield return null;
-        }
-
-        for (int i = 0; i < settleFrames; i++)
-        {
-            if (waited >= timeoutFrames)
-            {
-                ReinforcementLearningManager.Instance.ReportLearningStepTimeout(unit);
-                yield break;
-            }
-
-            waited++;
-            yield return null;
-        }
-    }    
-    
     #region Units actions
     public bool DoAction(Unit unit, bool finishTurnIfNoActions = true)
     {
@@ -545,6 +402,7 @@ public class RoundsManager : MonoBehaviour
     public void FinishTurn(Unit unit, bool selectNextUnit = true)
     {
         if (unit == null || IsResolvingTurnStart) return;
+        if (GameManager.IsAutoCombatMode) selectNextUnit = false;
 
         if (unit.IsTurnFinished)
         {
@@ -728,24 +586,15 @@ public class RoundsManager : MonoBehaviour
 
     public void TryAdvanceRoundIfComplete()
     {
-        if (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning) return;
-        if (_isRoundAdvanceScheduled || _isRoundGenerationInProgress) return;
-        if (RoundNumber <= 0) return;
-        if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
-        if (!AreAllTurnsFinished()) return;
-        if (!IsBattleStillOngoing()) return;
-
-        _isRoundAdvanceScheduled = true;
-        StartCoroutine(AdvanceRoundWhenReady());
+        // AutoCombat owns automatic advancement. Manual advancement has its own path.
     }
-
 
     private void TryAdvanceRoundAfterManualFinish()
     {
         if (_isRoundAdvanceScheduled || _isRoundGenerationInProgress) return;
         if (RoundNumber <= 0) return;
         if (SaveAndLoadManager.Instance != null && SaveAndLoadManager.Instance.IsLoading) return;
-        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsLearning) return;
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsSessionActive) return;
         if (!AreAllTurnsFinished()) return;
         if (!IsBattleStillOngoing()) return;
 
@@ -765,7 +614,7 @@ public class RoundsManager : MonoBehaviour
 
         _isRoundAdvanceScheduled = false;
 
-        if ((ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning) && GameManager.IsAutoCombatMode)
+        if ((ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsSessionActive) && GameManager.IsAutoCombatMode)
         {
             yield break;
         }
@@ -791,7 +640,7 @@ public class RoundsManager : MonoBehaviour
 
         _isRoundAdvanceScheduled = false;
 
-        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsLearning)
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsSessionActive)
         {
             yield break;
         }

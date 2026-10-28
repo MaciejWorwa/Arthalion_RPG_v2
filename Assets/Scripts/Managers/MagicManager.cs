@@ -115,8 +115,26 @@ public class MagicManager : MonoBehaviour
         StartCoroutine(CastSpell());
     }
 
+    private List<GameObject> _automaticTargets;
+    private string _automaticCriticalChoice;
+
+    public IEnumerator CastSpellForAI(Unit caster, SpellData spell, List<GameObject> targets, string criticalChoice)
+    {
+        if (caster == null || targets.Count == 0 || !caster.CanDoAction || !caster.CanCastSpell) yield break;
+        if (!RoundsManager.Instance.CanUnitAct(caster)) yield break;
+        JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(spell), caster.GetComponent<Spell>());
+        _automaticTargets = new List<GameObject>(targets);
+        _automaticCriticalChoice = criticalChoice;
+        if (!RoundsManager.Instance.DoAction(caster)) { _automaticTargets = null; yield break; }
+        yield return StartCoroutine(CastSpell());
+    }
+
     public IEnumerator CastSpell()
     {
+        var automaticTargets = _automaticTargets;
+        string automaticCriticalChoice = _automaticCriticalChoice;
+        _automaticTargets = null;
+        bool automated = automaticTargets != null;
         if (Unit.SelectedUnit == null) yield break;
 
         Stats stats = Unit.SelectedUnit.GetComponent<Stats>();
@@ -164,11 +182,12 @@ public class MagicManager : MonoBehaviour
         // Krytyczne rzucenie zaklęcia
         if (DiceRollManager.Instance.IsDoubleDigit(castingTest[0], castingTest[1]))
         {
-            StartCoroutine(GodsWrath(stats, spell.CastingNumber));
+            yield return StartCoroutine(GodsWrath(stats, spell.CastingNumber));
 
             if(!spellFailed)
             {
-                CriticalCasting(spell);
+                if (automated) CriticalCastingString = automaticCriticalChoice;
+                else CriticalCasting(spell);
             }
         }
 
@@ -182,7 +201,12 @@ public class MagicManager : MonoBehaviour
 
         GridManager.Instance.ResetColorOfTilesInMovementRange();
 
-        IsTargetSelecting = true;
+        IsTargetSelecting = !automated;
+        if (automated)
+        {
+            Targets.Clear();
+            foreach (GameObject target in automaticTargets.Take(Mathf.Max(1, spell.Targets) * (CriticalCastingString == "target" ? 2 : 1))) Targets.Add(target);
+        }
         _targetsStats.Clear();
 
         //Zmienia kolor przycisku na aktywny
@@ -190,9 +214,9 @@ public class MagicManager : MonoBehaviour
 
         Debug.Log("Kliknij prawym przyciskiem myszy na jednostkę, która ma być celem zaklęcia.");
 
-        if (CriticalCastingString == "target") spell.Targets *= 2;
 
-        while (Targets.Count < spell.Targets)
+
+        while (!automated && Targets.Count < spell.Targets)
         {
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) break;
             yield return null;
@@ -235,7 +259,7 @@ public class MagicManager : MonoBehaviour
             // Wywołanie efektu zaklęcia
             foreach (var collider in allTargets)
             {
-                StartCoroutine(HandleSpellEffect(stats, collider.GetComponent<Stats>(), spell, rollResult, castingTest));
+                yield return StartCoroutine(HandleSpellEffect(stats, collider.GetComponent<Stats>(), spell, rollResult, castingTest));
             }
         }  
 

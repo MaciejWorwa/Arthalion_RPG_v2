@@ -387,6 +387,7 @@ public class GridManager : MonoBehaviour
 
     public void HighlightTilesInMovementRange(Stats unitStats)
     {
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsFastSimulation) return;
         ResetColorOfTilesInMovementRange();
 
         if ((GameManager.IsAutoCombatMode && !(unitStats.CompareTag("PlayerUnit") && GameManager.IsStatsHidingMode)) || Unit.SelectedUnit == null || (!Unit.SelectedUnit.GetComponent<Unit>().CanMove && !Unit.SelectedUnit.GetComponent<Unit>().IsRunning))

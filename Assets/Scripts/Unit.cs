@@ -62,10 +62,17 @@ public class Unit : MonoBehaviour
     public Unit Mount; // Wierzchowiec
     public bool IsMounted; // Zmienna określająca, czy jednostka w danej chwili dosiada wierzchowca, czy nie
     public bool HasRider; // Zmienna określająca, czy jednostka w danej chwili jest przez kogoś dosiadana
+    [System.NonSerialized] public bool RestoredByLearning;
+    [System.NonSerialized] public int AISelectedHand;
 
     void Start()
     {
         Stats = GetComponent<Stats>();
+        if (RestoredByLearning)
+        {
+            DisplayUnitName(); DisplayUnitHealthPoints();
+            return;
+        }
 
         DisplayUnitName();
 
@@ -130,6 +137,7 @@ public class Unit : MonoBehaviour
     }
     public void SelectUnit()
     {
+        bool fast = ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsFastSimulation;
         if (!gameObject.activeSelf) return;
         if (RoundsManager.Instance != null && RoundsManager.Instance.IsResolvingTurnStart
             && (RoundsManager.Instance.TurnStartUnit != this || SelectedUnit == gameObject)) return;
@@ -139,9 +147,12 @@ public class Unit : MonoBehaviour
             SelectedUnit = this.gameObject;
 
             //Odświeża listę ekwipunku
-            InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedIndex = 0;
-            InventoryManager.Instance.UpdateInventoryDropdown(SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
-            InventoryManager.Instance.DisplayEncumbrance(Stats);
+            if (!fast)
+            {
+                InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedIndex = 0;
+                InventoryManager.Instance.UpdateInventoryDropdown(SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
+                InventoryManager.Instance.DisplayEncumbrance(Stats);
+            }
 
             CombatManager.Instance.SetActionsButtonsInteractable();
         }
@@ -170,9 +181,12 @@ public class Unit : MonoBehaviour
             MovementManager.Instance.Retreat(false); //Resetuje bezpieczny odwrót    
 
             //Odświeża listę ekwipunku
-            InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedIndex = 0;
-            InventoryManager.Instance.UpdateInventoryDropdown(SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
-            InventoryManager.Instance.DisplayEncumbrance(Stats);
+            if (!fast)
+            {
+                InventoryManager.Instance.InventoryScrollViewContent.GetComponent<CustomDropdown>().SelectedIndex = 0;
+                InventoryManager.Instance.UpdateInventoryDropdown(SelectedUnit.GetComponent<Inventory>().AllWeapons, true);
+                InventoryManager.Instance.DisplayEncumbrance(Stats);
+            }
         }
         IsSelected = SelectedUnit == this.gameObject;
         ChangeUnitColor(this.gameObject);
@@ -182,7 +196,8 @@ public class Unit : MonoBehaviour
             if (this == null) return; // Podpalenie mogło usunąć jednostkę.
         }
 
-        if(IsSelected && !IsTurnFinished && Entangled && !Grappled && CanDoAction)
+        if(IsSelected && !IsTurnFinished && Entangled && !Grappled && CanDoAction &&
+            (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.ControlsUnit(this)))
         {
             Stats entanglingUnitStats = null;
             foreach (var u in UnitsManager.Instance.AllUnits)
@@ -261,6 +276,11 @@ public class Unit : MonoBehaviour
             if (Mount.GetComponent<Stats>().Flight != 0) Stats.TempSz = Mount.GetComponent<Stats>().Flight;
         }
 
+        if (fast)
+        {
+            InitiativeQueueManager.Instance.UpdateInitiativeQueue();
+            return;
+        }
         GridManager.Instance.HighlightTilesInMovementRange(Stats);
 
         //Wczytuje osiągnięcia jednostki

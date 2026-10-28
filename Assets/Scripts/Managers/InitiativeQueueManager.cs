@@ -1,4 +1,4 @@
-﻿﻿using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -117,6 +117,12 @@ public class InitiativeQueueManager : MonoBehaviour
         //Sortowanie malejÄ…co wedĹ‚ug wartoĹ›ci inicjatywy
         InitiativeQueue = InitiativeQueue.OrderByDescending(pair => pair.Value).ToDictionary(pair => pair.Key, pair => pair.Value);
 
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.IsFastSimulation)
+        {
+            ActiveUnit = InitiativeQueue.FirstOrDefault(p => p.Key != null && !p.Key.IsTurnFinished && (p.Key.CanDoAction || p.Key.CanMove)).Key;
+            RoundsManager.Instance?.BeginTurn(ActiveUnit);
+            return;
+        }
         DisplayInitiativeQueue();
     }
 

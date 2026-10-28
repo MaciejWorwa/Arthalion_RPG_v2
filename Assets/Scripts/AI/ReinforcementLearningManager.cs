@@ -1,1528 +1,458 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using System.Linq;
-using System.IO;
-using System;
+using System.Diagnostics;
 using System.Globalization;
-using UnitStates;
+using System.IO;
+using System.Linq;
+using Arthalion.AI;
 using TMPro;
+using Unity.InferenceEngine;
+using Unity.MLAgents;
+using Unity.MLAgents.Actuators;
+using Unity.MLAgents.Policies;
+using Unity.MLAgents.Sensors;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
 
-namespace UnitStates
-{
-    public enum AIState
-    {
-        CanDoAction,
-        CanMove,
-        IsHeavilyWounded,
-        IsTargetHeavilyWounded,
-        IsStrongerThanTarget,
-        IsBeyondAttackRange,
-        IsInChargeRange,
-        HasRangedWeapon,
-        WeaponIsLoaded,
-        TargetBehindObstacle,
-        IsAiming,
-
-        COUNT
-    }
-}
-
-public enum TargetType
-{
-    None = 0,
-    Closest,
-    Furthest,
-    MostInjured,
-    LeastInjured,
-    Weakest,
-    Strongest,
-    MostAlliesNearby
-}
-
-public enum AttackType
-{
-    Move = 0,
-    Run,
-    Null,
-    Charge,
-    AllOutAttack,
-    Aim,
-    Reload,
-    FinishTurn,
-    MoveAway,
-    RunAway,
-    Retreat,
-    ChangeWeaponToRanged,
-    ChangeWeaponToMelee
-}
-
-public class ActionDefinition
-{
-    public TargetType targetType;
-    public AttackType attackType;
-
-    public ActionDefinition(TargetType t, AttackType a)
-    {
-        targetType = t;
-        attackType = a;
-    }
-}
-
+// Retains the existing scene component/GUID and UI event methods. Legacy Q tables
+// are deliberately never loaded into the new, incompatible observation schema.
 public class ReinforcementLearningManager : MonoBehaviour
 {
     public static ReinforcementLearningManager Instance { get; private set; }
-
-    [Header("Q-learning parameters")]
-    public float Alpha = 0.1f;
-    public float Gamma = 0.9f;
-    public float Epsilon = 0.2f;
-    public float EpsilonStart = 1.0f;
-    public float EpsilonEnd = 0.05f;
-    public int EpsilonDecayEpochs = 1000;
-
-    public float StepPenalty = -0.2f;
-
-    private int currentEpoch = 0;
-
-    [Header("Logging Parameters")]
-    public int ActionsPerEpoch = 500;
-    public SimpleGraph simpleGraph;
-    [Tooltip("Co ile epok zapisywac automatycznie Q-tabele. 0 = brak autozapisu.")]
-    public int AutoSaveEveryEpochs = 10;
-    [Header("Training Debug")]
+    [Header("Policy and experiment")]
+    public LearningMode Mode = LearningMode.Disabled;
+    public LearningOpponent Opponent = LearningOpponent.AutoCombat;
+    public LearningSide ControlledSide = LearningSide.Enemy;
+    public ModelAsset Model;
+    public string ModelLabel = "unassigned";
+    public bool FastSimulation = true;
+    public bool AutoAdvanceRounds = true;
+    [Tooltip("Explicit smoke test only: uniformly random LEGAL actions, never a trained AI.")]
+    public bool RandomPolicySmokeTest;
+    [Header("Episodes")]
+    public int Seed = 12345;
+    [Min(1)] public int MaxRounds = 50;
+    [Min(0)] public int EpisodeLimit;
+    public bool SwapControlledSide = true;
+    public bool RandomizePositions = true;
+    public bool RandomizeEquipment = true;
+    [Tooltip("Optional saved scenarios, e.g. AIlearning. Empty = capture the current battle.")]
+    public string[] ScenarioNames = Array.Empty<string>();
+    public bool PotentialShaping = true;
+    [Min(1)] public int MaxCommandsPerUnitTurn = 64;
+    [Min(1)] public float ResolutionTimeoutSeconds = 20;
+    public bool TraceCommands;
     [SerializeField] private TMP_Text _trainingDebugDisplay;
-    [Min(1)] public int LearningSettleFrames = 2;
-    [Min(10)] public int LearningStepTimeoutFrames = 240;
-    [Min(1)] public int MaxLearningIterationsPerUnitTurn = 8;
-    public bool EnableStepCsvLogging = true;
-
-    [Header("Periodic Evaluation")]
-    public bool EnablePeriodicEvaluation = true;
-    [Min(1)] public int EvaluateEveryEpisodes = 50;
-    [Min(1)] public int EvaluationEpisodesCount = 20;
-
-    private int _totalEpisodeCount = 0;
-    private int _trainingEpisodeCount = 0;
-    private int _evaluationEpisodeCount = 0;
-    private int _globalStepIndex = 0;
-    private int _currentEpisodeStepCount = 0;
-    private int _invalidActionCount = 0;
-    private int _noOpStepCount = 0;
-    private int _timeoutCount = 0;
-    private float _currentEpisodeReward = 0f;
-
-    private bool _isEvaluationMode = false;
-    private int _evaluationEpisodesLeft = 0;
-    private int _evaluationWins = 0;
-    private int _evaluationPlayed = 0;
-    private bool _stepTimeoutFlag = false;
-
-    private readonly Queue<int> _recentEpisodeWins = new();
-    private readonly Queue<float> _recentEpisodeRewards = new();
-    private const int RECENT_EPISODES_WINDOW = 100;
-
-    private string _currentRunFolder = string.Empty;
-    private string _stepLogPath = string.Empty;
-    private List<float> epochRewards = new List<float>();
-    private float currentEpochReward = 0f;
-    private int actionsThisEpoch = 0;
-
-    private const float WIN_REWARD = 100f;
-    private const float LOSS_REWARD = -30f;
-
-    [SerializeField] private int _playerWins;
-    [SerializeField] private int _enemyWins;
     [SerializeField] private TMP_Text _teamWinsDisplay;
+    public SimpleGraph simpleGraph;
+    [HideInInspector] public bool IsLearning; // compatibility for old Inspector bindings
 
-    private const int ACTION_COUNT = 43;
+    public bool IsSessionActive { get; private set; }
+    public bool IsRunningEpisodes => IsSessionActive && (Mode == LearningMode.Training || Mode == LearningMode.Evaluation);
+    public bool IsFastSimulation => IsSessionActive && FastSimulation;
+    public bool IsExecutingCommand { get; private set; }
+    public bool IsResetting { get; private set; }
+    public bool ExternalPolicy { get; private set; }
+    public List<SpellData> Spells { get; private set; } = new List<SpellData>();
+    public string RunFolder { get; private set; }
+    public int CompletedEpisodes { get; private set; }
+    public int Wins { get; private set; }
+    public int Losses { get; private set; }
+    public int Draws { get; private set; }
+    public int Aborts { get; private set; }
+    public int Commands { get; private set; }
+    public long PolicyDecisions { get; private set; }
+    public BattleResult LastResult { get; private set; }
+    private CombatLearningAgent _player, _enemy;
+    private TrainingBattleSnapshot _snapshot;
+    private StreamWriter _episodes, _steps;
+    private readonly Stopwatch _wallClock = new Stopwatch();
+    private readonly float[] _lastPotential = new float[2];
+    private readonly bool[] _hasDecision = new bool[2];
+    private float _initialPlayerHealth, _initialEnemyHealth;
+    private long _episodeStartDecisions;
+    private int _episodeCommands, _scenarioIndex, _episodeSeed;
+    private double _episodeStartTime;
+    private bool _starting, _stopRequested, _ownsAcademy, _previousAutoStep;
+    private bool _previousDice, _previousDefense, _previousAutoCombat, _previousKill, _previousStatsHiding;
+    private LogType _previousLogType;
+    private LearningMode _activeMode;
+    private string _failure;
+    private bool _settingsCaptured;
+    private int _previousFrameRate, _previousVSync;
+    private double _nextUiUpdate;
+    private bool _startupConfigurationApplied;
 
-    // ZMIANA: Zamiast float[,] używamy Dictionary.
-    // Klucz zewnętrzny: Rasa
-    // Klucz wewnętrzny: State Index (int)
-    // Wartość: Tablica Q-Values dla akcji (float[])
-    private Dictionary<string, Dictionary<int, float[]>> QTables = new Dictionary<string, Dictionary<int, float[]>>();
-
-    public bool IsLearning;
-    private bool _wasLearningEnabledLastFrame;
-    private HashSet<string> _trainedRaces = new HashSet<string>();
-
-    private struct LastStep
+    private string _runtimeException;
+    private void Awake()
     {
-        public string Race;
-        public int State;
-        public int Action;
-        public float ImmediateReward;
-        public Unit Target;
-        public bool TargetExisted;
-        public int PrevSelfHP;
-        public int PrevTargetHP;
-        public int TargetOverall;
-        public int ValidActionsCount;
-        public bool ForcedFallback;
-        public bool HasValue;
-    }
-
-    private readonly Dictionary<Unit, LastStep> _lastStepByUnit = new();
-
-    void Awake()
-    {
-        if (Instance == null) Instance = this;
+        if (Instance == null) { Instance = this; Application.logMessageReceived += CaptureRuntimeException; }
         else Destroy(gameObject);
     }
+    private void CaptureRuntimeException(string condition, string stack, LogType type)
+    { if (type == LogType.Exception && (_starting || IsSessionActive)) _runtimeException = condition + " " + stack; }
 
-    void Start()
+    private IEnumerator Start()
     {
-        _wasLearningEnabledLastFrame = IsLearning;
-        if (!IsLearning) return;
-
-        StartLearningSession(forceLoadFromDisk: true);
+        yield return null;
+        ApplyCommandLine();
+        _startupConfigurationApplied = true;
+        if (IsLearning && Mode == LearningMode.Disabled) Mode = LearningMode.Training;
+        if (Mode != LearningMode.Disabled) yield return StartConfiguredSession();
     }
 
-    void Update()
+    private void Update()
     {
-        if (IsLearning && !_wasLearningEnabledLastFrame)
+        if (!_startupConfigurationApplied) return;
+        if (_runtimeException != null)
         {
-            // Gdy IsLearning jest przełączone w runtime (np. toggle w Inspectorze),
-            // od razu dociągamy zapisane Q-tabele, żeby kontynuować trening.
-            StartLearningSession(forceLoadFromDisk: false);
+            string error = _runtimeException; _runtimeException = null;
+            if (_starting) StartupFailed(error); else if (IsSessionActive) Abort(error);
         }
-
-        _wasLearningEnabledLastFrame = IsLearning;
-
-        if (Input.GetKeyDown(KeyCode.R) && IsLearning) SaveQTables();
-    }
-
-    private void StartLearningSession(bool forceLoadFromDisk)
-    {
-        if (forceLoadFromDisk || QTables.Count == 0)
+        IsLearning = IsSessionActive && Mode == LearningMode.Training;
+        if (!_starting && Mode != _activeMode)
         {
-            LoadQTables();
+            if (Mode == LearningMode.Disabled) StopSession();
+            else if (!IsSessionActive) StartCoroutine(StartConfiguredSession());
+            else { Debug.LogWarning("[AI] Stop the current experiment before changing its mode."); Mode = _activeMode; }
         }
-
-        InitializeTrainingRun();
-        UpdateTrainingDebugUI();
+        if (IsSessionActive && Time.realtimeSinceStartupAsDouble >= _nextUiUpdate)
+        { UpdateTrainingUI(); _nextUiUpdate = Time.realtimeSinceStartupAsDouble + 0.5; }
     }
 
-    void OnApplicationQuit()
-    {
-        if (IsLearning) SaveQTables();
-    }
-    public int GetMaxLearningIterationsPerUnitTurn()
-    {
-        return Mathf.Max(1, MaxLearningIterationsPerUnitTurn);
-    }
+    [ContextMenu("AI/Start configured experiment")]
+    public void StartExperiment() { if (!_starting && !IsSessionActive) StartCoroutine(StartConfiguredSession()); }
 
-    public int GetLearningSettleFrames()
+    public IEnumerator StartConfiguredSession()
     {
-        return Mathf.Max(1, LearningSettleFrames);
-    }
-
-    public int GetLearningStepTimeoutFrames()
-    {
-        return Mathf.Max(10, LearningStepTimeoutFrames);
-    }
-
-    public bool ConsumeStepTimeoutFlag()
-    {
-        bool value = _stepTimeoutFlag;
-        _stepTimeoutFlag = false;
-        return value;
-    }
-
-    private float CurrentExplorationRate()
-    {
-        return _isEvaluationMode ? 0f : Epsilon;
-    }
-
-    public void ReportLearningStepTimeout(Unit unit)
-    {
-        _stepTimeoutFlag = true;
-        _timeoutCount++;
-        LogStepRow("timeout", unit, null, -1, 0f, 0f, 0f);
-        UpdateTrainingDebugUI();
-    }
-
-    public void NotifyEpisodeEnd(bool didAIWin)
-    {
-        _totalEpisodeCount++;
-
-        if (_isEvaluationMode)
+        if (_starting || IsSessionActive || Mode == LearningMode.Disabled) yield break;
+        _starting = true;
+        _settingsCaptured = true;
+        _previousFrameRate = Application.targetFrameRate; _previousVSync = QualitySettings.vSyncCount;
+        _previousDice = GameManager.IsAutoDiceRollingMode; _previousAutoCombat = GameManager.IsAutoCombatMode;
+        _previousDefense = GameManager.IsAutoDefenseMode;
+        _previousKill = GameManager.IsAutoKillMode; _previousStatsHiding = GameManager.IsStatsHidingMode;
+        _previousLogType = Debug.unityLogger.filterLogType;
+        GameManager.IsAutoDiceRollingMode = true; GameManager.IsAutoCombatMode = true;
+        GameManager.IsAutoDefenseMode = true;
+        GameManager.IsAutoKillMode = true; GameManager.IsStatsHidingMode = false;
+        GameManager.Instance?.HideActivePanels();
+        if (ScenarioNames.Length == 1 && ScenarioNames[0] == "@starter")
         {
-            _evaluationEpisodeCount++;
-            _evaluationPlayed++;
-            if (didAIWin) _evaluationWins++;
-            _evaluationEpisodesLeft--;
-
-            if (_evaluationEpisodesLeft <= 0)
-            {
-                float evalWinRate = _evaluationPlayed > 0 ? (float)_evaluationWins / _evaluationPlayed : 0f;
-                Debug.Log($"[RL] Evaluation finished: wins={_evaluationWins}/{_evaluationPlayed} ({evalWinRate:P1}).");
-                _isEvaluationMode = false;
-                _evaluationPlayed = 0;
-                _evaluationWins = 0;
-            }
+            yield return CombatTrainingPresets.EnsureCreated();
+            ScenarioNames = CombatTrainingPresets.Names;
         }
-        else
+        if (ScenarioNames.Length > 0)
         {
-            _trainingEpisodeCount++;
-            PushWindow(_recentEpisodeWins, didAIWin ? 1 : 0, RECENT_EPISODES_WINDOW);
-            PushWindow(_recentEpisodeRewards, _currentEpisodeReward, RECENT_EPISODES_WINDOW);
-
-            if (EnablePeriodicEvaluation && EvaluateEveryEpisodes > 0 && _trainingEpisodeCount % EvaluateEveryEpisodes == 0)
-            {
-                _isEvaluationMode = true;
-                _evaluationEpisodesLeft = Mathf.Max(1, EvaluationEpisodesCount);
-                _evaluationPlayed = 0;
-                _evaluationWins = 0;
-                Debug.Log($"[RL] Starting evaluation block: {_evaluationEpisodesLeft} episodes (epsilon=0, learning OFF).");
-            }
+            if (!Directory.Exists(Path.Combine(Application.persistentDataPath, ScenarioNames[0])))
+            { StartupFailed("Saved scenario does not exist: " + ScenarioNames[0]); yield break; }
+            SaveAndLoadManager.Instance.SetLoadingType("all"); SaveAndLoadManager.Instance.LoadGame(ScenarioNames[0]);
+            yield return new WaitUntil(() => !SaveAndLoadManager.Instance.IsLoading);
+            yield return null;
         }
-
-        _currentEpisodeReward = 0f;
-        _currentEpisodeStepCount = 0;
-        UpdateTrainingDebugUI();
-    }
-
-    private static void PushWindow<T>(Queue<T> queue, T value, int window)
-    {
-        queue.Enqueue(value);
-        while (queue.Count > window) queue.Dequeue();
-    }
-
-    private float GetRecentWinRate()
-    {
-        if (_recentEpisodeWins.Count == 0) return 0f;
-        return (float)_recentEpisodeWins.Average();
-    }
-
-    private float GetRecentEpisodeReward()
-    {
-        if (_recentEpisodeRewards.Count == 0) return 0f;
-        return _recentEpisodeRewards.Average();
-    }
-
-    private void UpdateTrainingDebugUI()
-    {
-        if (_trainingDebugDisplay == null) return;
-
-        string mode = _isEvaluationMode ? "EVAL" : "TRAIN";
-        float winRate = GetRecentWinRate() * 100f;
-        float avgReward = GetRecentEpisodeReward();
-        float invalidRate = _globalStepIndex > 0 ? (100f * _invalidActionCount / _globalStepIndex) : 0f;
-        float timeoutRate = _globalStepIndex > 0 ? (100f * _timeoutCount / _globalStepIndex) : 0f;
-        float noOpRate = _globalStepIndex > 0 ? (100f * _noOpStepCount / _globalStepIndex) : 0f;
-
-        _trainingDebugDisplay.text =
-                    $"Episodes T/E/All: {_trainingEpisodeCount}/{_evaluationEpisodeCount}/{_totalEpisodeCount}\n" +
-                    $"Epoch: {currentEpoch}\n" +
-                    $"WinRate(100): {winRate:F1}%  AvgReward(100): {avgReward:F2}\n" +
-                    $"Fallback%: {invalidRate:F1}  Timeout%: {timeoutRate:F1}  NoOp%: {noOpRate:F1}";
-    }
-
-    private void InitializeTrainingRun()
-    {
-        if (!EnableStepCsvLogging) return;
-
-        string root = Path.Combine(Application.persistentDataPath, "training_runs");
-        Directory.CreateDirectory(root);
-
-        _currentRunFolder = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-        Directory.CreateDirectory(_currentRunFolder);
-
-        _stepLogPath = Path.Combine(_currentRunFolder, "steps.csv");
-        File.WriteAllText(_stepLogPath,
-            "event;mode;episode;round;global_step;episode_step;unit_id;race;state;action;next_state;target_id;valid_actions;fallback;reward;old_q;new_q;epsilon;self_hp;target_hp\n");
-
-        Debug.Log($"[RL] Step log file: {_stepLogPath}");
-    }
-
-    private void LogStepRow(string eventType, Unit unit, LastStep? prevNullable, int nextState, float reward, float oldQ, float newQ)
-    {
-        if (!EnableStepCsvLogging || string.IsNullOrEmpty(_stepLogPath)) return;
-
-        LastStep prev = prevNullable ?? default;
-        int unitId = unit != null ? unit.UnitId : -1;
-        string race = (unit != null && unit.Stats != null && !string.IsNullOrEmpty(unit.Stats.Race))
-            ? unit.Stats.Race
-            : (!string.IsNullOrEmpty(prev.Race) ? prev.Race : "unknown");
-        int state = prev.State;
-        int action = prev.Action;
-        int targetId = prev.Target != null ? prev.Target.UnitId : -1;
-        int validActions = prev.ValidActionsCount;
-        int fallback = prev.ForcedFallback ? 1 : 0;
-        int selfHp = unit != null && unit.Stats != null ? unit.Stats.TempHealth : -1;
-        int targetHp = prev.Target != null && prev.Target.Stats != null ? prev.Target.Stats.TempHealth : -1;
-        string mode = _isEvaluationMode ? "EVAL" : "TRAIN";
-
-        string line = string.Join(";", new string[]
-        {
-            eventType,
-            mode,
-            _totalEpisodeCount.ToString(),
-            RoundsManager.RoundNumber.ToString(),
-            _globalStepIndex.ToString(),
-            _currentEpisodeStepCount.ToString(),
-            unitId.ToString(),
-            race,
-            state.ToString(),
-            action.ToString(),
-            nextState.ToString(),
-            targetId.ToString(),
-            validActions.ToString(),
-            fallback.ToString(),
-            F(reward),
-            F(oldQ),
-            F(newQ),
-            F(CurrentExplorationRate()),
-            selfHp.ToString(),
-            targetHp.ToString(),
-        });
-
-        File.AppendAllText(_stepLogPath, line + Environment.NewLine);
-    }
-
-    private static string F(float value)
-    {
-        return value.ToString("F4", CultureInfo.InvariantCulture);
-    }
-
-    // ======================================================================
-    //             DOSTĘP DO TABLICY Q (SPARSE MATRIX)
-    // ======================================================================
-
-    public void RegisterRace(string raceName)
-    {
-        if (string.IsNullOrEmpty(raceName)) return;
-        if (!QTables.ContainsKey(raceName))
-        {
-            QTables[raceName] = new Dictionary<int, float[]>();
-        }
-    }
-
-    // Pobiera tablicę wartości Q dla danego stanu. Jeśli stan nie istnieje, tworzy go.
-    private float[] GetStateQValues(string raceName, int stateIndex)
-    {
-        RegisterRace(raceName);
-        var raceTable = QTables[raceName];
-
-        if (!raceTable.ContainsKey(stateIndex))
-        {
-            // Leniwa inicjalizacja - tworzymy wpis tylko gdy jest potrzebny
-            raceTable[stateIndex] = new float[ACTION_COUNT];
-        }
-
-        return raceTable[stateIndex];
-    }
-
-    // ======================================================================
-    //                     PODSTAWOWE METODY Q-LEARNING
-    // ======================================================================
-
-    public int EncodeState(bool[] states)
-    {
-        int stateIndex = 0;
-        for (int i = 0; i < states.Length; i++)
-        {
-            if (states[i]) stateIndex |= (1 << i);
-        }
-        return stateIndex;
-    }
-
-    private bool[] DecodeState(int stateIndex)
-    {
-        int n = (int)AIState.COUNT;
-        bool[] s = new bool[n];
-        for (int i = 0; i < n; i++) s[i] = (stateIndex & (1 << i)) != 0;
-        return s;
-    }
-
-    public class ActionChoice
-    {
-        public int ActionId;
-        public Unit ChosenTarget;
-        public bool[] ChosenStates;
-        public int ValidActionCount;
-        public bool ForcedFallback;
-    }
-
-    // --- WYBÓR AKCJI ---
-    private ActionChoice ChooseValidActionEpsilonGreedy(ActionContext context, Unit unit)
-    {
-        float explorationRate = CurrentExplorationRate();
-
-        // 1. Eksploracja
-        if (UnityEngine.Random.value < explorationRate)
-        {
-            List<int> potentialActions = new List<int>();
-            for (int i = 0; i < ACTION_COUNT; i++)
-            {
-                Unit t = ResolveTargetFromAction(null, i, context.Info);
-                if (t != null || AllActions[i].targetType == TargetType.None)
-                {
-                    bool[] tempStates = DetermineStates(unit, t);
-                    if (IsActionValidForUnitAndTarget(unit, t, i, tempStates))
-                    {
-                        potentialActions.Add(i);
-                    }
-                }
-            }
-
-            if (potentialActions.Count > 0)
-            {
-                int rndIdx = potentialActions[UnityEngine.Random.Range(0, potentialActions.Count)];
-                Unit rndTarget = ResolveTargetFromAction(null, rndIdx, context.Info);
-                return new ActionChoice
-                {
-                    ActionId = rndIdx,
-                    ChosenTarget = rndTarget,
-                    ChosenStates = DetermineStates(unit, rndTarget),
-                    ValidActionCount = potentialActions.Count,
-                    ForcedFallback = false
-                };
-            }
-
-            return new ActionChoice
-            {
-                ActionId = (int)AttackType.FinishTurn,
-                ChosenTarget = null,
-                ChosenStates = DetermineStates(unit, null),
-                ValidActionCount = 0,
-                ForcedFallback = true
-            };
-        }
-
-        // 2. Eksploatacja
-        float maxQ = float.MinValue;
-        List<ActionChoice> bestChoices = new List<ActionChoice>();
-        int validActionsCount = 0;
-
-        for (int actId = 0; actId < AllActions.Length; actId++)
-        {
-            Unit potentialTarget = ResolveTargetFromAction(null, actId, context.Info);
-
-            if (AllActions[actId].targetType != TargetType.None && potentialTarget == null)
-                continue;
-
-            bool[] currentStates = DetermineStates(unit, potentialTarget);
-
-            if (!IsActionValidForUnitAndTarget(unit, potentialTarget, actId, currentStates))
-                continue;
-
-            validActionsCount++;
-            int stateIdx = EncodeState(currentStates);
-
-            float[] stateQValues = GetStateQValues(context.RaceName, stateIdx);
-            float q = stateQValues[actId];
-
-            if (q > maxQ)
-            {
-                maxQ = q;
-                bestChoices.Clear();
-                bestChoices.Add(new ActionChoice
-                {
-                    ActionId = actId,
-                    ChosenTarget = potentialTarget,
-                    ChosenStates = currentStates,
-                    ValidActionCount = validActionsCount,
-                    ForcedFallback = false
-                });
-            }
-            else if (Mathf.Abs(q - maxQ) < 0.001f)
-            {
-                bestChoices.Add(new ActionChoice
-                {
-                    ActionId = actId,
-                    ChosenTarget = potentialTarget,
-                    ChosenStates = currentStates,
-                    ValidActionCount = validActionsCount,
-                    ForcedFallback = false
-                });
-            }
-        }
-
-        if (bestChoices.Count > 0)
-        {
-            ActionChoice selected = bestChoices[UnityEngine.Random.Range(0, bestChoices.Count)];
-            selected.ValidActionCount = validActionsCount;
-            return selected;
-        }
-
-        return new ActionChoice
-        {
-            ActionId = (int)AttackType.FinishTurn,
-            ChosenTarget = null,
-            ChosenStates = DetermineStates(unit, null),
-            ValidActionCount = 0,
-            ForcedFallback = true
-        };
-    }
-
-    private bool IsActionValidForUnitAndTarget(Unit unit, Unit target, int actionId, bool[] states)
-    {
-        var def = AllActions[actionId];
-        var aType = def.attackType;
-
-        bool canMove = states[(int)AIState.CanMove];
-        bool canDoAction = states[(int)AIState.CanDoAction];
-        bool hasRanged = states[(int)AIState.HasRangedWeapon];
-        bool inCharge = states[(int)AIState.IsInChargeRange];
-        bool beyondAttack = states[(int)AIState.IsBeyondAttackRange];
-        bool isLoaded = states[(int)AIState.WeaponIsLoaded];
-        bool targetBehindObstacle = states[(int)AIState.TargetBehindObstacle];
-        bool isAiming = states[(int)AIState.IsAiming];
-
-        if (aType == AttackType.FinishTurn) return true;
-
-        switch (aType)
-        {
-            case AttackType.Move:
-            case AttackType.MoveAway:
-                return canMove;
-            case AttackType.Run:
-            case AttackType.RunAway:
-            case AttackType.Retreat:
-                return canMove && canDoAction;
-            case AttackType.Reload:
-                return canDoAction && hasRanged && !isLoaded;
-            case AttackType.ChangeWeaponToMelee:
-                return canDoAction && hasRanged;
-            case AttackType.ChangeWeaponToRanged:
-                return canDoAction && !hasRanged;
-            case AttackType.Aim:
-                return canDoAction && !isAiming;
-            case AttackType.Charge:
-                return canMove && canDoAction && inCharge && !hasRanged;
-            case AttackType.AllOutAttack:
-                return canDoAction && !hasRanged && !beyondAttack;
-            case AttackType.Null:
-                if (!canDoAction || beyondAttack) return false;
-                if (hasRanged) return isLoaded && !targetBehindObstacle;
-                return true;
-            default:
-                return canDoAction;
-        }
-    }
-
-    private bool IsActionValidForUnitAndTarget_Approx(bool[] states, int actionId)
-    {
-        return IsActionValidForUnitAndTarget(null, null, actionId, states);
-    }
-
-    private Unit ResolveTargetFromAction(Unit suggestedTarget, int actionId, TargetsInfo info)
-    {
-        var def = AllActions[actionId];
-        if (def.targetType == TargetType.None) return null;
-        if (suggestedTarget != null) return suggestedTarget;
-        return GetTargetByType(info, def.targetType);
-    }
-
-    private void UpdateQ(string raceName, int oldState, int action, float reward, int newState, bool isTerminal = false)
-    {
-        // Pobieramy tablice Q dla obu stanow
-        float[] qOldStateVals = GetStateQValues(raceName, oldState);
-
-        float oldQ = qOldStateVals[action];
-        float maxQnext = isTerminal ? 0f : GetMaxQNextMasked(raceName, newState);
-
-        float newQ = oldQ + Alpha * (reward + Gamma * maxQnext - oldQ);
-
-        // Zapisujemy nowa wartosc
-        qOldStateVals[action] = newQ;
-    }
-
-    private float GetMaxQNextMasked(string race, int nextStateIndex)
-    {
-        // Sprawdzamy czy stan w ogóle istnieje w pamięci, jeśli nie -> maxQ = 0 (domyślnie)
-        if (!QTables.ContainsKey(race) || !QTables[race].ContainsKey(nextStateIndex))
-        {
-            // Nowy stan, wszystkie Q=0, więc max też 0.
-            // Sprawdzamy tylko poprawność akcji, ale przy Q=0 wynik to 0.
-            return 0f;
-        }
-
-        float[] qNextStateVals = QTables[race][nextStateIndex];
-        bool[] nextStates = DecodeState(nextStateIndex);
-
-        float best = float.MinValue;
-        bool found = false;
-
-        for (int a = 0; a < AllActions.Length; a++)
-        {
-            if (!IsActionValidForUnitAndTarget_Approx(nextStates, a)) continue;
-
-            float v = qNextStateVals[a];
-            if (!found || v > best) { best = v; found = true; }
-        }
-        return found ? best : 0f;
-    }
-
-    // ======================================================================
-    //         PATHFINDING HELPERS (BFS + Manhattan)
-    // ======================================================================
-
-    private int GetManhattanDistance(Vector2 a, Vector2 b)
-    {
-        return Mathf.Abs((int)(a.x - b.x)) + Mathf.Abs((int)(a.y - b.y));
-    }
-
-    private int CalculateQuickPathLength(Vector2 startPos, Vector2 targetPos, int maxSearchDepth)
-    {
-        if (GetManhattanDistance(startPos, targetPos) > maxSearchDepth) return -1;
-        if (GetManhattanDistance(startPos, targetPos) == 1) return 1;
-
-        Queue<Vector2> queue = new Queue<Vector2>();
-        HashSet<Vector2> visited = new HashSet<Vector2>();
-        Dictionary<Vector2, int> depth = new Dictionary<Vector2, int>();
-
-        queue.Enqueue(startPos);
-        visited.Add(startPos);
-        depth[startPos] = 0;
-
-        Vector2[] directions = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
-
-        while (queue.Count > 0)
-        {
-            Vector2 current = queue.Dequeue();
-            int currentDepth = depth[current];
-
-            if (currentDepth >= maxSearchDepth) continue;
-
-            foreach (Vector2 dir in directions)
-            {
-                Vector2 neighbor = current + dir;
-                if (neighbor == targetPos) return currentDepth + 1;
-                if (visited.Contains(neighbor)) continue;
-
-                Collider2D col = Physics2D.OverlapPoint(neighbor);
-                bool isBlocked = false;
-
-                if (col != null)
-                {
-                    if (col.CompareTag("Tile"))
-                    {
-                        var tileComp = col.GetComponent<Tile>();
-                        if (tileComp != null && tileComp.IsOccupied) isBlocked = true;
-                    }
-                    else if (col.GetComponent<Unit>() != null || col.GetComponent<MapElement>() != null)
-                    {
-                        isBlocked = true;
-                    }
-                }
-                else isBlocked = true;
-
-                if (!isBlocked)
-                {
-                    visited.Add(neighbor);
-                    depth[neighbor] = currentDepth + 1;
-                    queue.Enqueue(neighbor);
-                }
-            }
-        }
-        return -1;
-    }
-
-    // ======================================================================
-    //         LOGIKA STANÓW
-    // ======================================================================
-
-    public bool[] DetermineStates(Unit unit, Unit target)
-    {
-        bool[] s = new bool[(int)AIState.COUNT];
-
-        Stats stats = unit.GetComponent<Stats>();
-        Weapon weapon = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-        bool hasRanged = weapon != null && weapon.Type.Contains("ranged");
-
-        s[(int)AIState.CanDoAction] = unit.CanDoAction;
-        s[(int)AIState.CanMove] = unit.CanMove;
-        s[(int)AIState.HasRangedWeapon] = hasRanged;
-        s[(int)AIState.IsHeavilyWounded] = stats.TempHealth <= (stats.MaxHealth * 0.3f);
-        s[(int)AIState.WeaponIsLoaded] = (weapon != null) && weapon.ReloadLeft == 0;
-        s[(int)AIState.IsAiming] = unit.AimingBonus > 0;
-
-        if (target != null)
-        {
-            int manhattanDist = GetManhattanDistance(unit.transform.position, target.transform.position);
-            float distance = CombatManager.Instance.CalculateDistance(unit.gameObject, target.gameObject);
-            float attackRange = weapon != null ? weapon.AttackRange : 1.5f;
-            int attackRangeInt = Mathf.CeilToInt(attackRange);
-            if (!hasRanged) attackRangeInt = 1;
-
-            // Jeśli !HasRanged i !IsBeyondAttackRange -> jesteśmy w melee.
-
-            if (hasRanged)
-                s[(int)AIState.IsBeyondAttackRange] = distance > attackRange || distance <= 1.5f;
-            else
-                s[(int)AIState.IsBeyondAttackRange] = distance > attackRange;
-
-            // Charge Logic
-            int movement = stats.TempSz;
-            float minCharge = movement / 2f;
-            int maxCharge = movement * 2;
-
-            if (manhattanDist >= minCharge && manhattanDist <= maxCharge)
-            {
-                int realPathLength = CalculateQuickPathLength(unit.transform.position, target.transform.position, maxCharge);
-                s[(int)AIState.IsInChargeRange] = (realPathLength != -1 && realPathLength >= minCharge);
-            }
-            else
-            {
-                s[(int)AIState.IsInChargeRange] = false;
-            }
-
-            if (hasRanged)
-            {
-                float distFloat = Vector2.Distance(unit.transform.position, target.transform.position);
-                s[(int)AIState.TargetBehindObstacle] = IsTargetBehindObstacle(unit.gameObject, target.gameObject, distFloat);
-            }
-
-            Stats tStats = target.GetComponent<Stats>();
-            if (tStats != null)
-            {
-                s[(int)AIState.IsTargetHeavilyWounded] = tStats.TempHealth <= (tStats.MaxHealth * 0.3f);
-                s[(int)AIState.IsStrongerThanTarget] = stats.TempHealth * stats.Overall > tStats.TempHealth * tStats.Overall;
-            }
-        }
-
-        return s;
-    }
-
-    public void SimulateUnit(Unit unit)
-    {
-        if (unit == null) return;
-        Stats stats = unit.GetComponent<Stats>();
-        if (stats == null || stats.TempHealth <= 0) return;
-
-        // Rozlicz poprzedni krok
-        if (_lastStepByUnit.TryGetValue(unit, out var prev) && prev.HasValue)
-        {
-            float delayedReward = ComputeDelayedReward(unit, prev);
-
-            Unit targetForNextState = prev.TargetExisted && prev.Target != null ? prev.Target : null;
-            if (targetForNextState == null)
-            {
-                var infoTemp = GatherTargetsInfo(unit);
-                targetForNextState = infoTemp.Closest;
-            }
-
-            bool[] statesNow = DetermineStates(unit, targetForNextState);
-            int stateNowIndex = EncodeState(statesNow);
-
-            float oldQ = GetStateQValues(prev.Race, prev.State)[prev.Action];
-
-            if (!_isEvaluationMode)
-            {
-                UpdateQ(prev.Race, prev.State, prev.Action, delayedReward, stateNowIndex);
-                currentEpochReward += delayedReward;
-                actionsThisEpoch++;
-            }
-
-            float newQ = GetStateQValues(prev.Race, prev.State)[prev.Action];
-
-            _currentEpisodeReward += delayedReward;
-            _currentEpisodeStepCount++;
-            _globalStepIndex++;
-
-            if (Mathf.Abs(delayedReward) < 0.001f)
-            {
-                _noOpStepCount++;
-            }
-
-            LogStepRow("transition", unit, prev, stateNowIndex, delayedReward, oldQ, newQ);
-            _lastStepByUnit[unit] = new LastStep { HasValue = false };
-        }
-
-        TargetsInfo info = GatherTargetsInfo(unit);
-        ActionContext ctx = new ActionContext { Unit = unit, RaceName = stats.Race, Info = info };
-
-        ActionChoice choice = ChooseValidActionEpsilonGreedy(ctx, unit);
-        if (choice.ForcedFallback && (unit.CanDoAction || unit.CanMove))
-        {
-            _invalidActionCount++;
-
-            LastStep fallbackStep = new LastStep
-            {
-                Race = stats.Race,
-                State = EncodeState(choice.ChosenStates),
-                Action = choice.ActionId,
-                ValidActionsCount = choice.ValidActionCount,
-                ForcedFallback = true,
-                HasValue = false
-            };
-
-            LogStepRow("fallback", unit, fallbackStep, fallbackStep.State, 0f, 0f, 0f);
-        }
-
-        int prevSelfHP = stats.TempHealth;
-        int prevTargetHP = 0;
-        int targetOverall = 0;
-        bool targetExisted = (choice.ChosenTarget != null);
-
-        if (targetExisted)
-        {
-            var ts = choice.ChosenTarget.GetComponent<Stats>();
-            if (ts != null) { prevTargetHP = ts.TempHealth; targetOverall = ts.Overall; }
-        }
-
-        float immediateReward = PerformParameterAction(choice.ActionId, unit, choice.ChosenTarget, info, prevSelfHP);
-        immediateReward += StepPenalty;
-
-        _lastStepByUnit[unit] = new LastStep
-        {
-            Race = stats.Race,
-            State = EncodeState(choice.ChosenStates),
-            Action = choice.ActionId,
-            ImmediateReward = immediateReward,
-            Target = choice.ChosenTarget,
-            TargetExisted = targetExisted,
-            PrevSelfHP = prevSelfHP,
-            PrevTargetHP = prevTargetHP,
-            TargetOverall = targetOverall,
-            ValidActionsCount = choice.ValidActionCount,
-            ForcedFallback = choice.ForcedFallback,
-            HasValue = true
-        };
-
-        if (!_isEvaluationMode && actionsThisEpoch >= ActionsPerEpoch)
-        {
-            AdvanceEpoch();
-        }
-
-        UpdateTrainingDebugUI();
-    }
-
-    private void AdvanceEpoch()
-    {
-        float avgReward = currentEpochReward / Mathf.Max(1, actionsThisEpoch);
-        epochRewards.Add(avgReward);
-        Debug.Log($"Epoch {currentEpoch} ended. Avg Reward: {avgReward:F2} | Epsilon: {Epsilon:F3}");
-
-        currentEpochReward = 0f;
-        actionsThisEpoch = 0;
-        currentEpoch++;
-
-        if (currentEpoch < EpsilonDecayEpochs)
-        {
-            float progress = (float)currentEpoch / EpsilonDecayEpochs;
-            Epsilon = Mathf.Lerp(EpsilonStart, EpsilonEnd, progress);
-        }
-        else Epsilon = EpsilonEnd;
-
-        SaveAverageReward(avgReward);
-        if (AutoSaveEveryEpochs > 0 && (currentEpoch % AutoSaveEveryEpochs == 0))
-        {
-            SaveQTables();
-        }
-
-        UpdateTrainingDebugUI();
-    }
-
-    private float ComputeDelayedReward(Unit unit, LastStep ls)
-    {
-        float reward = ls.ImmediateReward;
-        var selfStats = unit.GetComponent<Stats>();
-        if (selfStats == null) return reward;
-
-        int hpDiff = selfStats.TempHealth - ls.PrevSelfHP;
-        if (hpDiff < 0) reward += hpDiff * 2.0f;
-        if (selfStats.TempHealth <= 0) reward += LOSS_REWARD;
-
-        if (ls.TargetExisted)
-        {
-            bool targetDead = false;
-            int currentTargetHP = 0;
-
-            if (ls.Target == null || ls.Target.GetComponent<Stats>() == null) targetDead = true;
-            else
-            {
-                var tStats = ls.Target.GetComponent<Stats>();
-                currentTargetHP = tStats.TempHealth;
-                if (currentTargetHP <= 0) targetDead = true;
-            }
-
-            if (targetDead) reward += 20f + (ls.TargetOverall / 2f);
-            else
-            {
-                int dmgDealt = ls.PrevTargetHP - currentTargetHP;
-                if (dmgDealt > 0) reward += dmgDealt * 1.5f;
-            }
-        }
-        return reward;
-    }
-
-    private float PerformParameterAction(int actionID, Unit unit, Unit chosenTarget, TargetsInfo info, int oldHP)
-    {
-        float reward = 0f;
-        if (actionID < 0 || actionID >= AllActions.Length)
-        {
-            RoundsManager.Instance.FinishTurn();
-            return reward;
-        }
-
-        ActionDefinition def = AllActions[actionID];
-        AttackType aType = def.attackType;
-        TargetType tType = def.targetType;
-
-        Unit target = chosenTarget != null ? chosenTarget : GetTargetByType(info, tType);
-
-        switch (aType)
-        {
-            case AttackType.Move:
-                if (target != null) MoveTowards(unit, target.gameObject);
-                break;
-            case AttackType.Run:
-                if (target != null) MoveTowards(unit, target.gameObject, 3);
-                break;
-            case AttackType.MoveAway:
-                if (target != null)
-                {
-                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-                    if (tile != null) MoveTowards(unit, tile, 1, true);
-                }
-                break;
-            case AttackType.RunAway:
-                if (target != null)
-                {
-                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-                    if (tile != null) MoveTowards(unit, tile, 3, true);
-                }
-                break;
-            case AttackType.Retreat:
-                if (target != null)
-                {
-                    GameObject tile = GetTileFarthestFromTarget(unit.gameObject, target.gameObject);
-                    if (tile != null)
-                    {
-                        MovementManager.Instance.Retreat(true);
-                        MoveTowards(unit, tile, 1, true);
-                    }
-                }
-                break;
-            case AttackType.Aim:
-                CombatManager.Instance.SetAim();
-                return reward;
-            case AttackType.Reload:
-                CombatManager.Instance.Reload();
-                reward += 1f;
-                return reward;
-            case AttackType.ChangeWeaponToMelee:
-                ChangeWeapon(unit, "melee");
-                return reward;
-            case AttackType.ChangeWeaponToRanged:
-                ChangeWeapon(unit, "ranged");
-                return reward;
-            case AttackType.FinishTurn:
-                RoundsManager.Instance.FinishTurn();
-                return reward;
-        }
-
-        string attackName = null;
-        if (aType == AttackType.Charge) attackName = "Charge";
-        else if (aType == AttackType.AllOutAttack) attackName = "AllOutAttack";
-
-        if (aType == AttackType.Null || aType == AttackType.Charge || aType == AttackType.AllOutAttack)
-        {
-            PerformAttack(unit.gameObject, target != null ? target.gameObject : null, attackName);
-        }
-
-        reward += CalculateRewardBasedOnUnitHealth(unit.GetComponent<Stats>(), oldHP);
-        return reward;
-    }
-
-    // --- HELPERS ---
-    private void MoveTowards(Unit unit, GameObject targetObject, int modifier = 1, bool retreat = false)
-    {
-        if (modifier != 1) StartCoroutine(MovementManager.Instance.UpdateMovementRange(modifier));
-        GameObject tile = retreat ? targetObject : CombatManager.Instance.GetTileAdjacentToTarget(unit.gameObject, targetObject);
-        if (tile != null)
-        {
-            MovementManager.Instance.MoveSelectedUnit(tile, unit.gameObject);
-            Physics2D.SyncTransforms();
-        }
-    }
-
-    private void PerformAttack(GameObject attacker, GameObject target, string attackType)
-    {
-        if (attacker == null || target == null) return;
-        var aUnit = attacker.GetComponent<Unit>();
-        var tUnit = target.GetComponent<Unit>();
-        if (attackType != null) CombatManager.Instance.ChangeAttackType(attackType);
-        CombatManager.Instance.Attack(aUnit, tUnit, false);
-    }
-
-    private void ChangeWeapon(Unit unit, string desiredType)
-    {
-        if (unit == null) return;
-        var inv = unit.GetComponent<Inventory>();
-        var unitWeapon = unit.GetComponent<Weapon>();
-        if (inv == null || unitWeapon == null) return;
-
-        Weapon current = InventoryManager.Instance.ChooseWeaponToAttack(unit.gameObject);
-        if (current != null && !current.Broken && current.Type != null && current.Type.Contains(desiredType)) return;
-
-        Weapon candidate = inv.AllWeapons.FirstOrDefault(w => w != null && w.Armor == 0 && !w.Broken && w.Type != null && w.Type.Contains(desiredType));
-        if (candidate == null) return;
-
-        if (inv.EquippedWeapons == null || inv.EquippedWeapons.Length < 2) return;
-        inv.EquippedWeapons[0] = candidate;
-        inv.EquippedWeapons[1] = candidate.TwoHanded ? candidate : inv.EquippedWeapons[1];
-
-        var fields = typeof(Weapon).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-        foreach (var f in fields) f.SetValue(unitWeapon, f.GetValue(candidate));
-        Debug.Log($"{unit.name} dobył/a {candidate.Name}.");
-    }
-
-    private int CalculateRewardBasedOnUnitHealth(Stats stats, int oldAttackerHP)
-    {
-        int reward = 0;
-        int lostHP = oldAttackerHP - stats.TempHealth;
-        if (lostHP > 0) reward -= lostHP;
-        if (stats.TempHealth < 0) reward -= 15;
-        return reward;
-    }
-
-    public void GiveTerminalRewardToAll(bool didAIWin)
-    {
-        float terminal = didAIWin ? WIN_REWARD : LOSS_REWARD;
-
-        foreach (var kv in _lastStepByUnit.ToList())
-        {
-            Unit u = kv.Key;
-            LastStep ls = kv.Value;
-
-            if (!ls.HasValue)
-                continue;
-
-            int nextState = ls.State;
-            float terminalReward;
-
-            if (u == null)
-            {
-                terminalReward = ls.ImmediateReward + terminal;
-            }
-            else
-            {
-                TargetsInfo infoNow = GatherTargetsInfo(u);
-                Unit defaultTargetNow = infoNow != null ? infoNow.Closest : null;
-                bool[] statesNow = DetermineStates(u, defaultTargetNow);
-                nextState = EncodeState(statesNow);
-                terminalReward = ComputeDelayedReward(u, ls) + terminal;
-            }
-
-            float oldQ = GetStateQValues(ls.Race, ls.State)[ls.Action];
-
-            if (!_isEvaluationMode)
-            {
-                UpdateQ(ls.Race, ls.State, ls.Action, terminalReward, nextState, true);
-                currentEpochReward += terminalReward;
-                actionsThisEpoch++;
-            }
-
-            float newQ = GetStateQValues(ls.Race, ls.State)[ls.Action];
-
-            _currentEpisodeReward += terminalReward;
-            _currentEpisodeStepCount++;
-            _globalStepIndex++;
-
-            LogStepRow("terminal", u, ls, nextState, terminalReward, oldQ, newQ);
-        }
-
-        _lastStepByUnit.Clear();
-        UpdateTrainingDebugUI();
-    }
-
-    private Unit GetTargetByType(TargetsInfo info, TargetType t)
-    {
-        switch (t)
-        {
-            case TargetType.Closest: return info.Closest;
-            case TargetType.Furthest: return info.Furthest;
-            case TargetType.MostInjured: return info.MostInjured;
-            case TargetType.LeastInjured: return info.LeastInjured;
-            case TargetType.Weakest: return info.Weakest;
-            case TargetType.Strongest: return info.Strongest;
-            case TargetType.MostAlliesNearby: return info.WithMostAllies;
-            default: return null;
-        }
-    }
-
-    public TargetsInfo GatherTargetsInfo(Unit currentUnit)
-    {
-        TargetsInfo info = new TargetsInfo();
-        foreach (Unit other in UnitsManager.Instance.AllUnits)
-        {
-            if (other == null) continue;
-            var oStats = other.GetComponent<Stats>();
-            if (oStats == null || oStats.TempHealth <= 0) continue;
-            if (!IsValidTarget(currentUnit, other)) continue;
-
-            float dist = Vector2.Distance(currentUnit.transform.position, other.transform.position);
-            info.Distances[other] = dist;
-
-            if (dist < info.ClosestDistance) { info.ClosestDistance = dist; info.Closest = other; }
-            if (dist > info.FurthestDistance) { info.FurthestDistance = dist; info.Furthest = other; }
-
-            float hp = oStats.TempHealth;
-            if (hp < info.MostInjuredHP) { info.MostInjuredHP = hp; info.MostInjured = other; }
-            if (hp > info.LeastInjuredHP) { info.LeastInjuredHP = hp; info.LeastInjured = other; }
-
-            int ov = oStats.Overall;
-            if (ov < info.WeakestOverall) { info.WeakestOverall = ov; info.Weakest = other; }
-            if (ov > info.StrongestOverall) { info.StrongestOverall = ov; info.Strongest = other; }
-
-            int allies = 0, enemies = 0;
-            CountAdjacentUnits(other.transform.position, currentUnit.tag, other.tag, ref allies, ref enemies);
-            int adv = allies - enemies;
-            if (adv > info.WithMostAlliesScore) { info.WithMostAlliesScore = adv; info.WithMostAllies = other; }
-        }
-        return info;
-    }
-
-    private bool IsValidTarget(Unit currentUnit, Unit other)
-    {
-        if (other == null || currentUnit == null) return false;
-        if (other == currentUnit) return false;
-        if (other.CompareTag(currentUnit.tag)) return false;
-        return true;
-    }
-
-    private void CountAdjacentUnits(Vector2 center, string allyTag, string opponentTag, ref int allies, ref int opponents)
-    {
-        Vector2[] offsets = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
-        foreach (var off in offsets)
-        {
-            Collider2D col = Physics2D.OverlapPoint(center + off);
-            if (col == null) continue;
-            if (col.CompareTag(allyTag)) allies++;
-            else if (col.CompareTag(opponentTag)) opponents++;
-        }
-    }
-
-    private bool IsTargetBehindObstacle(GameObject attacker, GameObject target, float dist)
-    {
-        var hits = Physics2D.RaycastAll(attacker.transform.position, target.transform.position - attacker.transform.position, dist);
-        foreach (var h in hits)
-        {
-            if (h.collider.gameObject == attacker || h.collider.gameObject == target) continue;
-            if (h.collider.GetComponent<MapElement>() != null || h.collider.GetComponent<Unit>() != null) return true;
-        }
-        return false;
-    }
-
-    public GameObject GetTileFarthestFromTarget(GameObject attacker, GameObject target)
-    {
-        if (target == null) return null;
-        Vector2 tPos = target.transform.position;
-        Tile bestTile = null;
-        float maxDist = -1f;
-        int moveRange = attacker.GetComponent<Stats>().TempSz;
-        Vector2 aPos = attacker.transform.position;
-
-        foreach (Tile tile in GridManager.Instance.Tiles)
-        {
-            if (tile.IsOccupied) continue;
-            float dToSelf = GetManhattanDistance(aPos, tile.transform.position); // Optymalizacja
-            if (dToSelf > moveRange) continue;
-
-            float dToTarget = Vector2.Distance(tile.transform.position, tPos);
-            if (dToTarget > maxDist)
-            {
-                maxDist = dToTarget;
-                bestTile = tile;
-            }
-        }
-        return bestTile != null ? bestTile.gameObject : null;
-    }
-
-    public bool BothTeamsExist()
-    {
-        if (UnitsManager.Instance == null || UnitsManager.Instance.AllUnits == null)
-        {
-            return false;
-        }
-
-        bool p = false, e = false;
-        foreach (var u in UnitsManager.Instance.AllUnits)
-        {
-            if (u == null) continue;
-
-            Stats stats = u.Stats != null ? u.Stats : u.GetComponent<Stats>();
-            if (stats == null) continue;
-
-            if (u.CompareTag("PlayerUnit") && stats.TempHealth > 0) p = true;
-            if (u.CompareTag("EnemyUnit") && stats.TempHealth > 0) e = true;
-            if (p && e) return true;
-        }
-
-        if (p && !e) _playerWins++;
-        if (!p && e) _enemyWins++;
-        return false;
-    }
-
-    public void ToggleLogs()
-    {
-        var logger = Debug.unityLogger;
-
-        if (logger.filterLogType == LogType.Error)
-        {
-            // Przywróć pełne logi
-            logger.filterLogType = LogType.Log;
-        }
-        else
-        {
-            // Pokazuj tylko błędy i wyjątki
-            logger.filterLogType = LogType.Error;
-        }
-
-        //Debug.unityLogger.logEnabled = !Debug.unityLogger.logEnabled; // To wyłącza wszystkie logi, razem z errorami
-    }
-
-    // ======================================================================
-    // ZAPIS / ODCZYT JSON (SPARSE FORMAT)
-    // ======================================================================
-
-    [System.Serializable]
-    public class QTableStateEntry
-    {
-        public int state;       // Index stanu
-        public float[] values;  // Tablica wartości Q (o długości ACTION_COUNT)
-    }
-
-    [System.Serializable]
-    public class QTableData
-    {
-        public string raceName;
-        public List<QTableStateEntry> entries = new List<QTableStateEntry>();
-    }
-
-    [System.Serializable]
-    public class QTablesContainer
-    {
-        public List<QTableData> tables = new List<QTableData>();
-    }
-
-    public void SaveQTables()
-    {
-        QTablesContainer container = new QTablesContainer();
-
-        foreach (var kvp in QTables)
-        {
-            QTableData data = new QTableData { raceName = kvp.Key };
-
-            // Iterujemy tylko po istniejących stanach w słowniku
-            foreach (var stateKvp in kvp.Value)
-            {
-                data.entries.Add(new QTableStateEntry
-                {
-                    state = stateKvp.Key,
-                    values = stateKvp.Value
-                });
-            }
-            container.tables.Add(data);
-        }
-
-        string json = JsonUtility.ToJson(container, true);
-        File.WriteAllText(Path.Combine(Application.persistentDataPath, "q_tables.json"), json);
-        Debug.Log("QTables saved (Sparse Format).");
-    }
-
-    public void LoadQTables()
-    {
-        string path = Path.Combine(Application.persistentDataPath, "q_tables.json");
-        if (!File.Exists(path)) return;
-
+        if (!UnitsManager.Instance.AllUnits.Any(u => u != null && u.CompareTag("PlayerUnit")) ||
+            !UnitsManager.Instance.AllUnits.Any(u => u != null && u.CompareTag("EnemyUnit")))
+        { StartupFailed("Prepare units on BOTH sides before starting AI training."); yield break; }
+        TextAsset spells = Resources.Load<TextAsset>("spells");
+        if (spells != null) Spells = JsonHelper.FromJson<SpellData>(spells.text).OrderBy(s => s.Name, StringComparer.Ordinal).ToList();
+        Academy academy = Academy.Instance;
+        if (!RandomPolicySmokeTest && (Mode == LearningMode.Training || ExternalPolicy) && !academy.IsCommunicatorOn)
+        { StartupFailed("Python policy is not connected. Start Tools/AI/start-training.ps1 or evaluate.py first. No random fallback was used."); yield break; }
+        if (!RandomPolicySmokeTest && Mode != LearningMode.Training && !ExternalPolicy && Model == null)
+        { StartupFailed("Assign a trained ONNX Model for inference/evaluation, or connect the external evaluator."); yield break; }
+        _previousAutoStep = academy.AutomaticSteppingEnabled; academy.AutomaticSteppingEnabled = false; _ownsAcademy = true;
         try
         {
-            var container = JsonUtility.FromJson<QTablesContainer>(File.ReadAllText(path));
-
-            foreach (var data in container.tables)
+            _snapshot = new TrainingBattleSnapshot();
+            _player = CreateAgent(true); _enemy = CreateAgent(false);
+            _ = CombatObservations.Board(); // Reject unsupported sizes before accepting training data.
+            RunFolder = CommandLine("--ai-output") ?? Path.Combine(Application.persistentDataPath, "ai_training_runs", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff"));
+            RunFolder = Path.Combine(RunFolder, "worker_" + (CommandLine("--mlagents-port") ?? "editor"));
+            Directory.CreateDirectory(RunFolder);
+            File.WriteAllText(Path.Combine(RunFolder, "manifest.json"), JsonUtility.ToJson(new RunManifest {
+                schema = CombatObservations.SchemaHash(), model = Model != null ? Model.name : ModelLabel,
+                mode = Mode.ToString(), opponent = Opponent.ToString(), seed = Seed, shaping = PotentialShaping,
+                vectorSize = CombatObservations.VectorSize, unitSize = CombatObservations.UnitSize,
+                weaponSize = CombatObservations.WeaponSize, effectSize = CombatObservations.EffectSize,
+                spellSize = CombatObservations.SpellSize, scenarios = ScenarioNames, maxRounds = MaxRounds
+                , rules = Resources.Load<TextAsset>("ai_rules_version")?.text ?? "editor-unversioned"
+            }, true));
+            string episodePath = Path.Combine(RunFolder, "episodes.csv");
+            bool append = Mode == LearningMode.Training && File.Exists(episodePath) && new FileInfo(episodePath).Length > 0;
+            if (append)
             {
-                // Tworzymy słownik dla danej rasy
-                Dictionary<int, float[]> raceDict = new Dictionary<int, float[]>();
-
-                foreach (var entry in data.entries)
+                foreach (string line in File.ReadLines(episodePath).Skip(1))
                 {
-                    raceDict[entry.state] = entry.values;
-                }
-
-                QTables[data.raceName] = raceDict;
-                _trainedRaces.Add(data.raceName);
-            }
-            Debug.Log("QTables loaded (Sparse Format).");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Failed to load QTables: " + e.Message);
-        }
-    }
-
-    // ======================================================================
-    //                            EKSPORT WYNIKÓW
-    // ======================================================================
-
-    public void ExportAllData()
-    {
-        string folderPath = Application.persistentDataPath;
-        ExportAllQToCSV(folderPath);
-    }
-
-    public void ExportAllQToCSV(string folderPath)
-    {
-        if (!Directory.Exists(folderPath))
-        {
-            Directory.CreateDirectory(folderPath);
-        }
-
-        foreach (string raceName in QTables.Keys)
-        {
-            string sanitizedRace = raceName.Replace(" ", "_");
-            string fileName = $"Q_{sanitizedRace}.csv";
-            string filePath = Path.Combine(folderPath, fileName);
-
-            ExportQToCSV(raceName, filePath);
-        }
-    }
-
-    public void ExportQToCSV(string raceName, string filePath)
-    {
-        if (!QTables.ContainsKey(raceName)) return;
-
-        var table = QTables[raceName];
-        int numActions = ACTION_COUNT;
-        int numberOfStates = (int)AIState.COUNT;
-
-        using (StreamWriter sw = new StreamWriter(filePath))
-        {
-            List<string> headers = new List<string> { "StateIndex" };
-            for (int i = 0; i < numberOfStates; i++)
-            {
-                headers.Add(((AIState)i).ToString());
-            }
-            headers.Add("ActionIndex");
-            headers.Add("QValue");
-            sw.WriteLine(string.Join(";", headers));
-
-            // Iterujemy tylko po zapisanych stanach
-            foreach (var kvp in table)
-            {
-                int s = kvp.Key;
-                float[] values = kvp.Value;
-
-                List<string> rowValues = new List<string> { s.ToString() };
-                for (int i = 0; i < numberOfStates; i++)
-                {
-                    bool isSet = (s & (1 << i)) != 0;
-                    rowValues.Add(isSet.ToString().ToLower());
-                }
-
-                for (int a = 0; a < numActions; a++)
-                {
-                    // Eksportujemy tylko niezerowe, żeby oszczędzić miejsce w CSV,
-                    // albo wszystkie - tutaj wszystkie dla czytelności wykresów
-                    List<string> actionValues = new List<string>(rowValues)
-                    {
-                        a.ToString(),
-                        values[a].ToString("F2")
-                    };
-                    sw.WriteLine(string.Join(";", actionValues));
+                    string[] row = line.Split(';');
+                    if (row.Length < 11 || !Enum.TryParse(row[5], out BattleResult result)) continue;
+                    CompletedEpisodes++;
+                    if (result == BattleResult.TechnicalAbort) Aborts++;
+                    else if (result == BattleResult.Draw) Draws++;
+                    else if (CombatLearningContract.OutcomeReward(result, row[4] == "Player") > 0) Wins++; else Losses++;
                 }
             }
-        }
-        Debug.Log($"Q-values for race '{raceName}' exported to: {filePath}");
-    }
-
-    // ======================================================================
-    //                        EKSPORT LOGÓW
-    // ======================================================================
-
-    private void SaveAverageReward(float averageReward)
-    {
-        string filePath = Path.Combine(Application.persistentDataPath, "average_rewards.csv");
-        bool fileExists = File.Exists(filePath);
-
-        using (StreamWriter sw = new StreamWriter(filePath, append: true))
-        {
-            if (!fileExists)
+            _episodes = new StreamWriter(episodePath, append) { AutoFlush = true };
+            if (!append) _episodes.WriteLine("episode;mode;scenario;seed;learned_side;result;model;rounds;commands;decisions;seconds;wins;losses;draws;aborts;win_rate;ci_low;ci_high;error");
+            if (TraceCommands)
             {
-                sw.WriteLine("Epoch;AverageReward");
+                _steps = new StreamWriter(Path.Combine(RunFolder, "commands.csv"));
+                _steps.WriteLine("episode;round;unit;race;action;target;x;y");
             }
-            sw.WriteLine($"{epochRewards.Count};{averageReward}");
         }
+        catch (Exception error) { StartupFailed(error.ToString()); yield break; }
+        _wallClock.Start(); _activeMode = Mode; IsSessionActive = true; _starting = false; _stopRequested = false;
+        IsLearning = Mode == LearningMode.Training;
+        if (FastSimulation)
+        { Debug.unityLogger.filterLogType = LogType.Error; QualitySettings.vSyncCount = 0; Application.targetFrameRate = -1; }
+        Debug.LogError("[AI] Experiment started. Metrics: " + RunFolder);
+        yield return ResetEpisode(false);
+        RoundsManager.Instance.NextRound();
+    }
 
-        if (simpleGraph != null)
+    private CombatLearningAgent CreateAgent(bool player)
+    {
+        var go = new GameObject(player ? "AI player team" : "AI enemy team"); go.transform.SetParent(transform); go.SetActive(false);
+        var behavior = go.AddComponent<BehaviorParameters>();
+        behavior.BehaviorName = CombatLearningContract.BehaviorName;
+        behavior.TeamId = Opponent == LearningOpponent.SelfPlay ? (player ? 0 : 1) : 0;
+        behavior.BrainParameters.VectorObservationSize = CombatObservations.VectorSize;
+        behavior.BrainParameters.ActionSpec = ActionSpec.MakeDiscrete(CombatLearningContract.ActionOptions);
+        behavior.DeterministicInference = true;
+        behavior.InferenceDevice = InferenceDevice.Burst;
+        behavior.Model = Model;
+        behavior.BehaviorType = RandomPolicySmokeTest ? BehaviorType.HeuristicOnly :
+            Mode == LearningMode.Training || ExternalPolicy ? BehaviorType.Default : BehaviorType.InferenceOnly;
+        BufferSensorComponent units = Buffer(go, "01_units", CombatLearningContract.MaxUnits, CombatObservations.UnitSize);
+        BufferSensorComponent weapons = Buffer(go, "02_weapons", CombatLearningContract.MaxWeapons, CombatObservations.WeaponSize);
+        BufferSensorComponent effects = Buffer(go, "03_effects", CombatLearningContract.MaxEffects, CombatObservations.EffectSize);
+        BufferSensorComponent spells = Buffer(go, "04_spells", CombatLearningContract.MaxSpells, CombatObservations.SpellSize);
+        var agent = go.AddComponent<CombatLearningAgent>(); agent.MaxStep = 0;
+        agent.Configure(this, player, units, weapons, effects, spells);
+        go.SetActive(true);
+        return agent;
+    }
+
+    private static BufferSensorComponent Buffer(GameObject go, string name, int count, int size)
+    { var sensor = go.AddComponent<BufferSensorComponent>(); sensor.SensorName = name; sensor.MaxNumObservables = count; sensor.ObservableSize = size; return sensor; }
+
+    public bool LearnedPlayerSide => CombatLearningContract.ControlledPlayerSide(ControlledSide, CompletedEpisodes, SwapControlledSide && IsRunningEpisodes);
+    public bool ControlsUnit(Unit unit) => IsSessionActive && unit != null &&
+        (Opponent == LearningOpponent.SelfPlay || unit.CompareTag("PlayerUnit") == LearnedPlayerSide);
+
+    public IEnumerator PlayUnitTurn(Unit unit)
+    {
+        var visited = new HashSet<string>(); int count = 0;
+        InventoryManager.Instance.SelectedHand = unit.AISelectedHand;
+        while (CombatActionRules.CanAct(unit) && (unit.CanDoAction || unit.CanMove))
         {
-            simpleGraph.AddValue(averageReward);
+            if (++count > MaxCommandsPerUnitTurn) { Abort("Unit turn command limit exceeded: " + unit.UnitId); yield break; }
+            CombatLearningAgent agent = unit.CompareTag("PlayerUnit") ? _player : _enemy;
+            visited.Add(CombatActionRules.LoadoutKey(unit));
+            CombatCommand command = null;
+            try { command = agent.Choose(unit, visited); }
+            catch (Exception error) { Abort(error.ToString()); }
+            if (command == null || LastResult == BattleResult.TechnicalAbort) yield break;
+            bool previousAction = unit.CanDoAction, previousMove = unit.CanMove;
+            int previousHp = unit.Stats.TempHealth;
+            Vector3 previousPosition = unit.transform.position;
+            _steps?.WriteLine(string.Join(";", CompletedEpisodes, RoundsManager.RoundNumber, unit.UnitId, unit.Stats.Race,
+                command.Kind, command.Target != null ? command.Target.UnitId : -1,
+                command.Destination != null ? command.Destination.transform.position.x.ToString(CultureInfo.InvariantCulture) : "",
+                command.Destination != null ? command.Destination.transform.position.y.ToString(CultureInfo.InvariantCulture) : ""));
+            IsExecutingCommand = true;
+            yield return CombatActionRules.Execute(unit, command);
+            yield return WaitForResolution();
+            IsExecutingCommand = false;
+            Commands++; _episodeCommands++;
+            if (unit == null || CheckBattleResult() != BattleResult.Ongoing || LastResult == BattleResult.TechnicalAbort) yield break;
+            if (unit.CanDoAction != previousAction || unit.CanMove != previousMove || unit.Stats.TempHealth != previousHp || unit.transform.position != previousPosition)
+                visited.Clear();
         }
+        if (unit != null && !unit.IsTurnFinished) RoundsManager.Instance.FinishTurn(unit, false);
     }
 
-    public void UpdateTeamWins()
+    public IEnumerator WaitForResolution()
     {
-        if (_teamWinsDisplay != null) _teamWinsDisplay.text = $"Player: {_playerWins} Enemy: {_enemyWins}";
+        double start = Time.realtimeSinceStartupAsDouble;
+        do
+        {
+            if (Time.realtimeSinceStartupAsDouble - start > ResolutionTimeoutSeconds)
+            { Abort($"Combat resolution timed out: move={MovementManager.Instance.IsMoving}, attack={CombatManager.Instance.IsAttackSequenceRunning}, turnStart={RoundsManager.Instance.IsResolvingTurnStart}, dice={DiceRollManager.Instance.IsWaitingForRoll}, autoDice={GameManager.IsAutoDiceRollingMode}, paused={GameManager.IsGamePaused}, selected={Unit.SelectedUnit?.name}"); yield break; }
+            yield return null;
+        } while (MovementManager.Instance.IsMoving || CombatManager.Instance.IsAttackSequenceRunning ||
+            AutoCombatManager.Instance.IsActing ||
+            RoundsManager.Instance.IsResolvingTurnStart || DiceRollManager.Instance.IsWaitingForRoll);
+        Physics2D.SyncTransforms();
     }
 
-    private static readonly ActionDefinition[] AllActions = new ActionDefinition[]
+    public BattleResult CheckBattleResult(bool includeRoundLimit = false)
     {
-        // --- MOVE (RUCH) ---
-        new ActionDefinition(TargetType.Closest, AttackType.Move),          // 0: Ruch do najbliższego wroga
-        new ActionDefinition(TargetType.Furthest, AttackType.Move),         // 1: Ruch do najdalszego wroga
-        new ActionDefinition(TargetType.MostInjured, AttackType.Move),      // 2: Ruch do najbardziej rannego wroga
-        new ActionDefinition(TargetType.LeastInjured, AttackType.Move),     // 3: Ruch do najmniej rannego wroga
-        new ActionDefinition(TargetType.Weakest, AttackType.Move),          // 4: Ruch do najsłabszego wroga (statystyki)
-        new ActionDefinition(TargetType.Strongest, AttackType.Move),        // 5: Ruch do najsilniejszego wroga (statystyki)
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Move), // 6: Ruch do wroga, przy którym jest najwięcej sojuszników
+        if (LastResult == BattleResult.TechnicalAbort) return LastResult;
+        bool player = UnitsManager.Instance.AllUnits.Any(u => CombatActionRules.IsPresent(u) && u.CompareTag("PlayerUnit"));
+        bool enemy = UnitsManager.Instance.AllUnits.Any(u => CombatActionRules.IsPresent(u) && u.CompareTag("EnemyUnit"));
+        if (!player && !enemy) return BattleResult.Draw;
+        if (!player) return BattleResult.EnemyWin;
+        if (!enemy) return BattleResult.PlayerWin;
+        return includeRoundLimit && RoundsManager.RoundNumber >= MaxRounds ? BattleResult.Draw : BattleResult.Ongoing;
+    }
 
-        // --- RUN (BIEG) ---
-        new ActionDefinition(TargetType.Closest, AttackType.Run),           // 7: Bieg do najbliższego wroga
-        new ActionDefinition(TargetType.Furthest, AttackType.Run),          // 8: Bieg do najdalszego wroga
-        new ActionDefinition(TargetType.MostInjured, AttackType.Run),       // 9: Bieg do najbardziej rannego wroga
-        new ActionDefinition(TargetType.LeastInjured, AttackType.Run),      // 10: Bieg do najmniej rannego wroga
-        new ActionDefinition(TargetType.Weakest, AttackType.Run),           // 11: Bieg do najsłabszego wroga
-        new ActionDefinition(TargetType.Strongest, AttackType.Run),         // 12: Bieg do najsilniejszego wroga
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Run),  // 13: Bieg do wroga, przy którym jest najwięcej sojuszników
+    public IEnumerator CompleteEpisode()
+    {
+        LastResult = CheckBattleResult(true);
+        bool abort = LastResult == BattleResult.TechnicalAbort;
+        foreach (CombatLearningAgent agent in new[] { _player, _enemy })
+        {
+            if (agent == null) continue;
+            int side = agent.PlayerSide ? 0 : 1;
+            if (!abort && _hasDecision[side])
+            {
+                if (PotentialShaping) agent.AddReward(-_lastPotential[side]); // terminal Phi = 0
+                agent.AddReward(CombatLearningContract.OutcomeReward(LastResult, agent.PlayerSide));
+            }
+            if (abort) agent.EpisodeInterrupted();
+            else { agent.ClearTerminalObservation(); agent.EndEpisode(); }
+        }
+        Academy.Instance.EnvironmentStep();
+        float reward = CombatLearningContract.OutcomeReward(LastResult, LearnedPlayerSide);
+        if (abort) Aborts++; else if (LastResult == BattleResult.Draw) Draws++; else if (reward > 0) Wins++; else Losses++;
+        int games = Wins + Losses + Draws;
+        CombatLearningContract.WilsonInterval(Wins, games, out double lower, out double upper);
+        _episodes.WriteLine(string.Join(";", CompletedEpisodes, Mode, ScenarioNames.Length == 0 ? "current" : ScenarioNames[_scenarioIndex],
+            _episodeSeed, LearnedPlayerSide ? "Player" : "Enemy", LastResult, Model != null ? Model.name : ModelLabel,
+            RoundsManager.RoundNumber, _episodeCommands, PolicyDecisions - _episodeStartDecisions,
+            (_wallClock.Elapsed.TotalSeconds - _episodeStartTime).ToString("F3", CultureInfo.InvariantCulture), Wins, Losses, Draws, Aborts,
+            (games == 0 ? 0 : (double)Wins / games).ToString("F5", CultureInfo.InvariantCulture),
+            lower.ToString("F5", CultureInfo.InvariantCulture), upper.ToString("F5", CultureInfo.InvariantCulture), (_failure ?? "").Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ')));
+        _steps?.Flush(); if (!FastSimulation) simpleGraph?.AddValue(games > 0 ? (float)Wins / games : 0);
+        CompletedEpisodes++;
+        if (_stopRequested || Mode == LearningMode.Inference || EpisodeLimit > 0 && CompletedEpisodes >= EpisodeLimit)
+        {
+            StopSession();
+            if (CommandLine("--ai-mode") != null) Application.Quit(abort ? 2 : 0);
+            yield break;
+        }
+        yield return ResetEpisode(true);
+    }
 
-        // --- STANDARD ATTACK (ZWYKŁY ATAK) ---
-        new ActionDefinition(TargetType.Closest, AttackType.Null),          // 14: Zwykły atak na najbliższego wroga
-        new ActionDefinition(TargetType.Furthest, AttackType.Null),         // 15: Zwykły atak na najdalszego wroga
-        new ActionDefinition(TargetType.MostInjured, AttackType.Null),      // 16: Zwykły atak na najbardziej rannego wroga
-        new ActionDefinition(TargetType.LeastInjured, AttackType.Null),     // 17: Zwykły atak na najmniej rannego wroga
-        new ActionDefinition(TargetType.Weakest, AttackType.Null),          // 18: Zwykły atak na najsłabszego wroga
-        new ActionDefinition(TargetType.Strongest, AttackType.Null),        // 19: Zwykły atak na najsilniejszego wroga
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Null), // 20: Zwykły atak na wroga z przewagą liczebną sojuszników
+    private IEnumerator ResetEpisode(bool next)
+    {
+        IsResetting = true; LastResult = BattleResult.Ongoing; _failure = null;
+        if (next && ScenarioNames.Length > 1 && (!SwapControlledSide || CompletedEpisodes % 2 == 0))
+        {
+            _scenarioIndex = (CompletedEpisodes / (SwapControlledSide ? 2 : 1)) % ScenarioNames.Length;
+            _snapshot.Dispose();
+            SaveAndLoadManager.Instance.SetLoadingType("all"); SaveAndLoadManager.Instance.LoadGame(ScenarioNames[_scenarioIndex]);
+            yield return new WaitUntil(() => !SaveAndLoadManager.Instance.IsLoading);
+            yield return null;
+            _snapshot = new TrainingBattleSnapshot();
+        }
+        _episodeSeed = CombatLearningContract.EpisodeSeed(Seed, CompletedEpisodes, SwapControlledSide);
+        yield return _snapshot.Restore(_episodeSeed, RandomizePositions && IsRunningEpisodes, RandomizeEquipment && IsRunningEpisodes);
+        UnityEngine.Random.InitState(_episodeSeed);
+        _player.SetEpisodeSeed(_episodeSeed); _enemy.SetEpisodeSeed(unchecked(_episodeSeed + 101));
+        _initialPlayerHealth = Health(true); _initialEnemyHealth = Health(false);
+        _lastPotential[0] = _lastPotential[1] = 0; _hasDecision[0] = _hasDecision[1] = false;
+        _episodeCommands = 0; _episodeStartDecisions = PolicyDecisions; _episodeStartTime = _wallClock.Elapsed.TotalSeconds;
+        IsResetting = false;
+    }
 
-        // --- CHARGE (SZARŻA) ---
-        new ActionDefinition(TargetType.Closest, AttackType.Charge),          // 21: Szarża na najbliższego wroga
-        new ActionDefinition(TargetType.Furthest, AttackType.Charge),         // 22: Szarża na najdalszego wroga
-        new ActionDefinition(TargetType.MostInjured, AttackType.Charge),      // 23: Szarża na najbardziej rannego wroga
-        new ActionDefinition(TargetType.LeastInjured, AttackType.Charge),     // 24: Szarża na najmniej rannego wroga
-        new ActionDefinition(TargetType.Weakest, AttackType.Charge),          // 25: Szarża na najsłabszego wroga
-        new ActionDefinition(TargetType.Strongest, AttackType.Charge),        // 26: Szarża na najsilniejszego wroga
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.Charge), // 27: Szarża na wroga z przewagą liczebną sojuszników
+    private static float Health(bool player) => UnitsManager.Instance.AllUnits.Where(u => u != null && u.CompareTag("PlayerUnit") == player)
+        .Sum(u => Mathf.Max(0, u.Stats.TempHealth));
+    private float Potential(bool player)
+    {
+        float value = Health(true) / Mathf.Max(1, _initialPlayerHealth) - Health(false) / Mathf.Max(1, _initialEnemyHealth);
+        return player ? value : -value;
+    }
 
-        // --- ALL OUT ATTACK (SZALEŃCZY ATAK) ---
-        new ActionDefinition(TargetType.Closest, AttackType.AllOutAttack),          // 28: Szaleńczy atak na najbliższego wroga
-        new ActionDefinition(TargetType.Furthest, AttackType.AllOutAttack),         // 29: Szaleńczy atak na najdalszego wroga
-        new ActionDefinition(TargetType.MostInjured, AttackType.AllOutAttack),      // 30: Szaleńczy atak na najbardziej rannego wroga
-        new ActionDefinition(TargetType.LeastInjured, AttackType.AllOutAttack),     // 31: Szaleńczy atak na najmniej rannego wroga
-        new ActionDefinition(TargetType.Weakest, AttackType.AllOutAttack),          // 32: Szaleńczy atak na najsłabszego wroga
-        new ActionDefinition(TargetType.Strongest, AttackType.AllOutAttack),        // 33: Szaleńczy atak na najsilniejszego wroga
-        new ActionDefinition(TargetType.MostAlliesNearby, AttackType.AllOutAttack), // 34: Szaleńczy atak na wroga z przewagą liczebną sojuszników
+    public void Abort(string reason) { _failure = reason; LastResult = BattleResult.TechnicalAbort; Debug.LogError("[AI] " + reason); }
+    public void RecordPolicyDecision() { PolicyDecisions++; }
+    public void PrepareTeamDecision(Unit unit)
+    {
+        int side = unit.CompareTag("PlayerUnit") ? 0 : 1;
+        CombatLearningAgent agent = side == 0 ? _player : _enemy;
+        if (PotentialShaping && _hasDecision[side]) agent.AddReward(Potential(side == 0) - _lastPotential[side]);
+        _lastPotential[side] = Potential(side == 0); _hasDecision[side] = true;
+    }
+    public int ChooseReaction(Unit unit, int phase, int[] choices)
+    {
+        try { return (unit.CompareTag("PlayerUnit") ? _player : _enemy).ChooseReaction(unit, phase, choices); }
+        catch (Exception error) { Abort(error.ToString()); return choices[0]; }
+    }
+    public void RequestStop() { _stopRequested = true; }
+    private void StartupFailed(string reason) { Debug.LogError("[AI] " + reason); _starting = false; StopSession(); if (CommandLine("--ai-mode") != null) Application.Quit(2); }
 
-        // --- SPECIAL / UTILITY (SPECJALNE / UŻYTKOWE) ---
-        new ActionDefinition(TargetType.None, AttackType.Aim),                  // 35: Przycelowanie (bonus do trafienia)
-        new ActionDefinition(TargetType.None, AttackType.Reload),               // 36: Przeładowanie broni
-        new ActionDefinition(TargetType.Closest, AttackType.MoveAway),          // 37: Odejście od najbliższego wroga (zwykły ruch)
-        new ActionDefinition(TargetType.Closest, AttackType.RunAway),           // 38: Ucieczka biegiem od najbliższego wroga
-        new ActionDefinition(TargetType.Closest, AttackType.Retreat),           // 39: Bezpieczny odwrót od najbliższego wroga
-        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToMelee),  // 40: Zmiana broni na białą (melee)
-        new ActionDefinition(TargetType.None, AttackType.ChangeWeaponToRanged), // 41: Zmiana broni na dystansową (ranged)
-        new ActionDefinition(TargetType.None, AttackType.FinishTurn),           // 42: Zakończenie tury (czekanie)
-    };
+    [ContextMenu("AI/Stop experiment")]
+    public void StopSession()
+    {
+        if (!_settingsCaptured && !IsSessionActive) { Mode = _activeMode = LearningMode.Disabled; return; }
+        _episodes?.Dispose(); _episodes = null; _steps?.Dispose(); _steps = null;
+        _snapshot?.Dispose(); _snapshot = null;
+        if (_player != null) Destroy(_player.gameObject); if (_enemy != null) Destroy(_enemy.gameObject);
+        if (_ownsAcademy && Academy.IsInitialized) Academy.Instance.AutomaticSteppingEnabled = _previousAutoStep;
+        _ownsAcademy = false;
+        GameManager.IsAutoDiceRollingMode = _previousDice; GameManager.IsAutoCombatMode = _previousAutoCombat;
+        GameManager.IsAutoDefenseMode = _previousDefense;
+        GameManager.IsAutoKillMode = _previousKill; GameManager.IsStatsHidingMode = _previousStatsHiding;
+        Debug.unityLogger.filterLogType = _previousLogType;
+        Application.targetFrameRate = _previousFrameRate; QualitySettings.vSyncCount = _previousVSync;
+        _settingsCaptured = false;
+        IsSessionActive = false; IsLearning = false; IsExecutingCommand = false;
+        Mode = _activeMode = LearningMode.Disabled;
+    }
+    private void OnApplicationQuit() { _episodes?.Dispose(); _steps?.Dispose(); }
+    private void OnDestroy() { Application.logMessageReceived -= CaptureRuntimeException; if (IsSessionActive) StopSession(); if (Instance == this) Instance = null; }
+
+    private void UpdateTrainingUI()
+    {
+        int games = Wins + Losses + Draws;
+        CombatLearningContract.WilsonInterval(Wins, games, out double lower, out double upper);
+        string text = $"{Mode} | {(RandomPolicySmokeTest ? "RANDOM SMOKE TEST" : Opponent.ToString())}\n" +
+            $"Episodes: {CompletedEpisodes}  W/L/D: {Wins}/{Losses}/{Draws}  Aborts: {Aborts}\n" +
+            $"Win rate: {(games > 0 ? 100f * Wins / games : 0):F1}%  CI95: {lower:P0}–{upper:P0}\n" +
+            $"Decisions: {PolicyDecisions} ({PolicyDecisions / Math.Max(1, _wallClock.Elapsed.TotalSeconds):F1}/s)  Commands: {Commands}";
+        if (_trainingDebugDisplay != null) _trainingDebugDisplay.text = text;
+        if (_teamWinsDisplay != null) _teamWinsDisplay.text = $"Learned AI {Wins} | AutoCombat {Losses} | Draw {Draws}";
+    }
+
+    public void ToggleLogs() { Debug.unityLogger.filterLogType = Debug.unityLogger.filterLogType == LogType.Error ? LogType.Log : LogType.Error; }
+    public void SaveQTables() { _episodes?.Flush(); _steps?.Flush(); Debug.Log("[AI] PPO checkpoints and ONNX are saved by the Python trainer, not as Q tables."); }
+    public void LoadQTables() { Debug.LogWarning("[AI] Legacy Q tables are incompatible. Assign a V1 ONNX model instead."); }
+    public void ExportAllData() { SaveQTables(); Debug.Log("[AI] CSV metrics: " + RunFolder); }
+
+    public static string CommandLine(string option)
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith(option + "=", StringComparison.Ordinal)) return args[i].Substring(option.Length + 1);
+            if (args[i] == option && i + 1 < args.Length) return args[i + 1];
+        }
+        return null;
+    }
+    private void ApplyCommandLine()
+    {
+        if (Enum.TryParse(CommandLine("--ai-mode"), true, out LearningMode mode)) Mode = mode;
+        if (int.TryParse(CommandLine("--ai-seed"), out int seed)) Seed = seed;
+        if (int.TryParse(CommandLine("--ai-episodes"), out int episodes)) EpisodeLimit = episodes;
+        if (int.TryParse(CommandLine("--ai-max-rounds"), out int rounds)) MaxRounds = Mathf.Max(1, rounds);
+        if (CommandLine("--ai-scenarios") != null) ScenarioNames = CommandLine("--ai-scenarios").Split(',');
+        if (bool.TryParse(CommandLine("--ai-fast"), out bool fast)) FastSimulation = fast;
+        ExternalPolicy = CommandLine("--ai-external-policy") == "true";
+        RandomPolicySmokeTest |= CommandLine("--ai-random-policy") == "true";
+        TraceCommands |= CommandLine("--ai-trace") == "true";
+        if (CommandLine("--ai-opponent") == "SelfPlay") Opponent = LearningOpponent.SelfPlay;
+        if (CommandLine("--ai-model-label") != null) ModelLabel = CommandLine("--ai-model-label");
+        if (Mode == LearningMode.Evaluation) { Seed = int.TryParse(CommandLine("--ai-seed"), out seed) ? seed : 87654321; PotentialShaping = false; }
+        if (Mode == LearningMode.Training && int.TryParse(CommandLine("--mlagents-port"), out int port)) Seed = unchecked(Seed + port * 9973);
+    }
+
+    [Serializable] private sealed class RunManifest
+    {
+        public int contractVersion = CombatLearningContract.Version;
+        public string schema, rules, model, mode, opponent;
+        public int seed, vectorSize, unitSize, weaponSize, effectSize, spellSize, maxRounds;
+        public bool shaping;
+        public string[] scenarios;
+    }
 }
-
-
-
-
-
-
-

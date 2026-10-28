@@ -100,6 +100,8 @@ public class StatesManager : MonoBehaviour
             && (ReinforcementLearningManager.Instance == null || !ReinforcementLearningManager.Instance.IsLearning);
 
         _attemptExtinguish = !manualDecision;
+        if (ReinforcementLearningManager.Instance != null && ReinforcementLearningManager.Instance.ControlsUnit(unit))
+            _attemptExtinguish = ReinforcementLearningManager.Instance.ChooseReaction(unit, 5, new[] { 0, 1 }) == 1;
         if (manualDecision)
         {
             if (_extinguishPanel == null)
